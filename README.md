@@ -23,6 +23,13 @@ pnpm build
 pnpm start
 ```
 
+## Sniffer & CLI
+- Démarrer avec logs détaillés (PowerShell):
+  ```powershell
+  $env:LOG_LEVEL="debug"; pnpm start
+  ```
+- CLI et commandes documentées dans `docs/CLI.md`.
+
 ## Configuration
 - Fichier: `config.yaml` (exemple: `config.example.yaml`).
 - `LOG_LEVEL` peut être `error|warn|info|debug|trace`. 

@@ -5,16 +5,17 @@
 ## Backlog
 - [ ] ConfigLoader: lecture YAML + hot reload (YAML + chokidar)
 - [ ] Logger: niveaux error/warn/info/debug/trace + couleurs
-- [ ] Router: pages, mapping `control -> (app, action, params)`
 - [ ] Drivers: Voicemeeter / QLC+ / OBS (APIs respectives)
-- [ ] Sniffer MIDI: mode debug pour inventorier tous les contrôles X-Touch
 - [ ] Tests de latence et perf (< 20 ms)
 - [ ] CI basique (lint, build)
+- [ ] Sniffer: export logs (JSON/CSV) et options de filtrage
+- [ ] Outil de capture: générer un mapping YAML à partir des logs sniffés
 
 ## En cours
-- [ ] (rien pour le moment)
+- [ ] Router: pages, mapping `control -> (app, action, params)`
 
 ## Fait
+- [x] Sniffer MIDI natif (CLI: midi-ports, midi-open <idx|name>, midi-close)
 - [x] Création du système de gestion de projet (`TASKS.md`, `MEMORY.md`)
 - [x] Ajout d’un squelette Node.js + TypeScript
 - [x] Initialisation du projet (structure, scripts pnpm, TypeScript) 

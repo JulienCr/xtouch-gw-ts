@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>XTouch GW – Web MIDI Sniffer</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; background: #0b0f14; color: #e5e7eb; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    .controls { margin-bottom: 12px; }
+    select, button { background: #111827; color: #e5e7eb; border: 1px solid #374151; padding: 6px 8px; border-radius: 6px; }
+    pre { background: #0f172a; color: #e5e7eb; border: 1px solid #1f2937; padding: 10px; border-radius: 6px; max-height: 60vh; overflow: auto; }
+    .ok { color: #34d399; }
+    .warn { color: #fbbf24; }
+    .err { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1>Web MIDI Sniffer</h1>
+  <div id="status" class="warn">Initialisation…</div>
+
+  <div class="controls">
+    <label>Entrée MIDI:
+      <select id="inputs"></select>
+    </label>
+    <button id="refresh">Rafraîchir</button>
+    <button id="start">Start</button>
+    <button id="stop">Stop</button>
+  </div>
+
+  <pre id="log"></pre>
+
+  <script>
+    const status = document.getElementById('status');
+    const inputs = document.getElementById('inputs');
+    const logEl = document.getElementById('log');
+    const refreshBtn = document.getElementById('refresh');
+    const startBtn = document.getElementById('start');
+    const stopBtn = document.getElementById('stop');
+
+    let access = null;
+    let input = null;
+    let lastTs = performance.now();
+
+    function line(s) {
+      logEl.textContent += s + "\n";
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function hex(bytes) {
+      return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+    }
+
+    async function init() {
+      if (!navigator.requestMIDIAccess) {
+        status.className = 'err';
+        status.textContent = 'Web MIDI non supporté par ce navigateur.';
+        return;
+      }
+      try {
+        access = await navigator.requestMIDIAccess({ sysex: true });
+        status.className = 'ok';
+        status.textContent = 'Accès Web MIDI OK';
+        await refresh();
+      } catch (e) {
+        status.className = 'err';
+        status.textContent = 'Échec accès Web MIDI: ' + e;
+      }
+    }
+
+    async function refresh() {
+      inputs.innerHTML = '';
+      for (const inp of access.inputs.values()) {
+        const opt = document.createElement('option');
+        opt.value = inp.id;
+        opt.textContent = `${inp.name} [${inp.manufacturer||'unknown'}]`;
+        inputs.appendChild(opt);
+      }
+      line('Ports listés.');
+    }
+
+    function onMidiMessage(ev) {
+      const now = performance.now();
+      const delta = (now - lastTs) / 1000;
+      lastTs = now;
+      const data = new Uint8Array(ev.data);
+      line(`${new Date().toISOString()} [Δ=${delta.toFixed(3)}s] ${hex(data)}`);
+    }
+
+    function start() {
+      stop();
+      const id = inputs.value;
+      for (const inp of access.inputs.values()) {
+        if (inp.id === id) {
+          input = inp;
+          input.addEventListener('midimessage', onMidiMessage);
+          line('Sniffer démarré.');
+          return;
+        }
+      }
+      line('Entrée introuvable.');
+    }
+
+    function stop() {
+      if (input) {
+        input.removeEventListener('midimessage', onMidiMessage);
+        input = null;
+        line('Sniffer stoppé.');
+      }
+    }
+
+    refreshBtn.addEventListener('click', refresh);
+    startBtn.addEventListener('click', start);
+    stopBtn.addEventListener('click', stop);
+
+    init();
+  </script>
+</body>
+</html>
