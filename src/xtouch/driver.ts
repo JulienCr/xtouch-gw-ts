@@ -26,6 +26,17 @@ function findPortIndexByNameFragment<T extends Input | Output>(
   return null;
 }
 
+function ascii7(text: string, length = 7): number[] {
+  const padded = (text ?? "").padEnd(length).slice(0, length);
+  const bytes: number[] = [];
+  for (let i = 0; i < padded.length; i += 1) {
+    const code = padded.charCodeAt(i);
+    // Conserver ASCII imprimable, sinon espace
+    bytes.push(code >= 0x20 && code <= 0x7e ? code : 0x20);
+  }
+  return bytes;
+}
+
 export class XTouchDriver {
   private input: Input | null = null;
   private output: Output | null = null;
@@ -109,6 +120,27 @@ export class XTouchDriver {
     const lsb = v & 0x7F;
     const msb = (v >> 7) & 0x7F;
     this.output.sendMessage([status, lsb, msb]);
+  }
+
+  // MCU LCD text: F0 00 00 66 14 12 pos <7 bytes> F7
+  sendLcdStripText(stripIndex0to7: number, upper: string, lower = ""): void {
+    if (!this.output) return;
+    const strip = Math.max(0, Math.min(7, Math.floor(stripIndex0to7)));
+    const up = ascii7(upper, 7);
+    const lo = ascii7(lower, 7);
+    const header = [0xF0, 0x00, 0x00, 0x66, 0x14, 0x12];
+    const posTop = 0x00 + strip * 7;
+    const posBot = 0x38 + strip * 7;
+    this.output.sendMessage([...header, posTop, ...up, 0xF7]);
+    this.output.sendMessage([...header, posBot, ...lo, 0xF7]);
+  }
+
+  // MCU LCD colors (firmware >= 1.22): F0 00 00 66 14 72 <8 bytes colors> F7
+  setLcdColors(colors: number[]): void {
+    if (!this.output) return;
+    const payload = colors.slice(0, 8);
+    while (payload.length < 8) payload.push(0);
+    this.output.sendMessage([0xF0, 0x00, 0x00, 0x66, 0x14, 0x72, ...payload, 0xF7]);
   }
 
   stop(): void {

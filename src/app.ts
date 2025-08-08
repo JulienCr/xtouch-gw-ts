@@ -62,6 +62,10 @@ export async function startApp(): Promise<() => void> {
     }, { echoPitchBend: true });
     xtouch.start();
 
+    const x = xtouch as import("./xtouch/driver").XTouchDriver; // non-null après start
+    // Afficher la page active au démarrage
+    x.sendLcdStripText(0, router.getActivePageName());
+
     const paging: Required<PagingConfig> = {
       channel: cfg.paging?.channel ?? 1,
       prev_note: cfg.paging?.prev_note ?? 46,
@@ -80,6 +84,8 @@ export async function startApp(): Promise<() => void> {
           if (note === paging.prev_note) router.prevPage();
           if (note === paging.next_note) router.nextPage();
           const page = router.getActivePage();
+          // Update LCD avec le nom de la page
+          x.sendLcdStripText(0, page?.name ?? "");
           // (Re)créer le bridge de page si besoin
           if (page?.passthrough) {
             pageBridge?.shutdown();
@@ -175,7 +181,7 @@ export async function startApp(): Promise<() => void> {
 
   // CLI de développement
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'help', 'exit'");
+  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'lcd <strip0-7> <upper> [lower]', 'help', 'exit'");
   rl.setPrompt("app> ");
   rl.prompt();
 
@@ -283,6 +289,22 @@ export async function startApp(): Promise<() => void> {
           }
           xtouch.setFader14(ch, v);
           logger.info(`Fader ${ch} ← ${v}`);
+          break;
+        }
+        case "lcd": {
+          const strip = Number(rest[0]);
+          const upper = rest[1];
+          const lower = rest.slice(2).join(" ") || "";
+          if (!Number.isFinite(strip) || !upper) {
+            logger.warn("Usage: lcd <strip0-7> <upper> [lower]");
+            break;
+          }
+          if (!xtouch) {
+            logger.warn("X-Touch non connecté");
+            break;
+          }
+          xtouch.sendLcdStripText(strip, upper, lower);
+          logger.info(`LCD[${strip}] ← '${upper}' | '${lower}'`);
           break;
         }
         case "help":
