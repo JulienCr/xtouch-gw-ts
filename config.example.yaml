@@ -1,0 +1,15 @@
+midi:
+  input_port: "UM-One"
+  output_port: "UM-One"
+
+pages:
+  - name: "Voicemeeter Main"
+    controls:
+      fader1: { app: "voicemeeter", action: "setBusVolume", params: ["A1"] }
+      fader2: { app: "qlc", action: "setChannelValue", params: [5] }
+      rotary1: { app: "obs", action: "setVolume", params: ["Mic/Aux"] }
+
+  - name: "QLC Scene Control"
+    controls:
+      button1: { app: "qlc", action: "triggerCue", params: ["Scene1"] }
+      button2: { app: "qlc", action: "triggerCue", params: ["Scene2"] } 

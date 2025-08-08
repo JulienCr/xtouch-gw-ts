@@ -1,0 +1,7 @@
+midi:
+  input_port: "UM-One"
+  output_port: "UM-One"
+
+pages:
+  - name: "Default"
+    controls: {} 
