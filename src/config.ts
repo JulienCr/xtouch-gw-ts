@@ -3,15 +3,29 @@ import path from "path";
 import YAML from "yaml";
 import chokidar from "chokidar";
 
+export interface PagingConfig {
+  channel?: number; // défaut 1
+  prev_note?: number; // défaut 46
+  next_note?: number; // défaut 47
+}
+
+export interface PageConfig {
+  name: string;
+  passthrough?: {
+    driver: string; // "midi" | "voicemeeter" | etc.
+    to_port: string; // vers appli cible (ex: "xtouch-gw")
+    from_port: string; // feedback depuis appli (ex: "xtouch-gw-feedback")
+  };
+  controls: Record<string, unknown>;
+}
+
 export interface AppConfig {
   midi: {
     input_port: string;
     output_port: string;
   };
-  pages: Array<{
-    name: string;
-    controls: Record<string, unknown>;
-  }>;
+  paging?: PagingConfig;
+  pages: Array<PageConfig>;
 }
 
 const DEFAULT_PATHS = ["config.yaml", path.join("config", "config.yaml")];

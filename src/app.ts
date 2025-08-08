@@ -8,6 +8,9 @@ import { QlcDriver } from "./drivers/qlc";
 import { ObsDriver } from "./drivers/obs";
 import { MidiInputSniffer, listInputPorts } from "./midi/sniffer";
 import { formatDecoded } from "./midi/decoder";
+import { XTouchDriver } from "./xtouch/driver";
+import { MidiBridgeDriver } from "./drivers/midiBridge";
+import type { PagingConfig } from "./config";
 
 function toHex(bytes: number[]): string {
   return bytes.map((b) => b.toString(16).padStart(2, "0")).join(" ");
@@ -27,7 +30,7 @@ export async function startApp(): Promise<() => void> {
   const router = new Router(cfg);
 
   // Enregistrer et initialiser les drivers
-  const drivers = [new ConsoleDriver(), new VoicemeeterDriver(), new QlcDriver(), new ObsDriver()];
+  const drivers = [new ConsoleDriver(), new QlcDriver(), new ObsDriver()];
   for (const d of drivers) {
     router.registerDriver(d.name, d);
     await d.init();
@@ -46,6 +49,79 @@ export async function startApp(): Promise<() => void> {
   // Sélection page par défaut
   if (cfg.pages.length > 0) {
     router.setActivePage(0);
+  }
+
+  // X-Touch: ouvrir les ports définis dans config.yaml
+  let xtouch: XTouchDriver | null = null;
+  let vmBridge: VoicemeeterDriver | null = null;
+  let pageBridge: MidiBridgeDriver | null = null;
+  try {
+    xtouch = new XTouchDriver({
+      inputName: cfg.midi.input_port,
+      outputName: cfg.midi.output_port,
+    }, { echoPitchBend: true });
+    xtouch.start();
+
+    const paging: Required<PagingConfig> = {
+      channel: cfg.paging?.channel ?? 1,
+      prev_note: cfg.paging?.prev_note ?? 46,
+      next_note: cfg.paging?.next_note ?? 47,
+    } as any;
+
+    // Navigation de pages via NoteOn
+    const unsubNav = xtouch.subscribe((_delta, data) => {
+      const status = data[0] ?? 0;
+      const type = (status & 0xf0) >> 4;
+      const ch = (status & 0x0f) + 1;
+      if (type === 0x9 && ch === paging.channel) {
+        const note = data[1] ?? 0;
+        const vel = data[2] ?? 0;
+        if (vel > 0) {
+          if (note === paging.prev_note) router.prevPage();
+          if (note === paging.next_note) router.nextPage();
+          const page = router.getActivePage();
+          // (Re)créer le bridge de page si besoin
+          if (page?.passthrough) {
+            pageBridge?.shutdown();
+            pageBridge = new MidiBridgeDriver(
+              xtouch!,
+              page.passthrough.to_port,
+              page.passthrough.from_port
+            );
+            pageBridge.init().catch((err) => logger.warn("Bridge page init error:", err as any));
+          } else {
+            pageBridge?.shutdown();
+            pageBridge = null;
+          }
+        }
+      }
+    });
+
+    // Si aucune page ne définit de passthrough, activer le bridge global vers Voicemeeter
+    const hasPagePassthrough = (cfg.pages ?? []).some((p) => !!p.passthrough);
+    if (!hasPagePassthrough) {
+      vmBridge = new VoicemeeterDriver(xtouch, {
+        toVoicemeeterOutName: "xtouch-gw",
+        fromVoicemeeterInName: "xtouch-gw-feedback",
+      });
+      await vmBridge.init();
+      logger.info("Mode bridge global Voicemeeter actif (aucun passthrough par page détecté).");
+    } else {
+      logger.info("Mode passthrough par page actif (bridge global désactivé).");
+    }
+
+    // Initialiser bridge pour page active si défini
+    const initialPage = router.getActivePage();
+    if (initialPage?.passthrough) {
+      pageBridge = new MidiBridgeDriver(
+        xtouch!,
+        initialPage.passthrough.to_port,
+        initialPage.passthrough.from_port
+      );
+      await pageBridge.init();
+    }
+  } catch (err) {
+    logger.warn("X-Touch/Voicemeeter non connecté:", (err as any)?.message ?? err);
   }
 
   // MIDI Sniffer
@@ -99,7 +175,7 @@ export async function startApp(): Promise<() => void> {
 
   // CLI de développement
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'help', 'exit'");
+  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'help', 'exit'");
   rl.setPrompt("app> ");
   rl.prompt();
 
@@ -154,6 +230,32 @@ export async function startApp(): Promise<() => void> {
           midiSniffer?.close();
           break;
         }
+        case "xtouch-stop": {
+          if (!xtouch) {
+            logger.info("X-Touch déjà stoppé.");
+            break;
+          }
+          xtouch.stop();
+          xtouch = null;
+          logger.info("X-Touch stoppé (ports libérés). Vous pouvez utiliser 'midi-open'.");
+          break;
+        }
+        case "xtouch-start": {
+          if (xtouch) {
+            logger.info("X-Touch déjà démarré.");
+            break;
+          }
+          try {
+            xtouch = new XTouchDriver({
+              inputName: cfg.midi.input_port,
+              outputName: cfg.midi.output_port,
+            });
+            xtouch.start();
+          } catch (err) {
+            logger.error("Impossible de démarrer X-Touch:", err as any);
+          }
+          break;
+        }
         case "learn": {
           const id = rest.join(" ");
           if (!id) {
@@ -168,8 +270,23 @@ export async function startApp(): Promise<() => void> {
           logger.info(`Learn armé pour '${id}'. Touchez un contrôle sur la X-Touch…`);
           break;
         }
+        case "fader": {
+          const ch = Number(rest[0]);
+          const v = Number(rest[1]);
+          if (!Number.isFinite(ch) || !Number.isFinite(v)) {
+            logger.warn("Usage: fader <ch> <0..16383>");
+            break;
+          }
+          if (!xtouch) {
+            logger.warn("X-Touch non connecté (vérifiez config.yaml et le câblage)");
+            break;
+          }
+          xtouch.setFader14(ch, v);
+          logger.info(`Fader ${ch} ← ${v}`);
+          break;
+        }
         case "help":
-          logger.info("help: page <idx|name> | pages | emit <controlId> [value] | midi-ports | midi-open <idx|name> | midi-close | learn <id> | exit");
+          logger.info("help: page <idx|name> | pages | emit <controlId> [value] | midi-ports | midi-open <idx|name> | midi-close | learn <id> | fader <ch> <0..16383> | exit");
           break;
         case "exit":
           rl.close();
@@ -194,6 +311,9 @@ export async function startApp(): Promise<() => void> {
     logger.info("Arrêt XTouch GW");
     stopWatch();
     midiSniffer?.close();
+    pageBridge?.shutdown();
+    vmBridge?.shutdown();
+    xtouch?.stop();
     process.exit(0);
   });
 

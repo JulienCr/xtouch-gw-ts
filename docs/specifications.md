@@ -331,3 +331,53 @@ Un mode debug permettra de :
 * Activé par `LOG_LEVEL=debug` ou via un flag CLI (`--sniff`).
 * Utile au démarrage du projet pour documenter tous les contrôles.
 * Peut aussi servir en production pour diagnostic en cas de problème de mapping.
+
+---
+
+## 10. Paging & Passthrough par page
+
+### 10.1 Schéma de configuration
+
+```yaml
+midi:
+  input_port: "UM-One"           # Ports de la surface X-Touch
+  output_port: "UM-One"
+
+paging:
+  channel: 1                      # Canal MIDI écouté pour la navigation (défaut: 1)
+  prev_note: 46                   # NoteOn pour page précédente (défaut: 46)
+  next_note: 47                   # NoteOn pour page suivante (défaut: 47)
+
+pages:
+  - name: "Voicemeeter Main"
+    passthrough:                  # Active un pont MIDI spécifique pour cette page
+      driver: "midi"             # Type de bridge (actuellement générique MIDI)
+      to_port: "xtouch-gw"       # Port vers l’application cible (ex: Voicemeeter IN)
+      from_port: "xtouch-gw-feedback" # Port de feedback depuis l’application cible
+    controls: {}
+
+  - name: "QLC+"
+    passthrough:
+      driver: "midi"
+      to_port: "qlc-in"
+      from_port: "qlc-out"
+    controls: {}
+```
+
+### 10.2 Comportement
+- Si au moins une page définit un bloc `passthrough`, le **mode passthrough par page** est actif.
+  - À chaque changement de page via `NoteOn (channel = paging.channel)`:
+    - `prev_note` → page précédente
+    - `next_note` → page suivante
+  - Le pont MIDI de la page active est (ré)ouvert: `to_port` ⇄ `from_port`.
+  - Les messages X‑Touch → `to_port` (appli) et le feedback `from_port` → X‑Touch.
+- Si aucune page n’a `passthrough`, le **bridge global Voicemeeter** est activé automatiquement (ports `xtouch-gw`/`xtouch-gw-feedback`).
+
+### 10.3 Note sur les faders motorisés
+- Le driver `XTouchDriver` peut émettre un **écho local PitchBend** pour stabiliser les faders en l’absence de feedback applicatif (option interne `echoPitchBend: true`).
+- En production, privilégier le feedback natif de l’application via le pont MIDI pour assurer la cohérence d’état.
+
+### 10.4 Bonnes pratiques
+- Éviter l’ouverture concurrente des mêmes ports par plusieurs bridges.
+  - Le runtime désactive le bridge global dès qu’un `passthrough` par page est détecté.
+- Centraliser la navigation de pages (notes 46/47 canal 1 par défaut) dans la config `paging`.

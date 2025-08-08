@@ -1,6 +1,6 @@
 import { logger } from "./logger";
 import type { ControlMapping, Driver, ExecutionContext } from "./types";
-import type { AppConfig } from "./config";
+import type { AppConfig, PageConfig } from "./config";
 
 export class Router {
   private config: AppConfig;
@@ -15,8 +15,12 @@ export class Router {
     this.drivers.set(key, driver);
   }
 
+  getActivePage(): PageConfig | undefined {
+    return this.config.pages[this.activePageIndex];
+  }
+
   getActivePageName(): string {
-    return this.config.pages[this.activePageIndex]?.name ?? "(none)";
+    return this.getActivePage()?.name ?? "(none)";
   }
 
   listPages(): string[] {
@@ -41,11 +45,24 @@ export class Router {
     return false;
   }
 
+  nextPage(): void {
+    if (this.config.pages.length === 0) return;
+    this.activePageIndex = (this.activePageIndex + 1) % this.config.pages.length;
+    logger.info(`Page suivante → ${this.getActivePageName()}`);
+  }
+
+  prevPage(): void {
+    if (this.config.pages.length === 0) return;
+    this.activePageIndex =
+      (this.activePageIndex - 1 + this.config.pages.length) % this.config.pages.length;
+    logger.info(`Page précédente → ${this.getActivePageName()}`);
+  }
+
   async handleControl(controlId: string, value?: unknown): Promise<void> {
-    const page = this.config.pages[this.activePageIndex];
+    const page = this.getActivePage();
     const mapping = page?.controls?.[controlId] as ControlMapping | undefined;
     if (!mapping) {
-      logger.debug(`Aucun mapping pour le contrôle '${controlId}' sur la page '${page?.name}'.`);
+      logger.debug(`Aucun mapping pour '${controlId}' sur '${page?.name}'.`);
       return;
     }
     const driver = this.drivers.get(mapping.app);
