@@ -5,6 +5,7 @@ Cette CLI, accessible dans le terminal au démarrage de l’app, permet de:
 - Sniffer et décoder les messages de la X‑Touch
 - Apprendre (learn) et générer des lignes de mapping YAML
 - Tester le Router avec des commandes synthétiques
+- Piloter directement la surface X‑Touch (faders) et gérer l’ouverture/fermeture des ports
 
 ## Lancer
 
@@ -28,21 +29,41 @@ $env:LOG_LEVEL="debug"; pnpm start
   - Liste les entrées MIDI disponibles, avec index et nom.
 
 - `midi-open <idx|nom>`
-  - Ouvre un port d’entrée MIDI par index ou par sous-chaîne du nom.
+  - Ouvre un port d’entrée MIDI par index ou par sous-chaîne du nom (pour sniffer/learn).
   - Exemple: `midi-open 0` ou `midi-open UM-One`
 
 - `midi-close`
-  - Ferme l’entrée MIDI ouverte.
+  - Ferme l’entrée MIDI ouverte par la commande ci-dessus.
 
 - `learn <id>`
   - Arme un "learn": le prochain message reçu propose un `controlId` et une ligne YAML prête à copier.
   - Exemple: `learn fader1` puis bouger le fader 1.
+
+- `fader <ch> <0..16383>`
+  - Envoie une position 14 bits directement au fader motorisé du canal MIDI (1..16).
+  - Exemple: `fader 5 8192` (milieu), `fader 5 0` (bas), `fader 5 16383` (haut).
+
+- `xtouch-stop`
+  - Arrête le driver X‑Touch et libère les ports (évite les conflits pour le sniffer).
+
+- `xtouch-start`
+  - Relance le driver X‑Touch en rouvrant les ports définis dans `config.yaml`.
 
 - `help`
   - Rappelle les commandes.
 
 - `exit`
   - Quitte proprement l’application.
+
+## Workflow recommandé (éviter conflits de ports)
+
+1. Au démarrage, le driver X‑Touch ouvre déjà les ports `midi.input_port` / `midi.output_port`.
+2. Pour sniffer/learn sur le même port d’entrée, libérez-le:
+   - `xtouch-stop`
+   - `midi-ports` puis `midi-open <idx|nom>`
+   - `learn <id>` et touchez un contrôle
+   - `midi-close`
+   - `xtouch-start` (reconnecte la surface)
 
 ## Logs
 

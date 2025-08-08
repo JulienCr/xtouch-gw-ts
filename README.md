@@ -28,7 +28,8 @@ pnpm start
   ```powershell
   $env:LOG_LEVEL="debug"; pnpm start
   ```
-- CLI et commandes documentées dans `docs/CLI.md`.
+- CLI et commandes documentées dans `docs/CLI.md` (incluant `fader`, `xtouch-stop`, `xtouch-start`).
+- Workflow anti‑conflit de port expliqué (stopper le driver avant `midi-open`).
 
 ## Configuration
 - Fichier: `config.yaml` (exemple: `config.example.yaml`).
