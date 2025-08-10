@@ -6,6 +6,12 @@ export type PageLcdLabel = string | { upper?: string; lower?: string };
 export function applyLcdForActivePage(router: Router, x: XTouchDriver): void {
   const page = router.getActivePage();
   const labels = (page as any)?.lcd?.labels as PageLcdLabel[] | undefined;
+  const colorsRaw = (page as any)?.lcd?.colors as Array<number | string> | undefined;
+  // Always start by clearing all strips to avoid leaks from previous pages
+  for (let i = 0; i < 8; i += 1) {
+    x.sendLcdStripText(i, "", "");
+  }
+
   if (Array.isArray(labels) && labels.length > 0) {
     for (let i = 0; i < 8; i += 1) {
       const item = labels[i];
@@ -15,13 +21,22 @@ export function applyLcdForActivePage(router: Router, x: XTouchDriver): void {
       } else if (item && ((item as any).upper || (item as any).lower)) {
         const it = item as { upper?: string; lower?: string };
         x.sendLcdStripText(i, it.upper || "", it.lower || "");
-      } else {
-        x.sendLcdStripText(i, "", "");
       }
     }
-  } else {
-    x.sendLcdStripText(0, router.getActivePageName());
   }
+
+  // Apply colors: if provided use them, otherwise clear all (0)
+  const colors: number[] = [];
+  if (Array.isArray(colorsRaw) && colorsRaw.length > 0) {
+    for (let i = 0; i < 8; i += 1) {
+      const v = colorsRaw[i];
+      const n = typeof v === "string" ? Number(v) : v;
+      colors.push(Number.isFinite(n as number) ? Math.max(0, Math.min(7, Number(n))) : 0);
+    }
+  } else {
+    for (let i = 0; i < 8; i += 1) colors.push(0);
+  }
+  x.setLcdColors(colors);
 }
 
 

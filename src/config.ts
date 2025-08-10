@@ -86,6 +86,11 @@ export interface PageConfig {
      * - un objet { upper, lower } pour deux lignes
      */
     labels?: Array<string | { upper?: string; lower?: string }>;
+    /**
+     * Couleurs LCD (0..7) pour chaque strip, longueur 8.
+     * Valeurs acceptées: nombre (0..7) ou chaîne convertible en nombre.
+     */
+    colors?: Array<number | string>;
   };
 }
 

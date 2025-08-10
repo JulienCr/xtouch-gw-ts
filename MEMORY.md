@@ -35,3 +35,6 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
    - Symptôme: après modification du code, le LCD affiche encore le nom de page (ancien fallback) et ignore la nouvelle logique.
    - Cause: process non redémarré / pas de rebuild → ancienne version en cours.
    - Rappel: après des changements de logique, redémarrer le process (`pnpm dev`) ou lancer un type-check (`pnpm run check:types`) et relancer. Le hot reload YAML ne recharge pas le code.
+ - 2025-08-10 — App web séparée pour l’édition de config
+   - Décision: isoler un éditeur Next.js dans `web/config-editor` pour éviter toute interaction avec la GW.
+   - Implémentation: API GET/PUT `/api/config` qui lit/écrit le `config.yaml` racine; UI YAML avec validation et preview JSON.

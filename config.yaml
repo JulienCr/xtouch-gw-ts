@@ -37,6 +37,7 @@ pages:
         - "Son\nMASTER"
         - "Son\nRetours"
         - "Lum\nFace"
+      colors: [2,2,2,4,4,7,3,6]
     passthroughs:
       - driver: "midi"
         to_port: "xtouch-gw"
