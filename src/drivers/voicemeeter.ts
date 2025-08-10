@@ -17,7 +17,11 @@ export class VoicemeeterDriver implements Driver {
   private inFromVM: Input | null = null; // feedback depuis VM
   private unsubXTouch?: () => void;
 
-  constructor(private readonly xtouch: XTouchDriver, private readonly cfg: VoicemeeterBridgeConfig) {}
+  constructor(
+    private readonly xtouch: XTouchDriver,
+    private readonly cfg: VoicemeeterBridgeConfig,
+    private readonly onFeedbackFromApp?: (raw: number[]) => void
+  ) {}
 
   async init(): Promise<void> {
     // Ouvrir OUT vers Voicemeeter (port nommé "xtouch-gw")
@@ -42,7 +46,8 @@ export class VoicemeeterDriver implements Driver {
     }
     inp.ignoreTypes(false, false, false);
     inp.on("message", (_delta, data) => {
-      // Transférer tel quel vers la surface X-Touch
+      // Mettre à jour le store via callback puis transférer tel quel vers X-Touch
+      try { this.onFeedbackFromApp?.(data); } catch {}
       this.xtouch.sendRawMessage(data);
     });
     inp.openPort(inIdx);

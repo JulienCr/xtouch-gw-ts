@@ -23,7 +23,8 @@ export class MidiBridgeDriver implements Driver {
     private readonly fromPort: string,
     private readonly filter?: MidiFilterConfig,
     private readonly transform?: TransformConfig,
-    private readonly optional: boolean = true
+    private readonly optional: boolean = true,
+    private readonly onFeedbackFromApp?: (raw: number[]) => void
   ) {}
 
   async init(): Promise<void> {
@@ -56,6 +57,7 @@ export class MidiBridgeDriver implements Driver {
         inp.on("message", (_delta, data) => {
           logger.debug(`Bridge RX <- ${this.fromPort}: ${human(data)} [${hex(data)}]`);
           try {
+            try { this.onFeedbackFromApp?.(data); } catch {}
             const txToXTouch = applyReverseTransform(data, this.transform);
             if (!txToXTouch) {
               logger.debug(`Bridge DROP (reverse transformed to null) -> X-Touch: ${human(data)} [${hex(data)}]`);

@@ -16,9 +16,13 @@
 
 ## En cours
 - [ ] Router (pages OK) → implémenter le mapping d’actions
+  - [ ] StateStore MIDI-only: capture des états par app (note/cc/pb/sysex), anti-boucle (50ms), cache lastSent
+  - [ ] Intégration refresh de page (ordonnancement Notes→CC→LCD→Faders)
+  - [ ] Filtrage par mapping page → MidiAddr (à faire)
  - [ ] Config Editor Web (Next.js) séparé: CRUD `config.yaml`, UI élégante Tailwind
 
 ## Nouveau
+- [ ] Persistence optionnelle du StateStore (`.state/xtouch-gw.json`), flag stale sur reload
 - [x] Transformer MIDI: Pitch Bend → Note On (même canal) avec vélocité mappée (0..127) pour compat QLC+
 - [x] Transformer MIDI: Pitch Bend → Control Change (canal cible configurable, CC par canal source)
 - [x] Bridge: transformation inverse automatique du feedback (CC/Note → Pitch Bend pour X‑Touch)

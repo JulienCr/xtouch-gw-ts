@@ -38,3 +38,7 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
  - 2025-08-10 — App web séparée pour l’édition de config
    - Décision: isoler un éditeur Next.js dans `web/config-editor` pour éviter toute interaction avec la GW.
    - Implémentation: API GET/PUT `/api/config` qui lit/écrit le `config.yaml` racine; UI YAML avec validation et preview JSON.
+  - 2025-08-10 — State virtuel MIDI & multipage
+    - Décision: adopter une source de vérité MIDI-only par app (Note/CC/PB/SysEx) via `StateStore` avec anti-boucle (50ms) et `lastSentToXTouch`.
+    - Implémentation: capture des feedbacks depuis `VoicemeeterDriver` et `MidiBridgeDriver` vers le `Router.onMidiFromApp()`. Refresh de page ordonné (Notes→CC→LCD→Faders).
+    - À améliorer: filtrage par mapping de page → `MidiAddr` et persistance `.state/xtouch-gw.json`.

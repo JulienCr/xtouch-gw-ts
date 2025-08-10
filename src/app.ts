@@ -74,6 +74,7 @@ export async function startApp(): Promise<() => void> {
     xtouch.start();
 
     const x = xtouch as import("./xtouch/driver").XTouchDriver; // non-null après start
+    router.attachXTouch(x, { interMsgDelayMs: 1 });
     applyLcdForActivePage(router, x);
 
     const paging: Required<PagingConfig> = {
@@ -82,7 +83,8 @@ export async function startApp(): Promise<() => void> {
       next_note: cfg.paging?.next_note ?? 47,
     } as any;
 
-    // Navigation de pages via NoteOn
+    // Navigation de pages via NoteOn (avec anti-rebond)
+    let navCooldownUntil = 0;
     const unsubNav = x.subscribe((_delta, data) => {
       const status = data[0] ?? 0;
       const type = (status & 0xf0) >> 4;
@@ -90,9 +92,12 @@ export async function startApp(): Promise<() => void> {
       if (type === 0x9 && ch === paging.channel) {
         const note = data[1] ?? 0;
         const vel = data[2] ?? 0;
+        const now = Date.now();
+        if (now < navCooldownUntil) return;
         if (vel > 0) {
           if (note === paging.prev_note) router.prevPage();
           if (note === paging.next_note) router.nextPage();
+          navCooldownUntil = now + 250; // anti-bounce après changement de page
           applyLcdForActivePage(router, x);
           const page = router.getActivePage();
           // (Re)créer le bridge de page si besoin
@@ -137,7 +142,7 @@ export async function startApp(): Promise<() => void> {
       vmBridge = new VoicemeeterDriver(x, {
         toVoicemeeterOutName: "xtouch-gw",
         fromVoicemeeterInName: "xtouch-gw-feedback",
-      });
+      }, (raw) => router.onMidiFromApp("voicemeeter", raw));
       await vmBridge.init();
       logger.info("Mode bridge global Voicemeeter actif (aucun passthrough par page détecté).");
     } else {
@@ -155,7 +160,8 @@ export async function startApp(): Promise<() => void> {
           item.from_port,
           item.filter,
           item.transform,
-          true
+          true,
+          (raw) => router.onMidiFromApp("midi-bridge", raw)
         );
         pageBridges.push(b);
         await b.init();

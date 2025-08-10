@@ -58,4 +58,7 @@ pages:
             base_cc: "0x45"     # Mapping: ch1→0x46, ch2→0x47, ch3→0x48, ch4→0x49, etc.
     controls: {}
   - name: "Default"
+    lcd:
+      labels:
+        - "Default"
     controls: {} 
