@@ -23,6 +23,7 @@
 - [x] Bridge: transformation inverse automatique du feedback (CC/Note → Pitch Bend pour X‑Touch)
 
 ## Fait
+- [x] LCD: libellés configurables par page dans `config.yaml` (`pages[].lcd.labels[0..7]`, string ou {upper,lower}). Application au démarrage et lors du changement de page.
 - [x] Sniffer MIDI natif (CLI: midi-ports, midi-open <idx|name>, midi-close, learn)
 - [x] X-Touch driver bidirectionnel (echo PitchBend, subscriptions)
 - [x] Commandes CLI utilitaires (fader, xtouch-stop/start, lcd)

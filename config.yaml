@@ -27,6 +27,16 @@ paging:
 
 pages:
   - name: "Voicemeeter+QLC"
+    lcd:
+      labels:
+        - "Mic\nBaba"
+        - "Mic\nMath"
+        - "Mic\nJu"
+        - "Son\nMac"
+        - "Son\nPC"
+        - "Son\nMASTER"
+        - "Son\nRetours"
+        - "Lum\nFace"
     passthroughs:
       - driver: "midi"
         to_port: "xtouch-gw"

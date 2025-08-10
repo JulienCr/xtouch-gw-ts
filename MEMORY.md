@@ -28,3 +28,7 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
     - Exemple: ch4 PB → ch1 CC 49 val[0..127]; ch1→CC46, ch2→CC47.
   - 2025-08-10 — Feedback inverse auto
     - Décision: toute transformation sortante (PB→Note, PB→CC) a son miroir automatique pour le feedback entrant (`Note/CC` → `PitchBend` vers X‑Touch) sans configuration supplémentaire.
+ - 2025-08-10 — Oubli de rebuild → ancien comportement
+   - Symptôme: après modification du code, le LCD affiche encore le nom de page (ancien fallback) et ignore la nouvelle logique.
+   - Cause: process non redémarré / pas de rebuild → ancienne version en cours.
+   - Rappel: après des changements de logique, redémarrer le process (`pnpm dev`) ou lancer un type-check (`pnpm run check:types`) et relancer. Le hot reload YAML ne recharge pas le code.

@@ -8,8 +8,29 @@ pages:
       fader1: { app: "voicemeeter", action: "setBusVolume", params: ["A1"] }
       fader2: { app: "qlc", action: "setChannelValue", params: [5] }
       rotary1: { app: "obs", action: "setVolume", params: ["Mic/Aux"] }
+    lcd:
+      labels:
+        # Exemple: 8 écrans (index 0..7). Supporte '\n' pour 2 lignes.
+        - "VM Main\nBus A1"
+        - "Mic"
+        - "Music"
+        - "Game"
+        - "Discord"
+        - "SFX"
+        - "Spare1"
+        - "Spare2"
 
   - name: "QLC Scene Control"
     controls:
       button1: { app: "qlc", action: "triggerCue", params: ["Scene1"] }
       button2: { app: "qlc", action: "triggerCue", params: ["Scene2"] } 
+    lcd:
+      labels:
+        - { upper: "QLC+", lower: "Scenes" }
+        - "S1"
+        - "S2"
+        - "S3"
+        - "S4"
+        - "S5"
+        - "S6"
+        - "Back"

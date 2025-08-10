@@ -43,6 +43,32 @@ export async function startApp(): Promise<() => void> {
     async (next) => {
       cfg = next;
       await router.updateConfig(next);
+      // Réappliquer les LCD si X-Touch actif
+      try {
+        if (xtouch) {
+          const x = xtouch as import("./xtouch/driver").XTouchDriver;
+          // Réutiliser la logique commune
+          const page = router.getActivePage();
+          const labels = (page as any)?.lcd?.labels as Array<string | { upper?: string; lower?: string }> | undefined;
+          if (Array.isArray(labels) && labels.length > 0) {
+            for (let i = 0; i < 8; i += 1) {
+              const item = labels[i];
+              if (typeof item === "string") {
+                const [upper, lower] = item.split(/\r?\n/, 2);
+                x.sendLcdStripText(i, upper || "", lower || "");
+              } else if (item && (item.upper || item.lower)) {
+                x.sendLcdStripText(i, item.upper || "", item.lower || "");
+              } else {
+                x.sendLcdStripText(i, "", "");
+              }
+            }
+          } else {
+            x.sendLcdStripText(0, router.getActivePageName());
+          }
+        }
+      } catch (e) {
+        logger.debug("Hot reload LCD refresh skipped:", e as any);
+      }
     },
     (err) => logger.warn("Erreur hot reload config:", err as any)
   );
@@ -65,8 +91,29 @@ export async function startApp(): Promise<() => void> {
     xtouch.start();
 
     const x = xtouch as import("./xtouch/driver").XTouchDriver; // non-null après start
-    // Afficher la page active au démarrage
-    x.sendLcdStripText(0, router.getActivePageName());
+    // Afficher les LCD de la page active au démarrage
+    const applyLcdForActivePage = () => {
+      const page = router.getActivePage();
+      const labels = (page as any)?.lcd?.labels as Array<string | { upper?: string; lower?: string }> | undefined;
+      if (Array.isArray(labels) && labels.length > 0) {
+        for (let i = 0; i < 8; i += 1) {
+          const item = labels[i];
+          if (typeof item === "string") {
+            const [upper, lower] = item.split(/\r?\n/, 2);
+            x.sendLcdStripText(i, upper || "", lower || "");
+          } else if (item && (item.upper || item.lower)) {
+            x.sendLcdStripText(i, item.upper || "", item.lower || "");
+          } else {
+            // Si rien défini pour ce strip, effacer
+            x.sendLcdStripText(i, "", "");
+          }
+        }
+      } else {
+        // Fallback: nom de la page sur LCD 1
+        x.sendLcdStripText(0, router.getActivePageName());
+      }
+    };
+    applyLcdForActivePage();
 
     const paging: Required<PagingConfig> = {
       channel: cfg.paging?.channel ?? 1,
@@ -86,8 +133,23 @@ export async function startApp(): Promise<() => void> {
           if (note === paging.prev_note) router.prevPage();
           if (note === paging.next_note) router.nextPage();
           const page = router.getActivePage();
-          // Update LCD avec le nom de la page
-          x.sendLcdStripText(0, page?.name ?? "");
+          // Mettre à jour les LCD selon la config page
+          const labels = (page as any)?.lcd?.labels as Array<string | { upper?: string; lower?: string }> | undefined;
+          if (Array.isArray(labels) && labels.length > 0) {
+            for (let i = 0; i < 8; i += 1) {
+              const item = labels[i];
+              if (typeof item === "string") {
+                const [upper, lower] = item.split(/\r?\n/, 2);
+                x.sendLcdStripText(i, upper || "", lower || "");
+              } else if (item && (item.upper || item.lower)) {
+                x.sendLcdStripText(i, item.upper || "", item.lower || "");
+              } else {
+                x.sendLcdStripText(i, "", "");
+              }
+            }
+          } else {
+            x.sendLcdStripText(0, page?.name ?? "");
+          }
           // (Re)créer le bridge de page si besoin
           if (page?.passthrough || page?.passthroughs) {
             // Fermer anciens bridges

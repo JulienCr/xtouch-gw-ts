@@ -76,6 +76,17 @@ export interface PageConfig {
   passthrough?: PassthroughConfig; // compat: une seule entrée
   passthroughs?: PassthroughConfig[]; // préféré: plusieurs entrées
   controls: Record<string, unknown>;
+  /**
+   * Configuration des LCD de la X-Touch pour cette page.
+   */
+  lcd?: {
+    /**
+     * Libellés des 8 écrans LCD (index 0..7). Chaque entrée peut être:
+     * - une chaîne (ligne du haut seulement)
+     * - un objet { upper, lower } pour deux lignes
+     */
+    labels?: Array<string | { upper?: string; lower?: string }>;
+  };
 }
 
 export interface AppConfig {
