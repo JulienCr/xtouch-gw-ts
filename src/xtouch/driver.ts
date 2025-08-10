@@ -106,6 +106,10 @@ export class XTouchDriver {
     this.suppressPitchBendUntilMs = Math.max(this.suppressPitchBendUntilMs, Date.now() + Math.max(0, ms));
   }
 
+  isPitchBendSquelched(): boolean {
+    return Date.now() < this.suppressPitchBendUntilMs;
+  }
+
   subscribe(handler: MessageHandler): () => void {
     this.handlers.add(handler);
     return () => this.handlers.delete(handler);

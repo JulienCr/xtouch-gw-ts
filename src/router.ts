@@ -280,7 +280,7 @@ export class Router {
 
     const batches = [notes, ccs, syx, pbs];
     // Anti-boucle moteurs: ignorer les PB entrants depuis X-Touch pendant le temps d'établissement
-    try { this.xtouch?.squelchPitchBend(150); } catch {}
+    try { this.xtouch?.squelchPitchBend(1200); } catch {}
     for (const batch of batches) {
       for (const e of batch) {
         const bytes = StateStore.entryToRawForXTouch(e);

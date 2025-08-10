@@ -24,7 +24,7 @@ export class MidiBridgeDriver implements Driver {
     private readonly filter?: MidiFilterConfig,
     private readonly transform?: TransformConfig,
     private readonly optional: boolean = true,
-    private readonly onFeedbackFromApp?: (raw: number[]) => void
+    private readonly onFeedbackFromApp?: (raw: number[], origin: "app" | "xtouch") => void
   ) {}
 
   async init(): Promise<void> {
@@ -60,8 +60,8 @@ export class MidiBridgeDriver implements Driver {
             const txToXTouch = applyReverseTransform(data, this.transform);
             // Alimenter le StateStore avec la version la plus utile pour le refresh
             try {
-              if (txToXTouch) this.onFeedbackFromApp?.(txToXTouch);
-              this.onFeedbackFromApp?.(data);
+              if (txToXTouch) this.onFeedbackFromApp?.(txToXTouch, "app");
+              this.onFeedbackFromApp?.(data, "app");
             } catch {}
             if (!txToXTouch) {
               logger.debug(`Bridge DROP (reverse transformed to null) -> X-Touch: ${human(data)} [${hex(data)}]`);
@@ -80,6 +80,14 @@ export class MidiBridgeDriver implements Driver {
       if (this.outToTarget) {
         this.unsubXTouch = this.xtouch.subscribe((_delta, data) => {
           try {
+            // Bloquer temporairement l'émission des PB du X‑Touch vers la cible pendant squelch
+            const status = data[0] ?? 0;
+            const typeNibble = (status & 0xf0) >> 4;
+            const isPB = typeNibble === 0xE;
+            if (isPB && (this.xtouch as any).isPitchBendSquelched?.()) {
+              logger.debug(`Bridge DROP (PB squelched) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
+              return;
+            }
             if (matchFilter(data, this.filter)) {
                const tx = applyTransform(data, this.transform);
               if (!tx) {
@@ -89,7 +97,7 @@ export class MidiBridgeDriver implements Driver {
               logger.debug(`Bridge TX -> ${this.toPort}: ${human(tx)} [${hex(tx)}]`);
               this.outToTarget?.sendMessage(tx);
               // MàJ du StateStore pour permettre un refresh correct même si l'app n'écho pas
-              try { this.onFeedbackFromApp?.(data); } catch {}
+              try { this.onFeedbackFromApp?.(data, "xtouch"); } catch {}
             } else {
               logger.debug(`Bridge DROP (filtered) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
             }

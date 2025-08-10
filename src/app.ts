@@ -126,8 +126,8 @@ export async function startApp(): Promise<() => void> {
         inp.on("message", (_delta, data) => {
           try {
             const tx = applyReverseTransform(data, transform);
-            if (tx) router.onMidiFromApp(info.appKey, tx);
-            router.onMidiFromApp(info.appKey, data);
+            if (tx) router.onMidiFromApp(info.appKey, tx, "app");
+            router.onMidiFromApp(info.appKey, data, "app");
           } catch (err) {
             logger.debug("Background listener error:", err as any);
           }
@@ -201,7 +201,7 @@ export async function startApp(): Promise<() => void> {
                 item.filter,
                 item.transform,
                 true,
-                (raw) => router.onMidiFromApp(appKey, raw)
+                (raw, origin) => router.onMidiFromApp(appKey, raw, origin)
               );
               pageBridges.push(b);
               b.init().catch((err) => logger.warn("Bridge page init error:", err as any));

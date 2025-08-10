@@ -10,21 +10,6 @@ paging:
   prev_note: 46
   next_note: 47
 
-# pages:
-#   - name: "Voicemeeter Main"
-#     passthrough:
-#       driver: "midi"
-#       to_port: "xtouch-gw"
-#       from_port: "xtouch-gw-feedback"
-#     controls: {}
-#   - name: "QLC+"
-#     passthrough:
-#       driver: "qlc"
-#       to_port: "qlc-in"
-#       from_port: "qlc-out"
-#   - name: "Default"
-#     controls: {} 
-
 pages:
   - name: "Voicemeeter+QLC"
     lcd:
@@ -37,7 +22,7 @@ pages:
         - "Son\nMASTER"
         - "Son\nRetours"
         - "Lum\nFace"
-      colors: [2,2,2,4,4,7,3,6]
+      colors: [1,1,1,4,4,7,5,3]
     passthroughs:
       - driver: "midi"
         to_port: "xtouch-gw"
@@ -56,6 +41,73 @@ pages:
             target_channel: 1   # Envoyer vers canal 1 (QLC+)
             base_cc: "0x45"     # Mapping: ch1→0x46, ch2→0x47, ch3→0x48, ch4→0x49, etc.
     controls: {}
+  - name: "Lum Latéraux"
+    lcd:
+      labels:
+        - "Jardin\nDimmer"
+        - "Jardin\nRouge"
+        - "Jardin\nVert"
+        - "Jardin\nBleu"
+        - "Cours\nDimmer"
+        - "Cours\nRouge"
+        - "Cours\nVert"
+        - "Cours\nBleu"
+      colors: [7,1,2,4,7,1,2,4]
+    passthroughs:
+      - driver: "midi"
+        to_port: "qlc-in"
+        from_port: "qlc-out"
+        transform:
+          pb_to_cc:
+            target_channel: 1   # Envoyer vers canal 1 (QLC+)
+            base_cc: "0x50"     # Mapping: ch1→0x46, ch2→0x47, ch3→0x48, ch4→0x49, etc.
+            cc_by_channel:
+              9: 78  # Master Dimmer
+  - name: "Néons Latéraux RGB"
+    lcd:
+      labels:
+        - "Jardin\nRouge"
+        - "Jardin\nVert"
+        - "Jardin\nBleu"
+        - "Cours\nRouge"
+        - "Cours\nVert"
+        - "Cours\nBleu"
+        - "-"
+        - "-"
+      colors: [1,2,4,1,2,4,0,0]
+    passthroughs:
+      - driver: "midi"
+        to_port: "qlc-in"
+        from_port: "qlc-out"
+        transform:
+          pb_to_cc:
+            target_channel: 1   # P3 = même CC que P1 mais sur canal MIDI 2 (QLC+ = +128)
+            base_cc: 89     # Base CC P1 (69) → P3 = 198–205 en QLC
+            cc_by_channel:
+              9: 78  # Master Dimmer (Fader 9)
+
+  - name: "Néons Contres RGB"
+    lcd:
+      labels:
+        - "Contre J\nRouge"
+        - "Contre J\nVert"
+        - "Contre J\nBleu"
+        - "Contre C\nRouge"
+        - "Contre C\nVert"
+        - "Contre C\nBleu"
+        - "-"
+        - "-"
+      colors: [1,2,4,1,2,4,0,0]
+    passthroughs:
+      - driver: "midi"
+        to_port: "qlc-in"
+        from_port: "qlc-out"
+        transform:
+          pb_to_cc:
+            target_channel: 1   # P4 = même CC que P2 mais sur canal MIDI 2 (QLC+ = +128)
+            base_cc: 95     # Base CC P2 (80) → P4 = 209–216 en QLC
+            cc_by_channel:
+              9: 78  # Master Dimmer (Fader 9)
   - name: "Default"
     lcd:
       labels:
