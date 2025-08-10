@@ -57,6 +57,7 @@ export class Router {
     if (this.config.pages.length === 0) return;
     this.activePageIndex = (this.activePageIndex + 1) % this.config.pages.length;
     logger.info(`Page suivante → ${this.getActivePageName()}`);
+    this.refreshPage();
   }
 
   prevPage(): void {
@@ -135,18 +136,15 @@ export class Router {
           origin: "xtouch",
         });
       }
-      // Notes 0,8,16,24 sur ch 1..9 → NoteOff (NoteOn vel 0)
+      // Notes 0..31 sur canal 1 → OFF (NoteOn vel 0). On ne touche qu'au canal 1.
       // ATTENTION: on envoie uniquement vers le port X-Touch; on n'injecte PAS ces msgs dans les bridges.
-      const defaultNotes = [0, 8, 16, 24];
-      for (let ch = 1; ch <= 9; ch += 1) {
-        for (const n of defaultNotes) {
-          entries.push({
-            addr: { status: "note", channel: ch, data1: n },
-            value: 0,
-            ts: Date.now(),
-            origin: "xtouch",
-          });
-        }
+      for (let n = 0; n <= 31; n += 1) {
+        entries.push({
+          addr: { status: "note", channel: 1, data1: n },
+          value: 0,
+          ts: Date.now(),
+          origin: "xtouch",
+        });
       }
     }
 
@@ -168,6 +166,15 @@ export class Router {
         // Important: n'envoyer que sur le port X-Touch; ne pas relayer ces frames vers les apps
         this.xtouch.sendRawMessage(bytes);
         this.state.markSentToXTouch(e.addr, e.value);
+        // Cas particulier: certaines firmwares X-Touch/MCU exigent un NoteOff explicite (0x80)
+        // pour éteindre les LED, alors que NoteOn vel=0 devrait suffire.
+        // Sur la page par défaut (reset), on envoie donc un NoteOff supplémentaire.
+        if (!hasPassthrough && e.addr.status === "note" && (e.value as number) === 0) {
+          const ch = Math.max(1, Math.min(16, e.addr.channel ?? 1));
+          const note = Math.max(0, Math.min(127, e.addr.data1 ?? 0));
+          const noteOff = [0x80 + (ch - 1), note, 0];
+          this.xtouch.sendRawMessage(noteOff);
+        }
         // tempo
         if (this.refreshTempoMs > 0) {
           // Busy wait micro-delay is bad; use setTimeout-like? Here synchronous, we skip.

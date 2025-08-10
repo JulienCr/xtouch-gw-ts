@@ -19,6 +19,9 @@
   - [ ] StateStore MIDI-only: capture des états par app (note/cc/pb/sysex), anti-boucle (50ms), cache lastSent
   - [ ] Intégration refresh de page (ordonnancement Notes→CC→LCD→Faders)
   - [ ] Filtrage par mapping page → MidiAddr (à faire)
+  - [x] Navigation next/prev: forcer `refreshPage()` sur les deux (fix next)
+  - [x] Page passthrough: les feedbacks des bridges alimentent `StateStore` avec l’app correcte (qlc/voicemeeter/obs)
+  - [x] Reset page "Default": Note OFF limité à canal 1, notes 0..31 (au lieu de 0,8,16,24 sur 1..9)
  - [ ] Config Editor Web (Next.js) séparé: CRUD `config.yaml`, UI élégante Tailwind
 
 ## Nouveau

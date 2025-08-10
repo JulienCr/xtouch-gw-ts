@@ -57,8 +57,12 @@ export class MidiBridgeDriver implements Driver {
         inp.on("message", (_delta, data) => {
           logger.debug(`Bridge RX <- ${this.fromPort}: ${human(data)} [${hex(data)}]`);
           try {
-            try { this.onFeedbackFromApp?.(data); } catch {}
             const txToXTouch = applyReverseTransform(data, this.transform);
+            // Alimenter le StateStore avec la version la plus utile pour le refresh
+            try {
+              if (txToXTouch) this.onFeedbackFromApp?.(txToXTouch);
+              this.onFeedbackFromApp?.(data);
+            } catch {}
             if (!txToXTouch) {
               logger.debug(`Bridge DROP (reverse transformed to null) -> X-Touch: ${human(data)} [${hex(data)}]`);
               return;

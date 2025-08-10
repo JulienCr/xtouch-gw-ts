@@ -83,6 +83,16 @@ export async function startApp(): Promise<() => void> {
       next_note: cfg.paging?.next_note ?? 47,
     } as any;
 
+    const resolveAppKeyForBridge = (toPort: string, fromPort: string): string => {
+      const to = (toPort || "").toLowerCase();
+      const from = (fromPort || "").toLowerCase();
+      const txt = `${to} ${from}`;
+      if (txt.includes("qlc")) return "qlc";
+      if (txt.includes("xtouch-gw") || txt.includes("voicemeeter")) return "voicemeeter";
+      if (txt.includes("obs")) return "obs";
+      return "midi-bridge";
+    };
+
     // Navigation de pages via NoteOn (avec anti-rebond)
     let navCooldownUntil = 0;
     const unsubNav = x.subscribe((_delta, data) => {
@@ -109,13 +119,15 @@ export async function startApp(): Promise<() => void> {
             pageBridges = [];
             const items = page.passthroughs ?? (page.passthrough ? [page.passthrough] : []);
             for (const item of items) {
+              const appKey = resolveAppKeyForBridge(item.to_port, item.from_port);
               const b = new MidiBridgeDriver(
                 x,
                 item.to_port,
                 item.from_port,
                 item.filter,
                 item.transform,
-                true
+                true,
+                (raw) => router.onMidiFromApp(appKey, raw)
               );
               pageBridges.push(b);
               b.init().catch((err) => logger.warn("Bridge page init error:", err as any));
@@ -154,6 +166,7 @@ export async function startApp(): Promise<() => void> {
     if (initialPage?.passthrough || initialPage?.passthroughs) {
       const items = initialPage.passthroughs ?? (initialPage.passthrough ? [initialPage.passthrough] : []);
       for (const item of items) {
+        const appKey = resolveAppKeyForBridge(item.to_port, item.from_port);
         const b = new MidiBridgeDriver(
           x,
           item.to_port,
@@ -161,7 +174,7 @@ export async function startApp(): Promise<() => void> {
           item.filter,
           item.transform,
           true,
-          (raw) => router.onMidiFromApp("midi-bridge", raw)
+          (raw) => router.onMidiFromApp(appKey, raw)
         );
         pageBridges.push(b);
         await b.init();
