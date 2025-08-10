@@ -196,21 +196,33 @@ export async function startApp(): Promise<() => void> {
   // CLI de développement
   const detachCli = attachCli({ router, xtouch });
 
+  let isCleaningUp = false;
+  const cleanup = () => {
+    if (isCleaningUp) return;
+    isCleaningUp = true;
+    logger.info("Arrêt XTouch GW");
+    try { stopWatch(); } catch {}
+    try { for (const b of pageBridges) b.shutdown().catch(() => {}); } catch {}
+    try { vmBridge?.shutdown(); } catch {}
+    try { vmSync?.stop(); } catch {}
+    try { xtouch?.stop(); } catch {}
+    process.exit(0);
+  };
+
   const onSig = () => {
-    detachCli();
+    try { detachCli(); } catch {}
+    cleanup();
   };
   process.on("SIGINT", onSig);
   process.on("SIGTERM", onSig);
-
-  const cleanup = () => {
-    logger.info("Arrêt XTouch GW");
-    stopWatch();
-    for (const b of pageBridges) b.shutdown().catch(() => {});
-    vmBridge?.shutdown();
-    vmSync?.stop();
-    xtouch?.stop();
-    process.exit(0);
-  };
+  process.on("uncaughtException", (err) => {
+    logger.error("Uncaught exception:", err as any);
+    cleanup();
+  });
+  process.on("unhandledRejection", (reason) => {
+    logger.error("Unhandled rejection:", reason as any);
+    cleanup();
+  });
 
   return cleanup;
 }

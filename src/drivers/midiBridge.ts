@@ -88,6 +88,8 @@ export class MidiBridgeDriver implements Driver {
               }
               logger.debug(`Bridge TX -> ${this.toPort}: ${human(tx)} [${hex(tx)}]`);
               this.outToTarget?.sendMessage(tx);
+              // MàJ du StateStore pour permettre un refresh correct même si l'app n'écho pas
+              try { this.onFeedbackFromApp?.(data); } catch {}
             } else {
               logger.debug(`Bridge DROP (filtered) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
             }

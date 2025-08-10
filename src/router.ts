@@ -118,12 +118,47 @@ export class Router {
     if (!this.xtouch) return;
     const page = this.getActivePage();
     if (!page) return;
-    const hasPassthrough = Boolean((page as any).passthrough || (Array.isArray((page as any).passthroughs) && (page as any).passthroughs.length > 0));
+    // Déterminer dynamiquement les apps concernées par la page
+    const items = (page as any).passthroughs
+      ?? ((page as any).passthrough ? [(page as any).passthrough] : []);
+    const resolveAppKey = (toPort: string, fromPort: string): string => {
+      const to = (toPort || "").toLowerCase();
+      const from = (fromPort || "").toLowerCase();
+      const txt = `${to} ${from}`;
+      if (txt.includes("qlc")) return "qlc";
+      if (txt.includes("xtouch-gw") || txt.includes("voicemeeter")) return "voicemeeter";
+      if (txt.includes("obs")) return "obs";
+      return "midi-bridge";
+    };
+    const appKeysFromPage: string[] = Array.isArray(items)
+      ? Array.from(new Set(items.map((it: any) => resolveAppKey(it?.to_port, it?.from_port))))
+      : [];
+    const hasPassthrough = appKeysFromPage.length > 0;
     let entries: MidiStateEntry[];
     if (hasPassthrough) {
-      // Rejouer l'état des apps concernées (global pour l'instant)
-      const appKeys = ["voicemeeter", "qlc", "obs"]; // extensible
-      entries = this.state.listEntriesForApps(appKeys);
+      // Rejouer l'état si présent, sinon valeurs nulles, sur PB ch1..9 et Notes 0..31 ch1..9
+      // IMPORTANT: ne considérer que les apps actives pour la page courante
+      const globalPriority = ["voicemeeter", "qlc", "obs", "midi-bridge"] as const;
+      const pagePriority = globalPriority.filter((k) => appKeysFromPage.includes(k));
+      const pickFirst = (addr: { status: "pb"|"note"; channel: number; data1: number }): MidiStateEntry | undefined => {
+        for (const app of pagePriority) {
+          const e = this.state.get(app as any, addr);
+          if (e) return e;
+        }
+        return undefined;
+      };
+      const now = Date.now();
+      entries = [];
+      for (let ch = 1; ch <= 9; ch += 1) {
+        const found = pickFirst({ status: "pb", channel: ch, data1: 0 });
+        entries.push(found ?? { addr: { status: "pb", channel: ch, data1: 0 }, value: 0, ts: now, origin: "xtouch" });
+      }
+      for (let ch = 1; ch <= 9; ch += 1) {
+        for (let n = 0; n <= 31; n += 1) {
+          const found = pickFirst({ status: "note", channel: ch, data1: n });
+          entries.push(found ?? { addr: { status: "note", channel: ch, data1: n }, value: 0, ts: now, origin: "xtouch" });
+        }
+      }
     } else {
       // Page "par défaut" sans passthrough → forcer un reset visuel minimal
       entries = [];
@@ -136,19 +171,33 @@ export class Router {
           origin: "xtouch",
         });
       }
-      // Notes 0..31 sur canal 1 → OFF (NoteOn vel 0). On ne touche qu'au canal 1.
+      // Notes 0..31 sur canaux 1..9 → OFF (NoteOn vel 0)
       // ATTENTION: on envoie uniquement vers le port X-Touch; on n'injecte PAS ces msgs dans les bridges.
-      for (let n = 0; n <= 31; n += 1) {
-        entries.push({
-          addr: { status: "note", channel: 1, data1: n },
-          value: 0,
-          ts: Date.now(),
-          origin: "xtouch",
-        });
+      for (let ch = 1; ch <= 9; ch += 1) {
+        for (let n = 0; n <= 31; n += 1) {
+          entries.push({
+            addr: { status: "note", channel: ch, data1: n },
+            value: 0,
+            ts: Date.now(),
+            origin: "xtouch",
+          });
+        }
+      }
+      // CC 0..31 sur canaux 1..9 → 0
+      for (let ch = 1; ch <= 9; ch += 1) {
+        for (let cc = 0; cc <= 31; cc += 1) {
+          entries.push({
+            addr: { status: "cc", channel: ch, data1: cc },
+            value: 0,
+            ts: Date.now(),
+            origin: "xtouch",
+          });
+        }
       }
     }
 
     // Ordonnancement: Notes -> CC -> SysEx -> PitchBend
+    // On force l'ordre: Notes -> CC -> SysEx -> PB
     const notes = entries.filter((e) => e.addr.status === "note");
     const ccs = entries.filter((e) => e.addr.status === "cc");
     const syx = entries.filter((e) => e.addr.status === "sysex");
@@ -159,17 +208,15 @@ export class Router {
       for (const e of batch) {
         const bytes = StateStore.entryToRawForXTouch(e);
         if (!bytes) continue;
-        // Éviter d'envoyer si identique sauf sur page par défaut (on force)
-        if (hasPassthrough) {
-          if (this.state.hasSameLastSent(e.addr, e.value)) continue;
-        }
+        // Important: sur changement de page, on force l'envoi des resets même si identiques
+        // (ex. certains firmwares nécessitent un NoteOff explicite après NoteOn vel 0)
         // Important: n'envoyer que sur le port X-Touch; ne pas relayer ces frames vers les apps
         this.xtouch.sendRawMessage(bytes);
         this.state.markSentToXTouch(e.addr, e.value);
         // Cas particulier: certaines firmwares X-Touch/MCU exigent un NoteOff explicite (0x80)
         // pour éteindre les LED, alors que NoteOn vel=0 devrait suffire.
-        // Sur la page par défaut (reset), on envoie donc un NoteOff supplémentaire.
-        if (!hasPassthrough && e.addr.status === "note" && (e.value as number) === 0) {
+        // On envoie un NoteOff supplémentaire pour toute note mise à 0.
+        if (e.addr.status === "note" && (e.value as number) === 0) {
           const ch = Math.max(1, Math.min(16, e.addr.channel ?? 1));
           const note = Math.max(0, Math.min(127, e.addr.data1 ?? 0));
           const noteOff = [0x80 + (ch - 1), note, 0];

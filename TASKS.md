@@ -29,6 +29,7 @@
 - [x] Transformer MIDI: Pitch Bend → Note On (même canal) avec vélocité mappée (0..127) pour compat QLC+
 - [x] Transformer MIDI: Pitch Bend → Control Change (canal cible configurable, CC par canal source)
 - [x] Bridge: transformation inverse automatique du feedback (CC/Note → Pitch Bend pour X‑Touch)
+ - [x] Passthrough pages – fallback d’état: au refresh, utiliser les valeurs du state si présentes pour PB ch 1..9 et Notes 0..31 (ch1), sinon envoyer des valeurs nulles (0), comme sur la page "Default".
  - [x] Refactor: extraction utilitaires MIDI (`src/midi/{utils,filter,transform,ports}.ts`) et LCD (`src/ui/lcd.ts`), simplification `drivers/midiBridge.ts`, mutualisation recherche ports, déduplication LCD, extraction CLI (`src/cli/`).
 
 ## Fait
