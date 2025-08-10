@@ -1,4 +1,3 @@
-import readline from "readline";
 import { logger, setLogLevel } from "./logger";
 import { loadConfig, findConfigPath, watchConfig, AppConfig } from "./config";
 import { Router } from "./router";
@@ -6,12 +5,13 @@ import { ConsoleDriver } from "./drivers/consoleDriver";
 import { VoicemeeterDriver } from "./drivers/voicemeeter";
 import { QlcDriver } from "./drivers/qlc";
 import { ObsDriver } from "./drivers/obs";
-import { MidiInputSniffer, listInputPorts } from "./midi/sniffer";
 import { formatDecoded } from "./midi/decoder";
 import { XTouchDriver } from "./xtouch/driver";
 import { MidiBridgeDriver } from "./drivers/midiBridge";
 import type { PagingConfig } from "./config";
 import { VoicemeeterSync } from "./apps/voicemeeterSync";
+import { applyLcdForActivePage } from "./ui/lcd";
+import { attachCli } from "./cli";
 
 function toHex(bytes: number[]): string {
   return bytes.map((b) => b.toString(16).padStart(2, "0")).join(" ");
@@ -47,24 +47,7 @@ export async function startApp(): Promise<() => void> {
       try {
         if (xtouch) {
           const x = xtouch as import("./xtouch/driver").XTouchDriver;
-          // Réutiliser la logique commune
-          const page = router.getActivePage();
-          const labels = (page as any)?.lcd?.labels as Array<string | { upper?: string; lower?: string }> | undefined;
-          if (Array.isArray(labels) && labels.length > 0) {
-            for (let i = 0; i < 8; i += 1) {
-              const item = labels[i];
-              if (typeof item === "string") {
-                const [upper, lower] = item.split(/\r?\n/, 2);
-                x.sendLcdStripText(i, upper || "", lower || "");
-              } else if (item && (item.upper || item.lower)) {
-                x.sendLcdStripText(i, item.upper || "", item.lower || "");
-              } else {
-                x.sendLcdStripText(i, "", "");
-              }
-            }
-          } else {
-            x.sendLcdStripText(0, router.getActivePageName());
-          }
+          applyLcdForActivePage(router, x);
         }
       } catch (e) {
         logger.debug("Hot reload LCD refresh skipped:", e as any);
@@ -91,29 +74,7 @@ export async function startApp(): Promise<() => void> {
     xtouch.start();
 
     const x = xtouch as import("./xtouch/driver").XTouchDriver; // non-null après start
-    // Afficher les LCD de la page active au démarrage
-    const applyLcdForActivePage = () => {
-      const page = router.getActivePage();
-      const labels = (page as any)?.lcd?.labels as Array<string | { upper?: string; lower?: string }> | undefined;
-      if (Array.isArray(labels) && labels.length > 0) {
-        for (let i = 0; i < 8; i += 1) {
-          const item = labels[i];
-          if (typeof item === "string") {
-            const [upper, lower] = item.split(/\r?\n/, 2);
-            x.sendLcdStripText(i, upper || "", lower || "");
-          } else if (item && (item.upper || item.lower)) {
-            x.sendLcdStripText(i, item.upper || "", item.lower || "");
-          } else {
-            // Si rien défini pour ce strip, effacer
-            x.sendLcdStripText(i, "", "");
-          }
-        }
-      } else {
-        // Fallback: nom de la page sur LCD 1
-        x.sendLcdStripText(0, router.getActivePageName());
-      }
-    };
-    applyLcdForActivePage();
+    applyLcdForActivePage(router, x);
 
     const paging: Required<PagingConfig> = {
       channel: cfg.paging?.channel ?? 1,
@@ -132,24 +93,8 @@ export async function startApp(): Promise<() => void> {
         if (vel > 0) {
           if (note === paging.prev_note) router.prevPage();
           if (note === paging.next_note) router.nextPage();
+          applyLcdForActivePage(router, x);
           const page = router.getActivePage();
-          // Mettre à jour les LCD selon la config page
-          const labels = (page as any)?.lcd?.labels as Array<string | { upper?: string; lower?: string }> | undefined;
-          if (Array.isArray(labels) && labels.length > 0) {
-            for (let i = 0; i < 8; i += 1) {
-              const item = labels[i];
-              if (typeof item === "string") {
-                const [upper, lower] = item.split(/\r?\n/, 2);
-                x.sendLcdStripText(i, upper || "", lower || "");
-              } else if (item && (item.upper || item.lower)) {
-                x.sendLcdStripText(i, item.upper || "", item.lower || "");
-              } else {
-                x.sendLcdStripText(i, "", "");
-              }
-            }
-          } else {
-            x.sendLcdStripText(0, page?.name ?? "");
-          }
           // (Re)créer le bridge de page si besoin
           if (page?.passthrough || page?.passthroughs) {
             // Fermer anciens bridges
@@ -229,217 +174,24 @@ export async function startApp(): Promise<() => void> {
     logger.warn("X-Touch/Voicemeeter non connecté:", (err as any)?.message ?? err);
   }
 
-  // MIDI Sniffer
-  let midiSniffer: MidiInputSniffer | null = null;
-  let pendingLearnControlId: string | null = null;
-  const ensureSniffer = () => {
-    if (!midiSniffer) {
-      midiSniffer = new MidiInputSniffer((evt) => {
-        // Log lisible (info) + brut en debug
-        logger.debug(`MIDI IN: ${toHex(evt.bytes)} (Δ=${evt.deltaSeconds.toFixed(3)}s)`);
-        logger.info(formatDecoded(evt.decoded));
-
-        // Mode learn: capture le prochain événement
-        if (pendingLearnControlId) {
-          const learnedFor = pendingLearnControlId;
-          pendingLearnControlId = null;
-          const d = evt.decoded as any;
-          // Construire une clé détecteur et un id suggéré
-          let detector = "";
-          let suggestedId = learnedFor;
-          if (d.type === "pitchBend") {
-            detector = `pb:${d.channel}`;
-            if (/^fader\d+$/.test(learnedFor) === false && d.channel) {
-              suggestedId = `fader${d.channel}`;
-            }
-          } else if (d.type === "controlChange") {
-            detector = `cc:${d.channel}:${d.controller}`;
-            if (/^enc(oder)?\d+/.test(learnedFor) === false) {
-              suggestedId = d.channel && d.channel !== 1 ? `enc${d.controller}_ch${d.channel}` : `enc${d.controller}`;
-            }
-          } else if (d.type === "noteOn" || d.type === "noteOff") {
-            detector = `note:${d.channel}:${d.note}`;
-            if (/^button\d+/.test(learnedFor) === false) {
-              suggestedId = d.channel && d.channel !== 1 ? `button${d.note}_ch${d.channel}` : `button${d.note}`;
-            }
-          } else {
-            detector = d.type;
-          }
-
-          const yamlLine = `${suggestedId}: { app: "console", action: "log", params: [] }`;
-          logger.info("LEARN →", formatDecoded(evt.decoded));
-          logger.info("Proposition controlId:", suggestedId);
-          logger.info("Détecteur:", detector);
-          logger.info("YAML:");
-          logger.info(yamlLine);
-        }
-      });
-    }
-    return midiSniffer;
-  };
-
   // CLI de développement
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'lcd <strip0-7> <upper> [lower]', 'help', 'exit'");
-  rl.setPrompt("app> ");
-  rl.prompt();
-
-  rl.on("line", async (line) => {
-    const [cmd, ...rest] = line.trim().split(/\s+/);
-    try {
-      switch (cmd) {
-        case "page": {
-          const arg = rest.join(" ");
-          const n = Number(arg);
-          const ok = Number.isFinite(n) ? router.setActivePage(n) : router.setActivePage(arg);
-          if (!ok) logger.warn("Page inconnue.");
-          break;
-        }
-        case "pages": {
-          logger.info("Pages:", router.listPages().join(", "));
-          break;
-        }
-        case "emit": {
-          const controlId = rest[0];
-          const valueRaw = rest[1];
-          const value = valueRaw !== undefined ? Number(valueRaw) : undefined;
-          await router.handleControl(controlId, Number.isFinite(value as number) ? value : valueRaw);
-          break;
-        }
-        case "midi-ports": {
-          const ports = listInputPorts();
-          if (ports.length === 0) {
-            logger.info("Aucun port MIDI d'entrée détecté.");
-          } else {
-            for (const p of ports) logger.info(`[${p.index}] ${p.name}`);
-          }
-          break;
-        }
-        case "midi-open": {
-          const arg = rest.join(" ");
-          if (!arg) {
-            logger.warn("Usage: midi-open <idx|name>");
-            break;
-          }
-          const n = Number(arg);
-          const snif = ensureSniffer();
-          if (Number.isFinite(n)) {
-            snif.openByIndex(n);
-          } else {
-            const ok = snif.openByName(arg);
-            if (!ok) logger.warn("Port non trouvé par nom.");
-          }
-          break;
-        }
-        case "midi-close": {
-          midiSniffer?.close();
-          break;
-        }
-        case "xtouch-stop": {
-          if (!xtouch) {
-            logger.info("X-Touch déjà stoppé.");
-            break;
-          }
-          xtouch.stop();
-          xtouch = null;
-          logger.info("X-Touch stoppé (ports libérés). Vous pouvez utiliser 'midi-open'.");
-          break;
-        }
-        case "xtouch-start": {
-          if (xtouch) {
-            logger.info("X-Touch déjà démarré.");
-            break;
-          }
-          try {
-            xtouch = new XTouchDriver({
-              inputName: cfg.midi.input_port,
-              outputName: cfg.midi.output_port,
-            });
-            xtouch.start();
-          } catch (err) {
-            logger.error("Impossible de démarrer X-Touch:", err as any);
-          }
-          break;
-        }
-        case "learn": {
-          const id = rest.join(" ");
-          if (!id) {
-            logger.warn("Usage: learn <id>");
-            break;
-          }
-          if (!midiSniffer) {
-            logger.warn("Ouvrez un port d'entrée d'abord: 'midi-ports' puis 'midi-open <idx|name>'");
-            break;
-          }
-          pendingLearnControlId = id;
-          logger.info(`Learn armé pour '${id}'. Touchez un contrôle sur la X-Touch…`);
-          break;
-        }
-        case "fader": {
-          const ch = Number(rest[0]);
-          const v = Number(rest[1]);
-          if (!Number.isFinite(ch) || !Number.isFinite(v)) {
-            logger.warn("Usage: fader <ch> <0..16383>");
-            break;
-          }
-          if (!xtouch) {
-            logger.warn("X-Touch non connecté (vérifiez config.yaml et le câblage)");
-            break;
-          }
-          xtouch.setFader14(ch, v);
-          logger.info(`Fader ${ch} ← ${v}`);
-          break;
-        }
-        case "lcd": {
-          const strip = Number(rest[0]);
-          const upper = rest[1];
-          const lower = rest.slice(2).join(" ") || "";
-          if (!Number.isFinite(strip) || !upper) {
-            logger.warn("Usage: lcd <strip0-7> <upper> [lower]");
-            break;
-          }
-          if (!xtouch) {
-            logger.warn("X-Touch non connecté");
-            break;
-          }
-          xtouch.sendLcdStripText(strip, upper, lower);
-          logger.info(`LCD[${strip}] ← '${upper}' | '${lower}'`);
-          break;
-        }
-        case "help":
-          logger.info("help: page <idx|name> | pages | emit <controlId> [value] | midi-ports | midi-open <idx|name> | midi-close | learn <id> | fader <ch> <0..16383> | exit");
-          break;
-        case "exit":
-          rl.close();
-          break;
-        default:
-          if (cmd.length > 0) logger.warn("Commande inconnue. Tapez 'help'.");
-      }
-    } catch (err) {
-      logger.error("Erreur CLI:", err as any);
-    } finally {
-      rl.prompt();
-    }
-  });
+  const detachCli = attachCli({ router, xtouch });
 
   const onSig = () => {
-    rl.close();
+    detachCli();
   };
   process.on("SIGINT", onSig);
   process.on("SIGTERM", onSig);
 
-  rl.on("close", () => {
+  const cleanup = () => {
     logger.info("Arrêt XTouch GW");
     stopWatch();
-    midiSniffer?.close();
     for (const b of pageBridges) b.shutdown().catch(() => {});
     vmBridge?.shutdown();
     vmSync?.stop();
     xtouch?.stop();
     process.exit(0);
-  });
-
-  return () => {
-    rl.close();
   };
+
+  return cleanup;
 }

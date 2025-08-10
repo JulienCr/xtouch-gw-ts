@@ -1,6 +1,7 @@
 import { Input, Output } from "@julusian/midi";
 import { logger } from "../logger";
 import { decodeMidi, PitchBendEvent } from "../midi/decoder";
+import { findPortIndexByNameFragment } from "../midi/ports";
 
 export interface XTouchPortsConfig {
   inputName: string; // sous-chaîne à chercher
@@ -13,18 +14,6 @@ export interface XTouchOptions {
 
 type MessageHandler = (deltaSeconds: number, data: number[]) => void;
 
-function findPortIndexByNameFragment<T extends Input | Output>(
-  device: T,
-  nameFragment: string
-): number | null {
-  const needle = nameFragment.trim().toLowerCase();
-  const count = device.getPortCount();
-  for (let i = 0; i < count; i += 1) {
-    const name = device.getPortName(i) ?? "";
-    if (name.toLowerCase().includes(needle)) return i;
-  }
-  return null;
-}
 
 function ascii7(text: string, length = 7): number[] {
   const padded = (text ?? "").padEnd(length).slice(0, length);

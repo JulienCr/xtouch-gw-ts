@@ -3,24 +3,13 @@ import { logger } from "../logger";
 import type { Driver, ExecutionContext } from "../types";
 import { decodeMidi } from "../midi/decoder";
 import type { XTouchDriver } from "../xtouch/driver";
+import { findPortIndexByNameFragment } from "../midi/ports";
 
 export interface VoicemeeterBridgeConfig {
   toVoicemeeterOutName: string; // "xtouch-gw"
   fromVoicemeeterInName: string; // "xtouch-gw-feedback"
 }
 
-function findPortIndexByNameFragment<T extends Input | Output>(
-  device: T,
-  nameFragment: string
-): number | null {
-  const needle = nameFragment.trim().toLowerCase();
-  const count = device.getPortCount();
-  for (let i = 0; i < count; i += 1) {
-    const name = device.getPortName(i) ?? "";
-    if (name.toLowerCase().includes(needle)) return i;
-  }
-  return null;
-}
 
 export class VoicemeeterDriver implements Driver {
   readonly name = "voicemeeter";
