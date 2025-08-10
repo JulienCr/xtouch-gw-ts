@@ -107,8 +107,8 @@ export class Router {
     this.refreshTempoMs = Math.max(0, Math.min(5, options?.interMsgDelayMs ?? 1));
   }
 
-  onMidiFromApp(appKey: string, raw: number[]): void {
-    const entry = StateStore.buildEntryFromRaw(appKey, raw, "app");
+  onMidiFromApp(appKey: string, raw: number[], origin: "app" | "xtouch" = "app"): void {
+    const entry = StateStore.buildEntryFromRaw(appKey, raw, origin);
     if (!entry) return;
     this.state.update(appKey, entry);
     // Trace utile pour diagnostiquer les refreshs et la reconstruction PB depuis CC/Notes
@@ -118,7 +118,7 @@ export class Router {
       const d1 = entry.addr.data1 ?? 0;
       const val = Array.isArray(entry.value) ? `${(entry.value as Uint8Array).length}b` : String(entry.value);
       // Niveau debug pour ne pas spammer par défaut
-      logger.debug(`State <- ${appKey}: ${human(raw)} [${hex(raw)}] → ${kind} ch=${ch} d1=${d1} val=${val}`);
+      logger.debug(`State <- ${appKey} (origin=${origin}): ${human(raw)} [${hex(raw)}] → ${kind} ch=${ch} d1=${d1} val=${val}`);
     } catch {}
     // Ne pas renvoyer immédiatement: les drivers se chargent de l'écho instantané.
     // Le Router utilise le store pour les refreshs de page.
@@ -279,6 +279,8 @@ export class Router {
     const pbs = entries.filter((e) => e.addr.status === "pb");
 
     const batches = [notes, ccs, syx, pbs];
+    // Anti-boucle moteurs: ignorer les PB entrants depuis X-Touch pendant le temps d'établissement
+    try { this.xtouch?.squelchPitchBend(150); } catch {}
     for (const batch of batches) {
       for (const e of batch) {
         const bytes = StateStore.entryToRawForXTouch(e);
