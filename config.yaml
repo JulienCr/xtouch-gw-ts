@@ -2,22 +2,49 @@ midi:
   input_port: "UM-One"
   output_port: "UM-One"
 
+features:
+  vm_sync: false
+
 paging:
   channel: 1
   prev_note: 46
   next_note: 47
 
+# pages:
+#   - name: "Voicemeeter Main"
+#     passthrough:
+#       driver: "midi"
+#       to_port: "xtouch-gw"
+#       from_port: "xtouch-gw-feedback"
+#     controls: {}
+#   - name: "QLC+"
+#     passthrough:
+#       driver: "qlc"
+#       to_port: "qlc-in"
+#       from_port: "qlc-out"
+#   - name: "Default"
+#     controls: {} 
+
 pages:
-  - name: "Voicemeeter Main"
-    passthrough:
-      driver: "midi"
-      to_port: "xtouch-gw"
-      from_port: "xtouch-gw-feedback"
+  - name: "Voicemeeter+QLC"
+    passthroughs:
+      - driver: "midi"
+        to_port: "xtouch-gw"
+        from_port: "xtouch-gw-feedback"
+        filter:
+          channels: [1,2,3,4,5,6,7]
+          types: ["noteOn","noteOff","controlChange","pitchBend"]
+          includeNotes: [0,8,16,24]
+      - driver: "midi"
+        to_port: "qlc-in"
+        from_port: "qlc-out"
+        filter:
+          channels: [8,9]
+          types: ["noteOn","noteOff","controlChange","pitchBend"]
+        transform:
+          pb_to_cc:
+            target_channel: 1   # Envoyer vers canal 1 (QLC+)
+            base_cc: "0x45"     # Mapping: ch1→0x46, ch2→0x47, ch3→0x48, ch4→0x49, etc.
     controls: {}
-  - name: "QLC+"
-    passthrough:
-      driver: "qlc"
-      to_port: "qlc-in"
-      from_port: "qlc-out"
   - name: "Default"
     controls: {} 

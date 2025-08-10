@@ -11,6 +11,7 @@ import { formatDecoded } from "./midi/decoder";
 import { XTouchDriver } from "./xtouch/driver";
 import { MidiBridgeDriver } from "./drivers/midiBridge";
 import type { PagingConfig } from "./config";
+import { VoicemeeterSync } from "./apps/voicemeeterSync";
 
 function toHex(bytes: number[]): string {
   return bytes.map((b) => b.toString(16).padStart(2, "0")).join(" ");
@@ -54,7 +55,8 @@ export async function startApp(): Promise<() => void> {
   // X-Touch: ouvrir les ports définis dans config.yaml
   let xtouch: XTouchDriver | null = null;
   let vmBridge: VoicemeeterDriver | null = null;
-  let pageBridge: MidiBridgeDriver | null = null;
+  let pageBridges: MidiBridgeDriver[] = [];
+  let vmSync: VoicemeeterSync | null = null;
   try {
     xtouch = new XTouchDriver({
       inputName: cfg.midi.input_port,
@@ -73,7 +75,7 @@ export async function startApp(): Promise<() => void> {
     } as any;
 
     // Navigation de pages via NoteOn
-    const unsubNav = xtouch.subscribe((_delta, data) => {
+    const unsubNav = x.subscribe((_delta, data) => {
       const status = data[0] ?? 0;
       const type = (status & 0xf0) >> 4;
       const ch = (status & 0x0f) + 1;
@@ -87,26 +89,45 @@ export async function startApp(): Promise<() => void> {
           // Update LCD avec le nom de la page
           x.sendLcdStripText(0, page?.name ?? "");
           // (Re)créer le bridge de page si besoin
-          if (page?.passthrough) {
-            pageBridge?.shutdown();
-            pageBridge = new MidiBridgeDriver(
-              xtouch!,
-              page.passthrough.to_port,
-              page.passthrough.from_port
-            );
-            pageBridge.init().catch((err) => logger.warn("Bridge page init error:", err as any));
+          if (page?.passthrough || page?.passthroughs) {
+            // Fermer anciens bridges
+            for (const b of pageBridges) {
+              b.shutdown().catch((err) => logger.warn("Bridge shutdown error:", err as any));
+            }
+            pageBridges = [];
+            const items = page.passthroughs ?? (page.passthrough ? [page.passthrough] : []);
+            for (const item of items) {
+              const b = new MidiBridgeDriver(
+                x,
+                item.to_port,
+                item.from_port,
+                item.filter,
+                item.transform,
+                true
+              );
+              pageBridges.push(b);
+              b.init().catch((err) => logger.warn("Bridge page init error:", err as any));
+            }
           } else {
-            pageBridge?.shutdown();
-            pageBridge = null;
+            for (const b of pageBridges) {
+              b.shutdown().catch((err) => logger.warn("Bridge shutdown error:", err as any));
+            }
+            pageBridges = [];
+          }
+          // Snapshot ciblé si voicemeeter
+          if (cfg.features?.vm_sync !== false) {
+            vmSync?.startSnapshotForPage(page?.name ?? "");
           }
         }
       }
     });
 
     // Si aucune page ne définit de passthrough, activer le bridge global vers Voicemeeter
-    const hasPagePassthrough = (cfg.pages ?? []).some((p) => !!p.passthrough);
+    const hasPagePassthrough = (cfg.pages ?? []).some(
+      (p) => !!p.passthrough || (Array.isArray((p as any).passthroughs) && (p as any).passthroughs.length > 0)
+    );
     if (!hasPagePassthrough) {
-      vmBridge = new VoicemeeterDriver(xtouch, {
+      vmBridge = new VoicemeeterDriver(x, {
         toVoicemeeterOutName: "xtouch-gw",
         fromVoicemeeterInName: "xtouch-gw-feedback",
       });
@@ -118,13 +139,29 @@ export async function startApp(): Promise<() => void> {
 
     // Initialiser bridge pour page active si défini
     const initialPage = router.getActivePage();
-    if (initialPage?.passthrough) {
-      pageBridge = new MidiBridgeDriver(
-        xtouch!,
-        initialPage.passthrough.to_port,
-        initialPage.passthrough.from_port
-      );
-      await pageBridge.init();
+    if (initialPage?.passthrough || initialPage?.passthroughs) {
+      const items = initialPage.passthroughs ?? (initialPage.passthrough ? [initialPage.passthrough] : []);
+      for (const item of items) {
+        const b = new MidiBridgeDriver(
+          x,
+          item.to_port,
+          item.from_port,
+          item.filter,
+          item.transform,
+          true
+        );
+        pageBridges.push(b);
+        await b.init();
+      }
+    }
+
+    // Voicemeeter snapshot & dirty loop si activé
+    if (cfg.features?.vm_sync !== false) {
+      vmSync = new VoicemeeterSync(x);
+      await vmSync.startSnapshotForPage(router.getActivePageName());
+      vmSync.startDirtyLoop();
+    } else {
+      logger.info("VM Sync désactivé via configuration.");
     }
   } catch (err) {
     logger.warn("X-Touch/Voicemeeter non connecté:", (err as any)?.message ?? err);
@@ -333,8 +370,9 @@ export async function startApp(): Promise<() => void> {
     logger.info("Arrêt XTouch GW");
     stopWatch();
     midiSniffer?.close();
-    pageBridge?.shutdown();
+    for (const b of pageBridges) b.shutdown().catch(() => {});
     vmBridge?.shutdown();
+    vmSync?.stop();
     xtouch?.stop();
     process.exit(0);
   });

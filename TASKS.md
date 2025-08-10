@@ -17,6 +17,11 @@
 ## En cours
 - [ ] Router (pages OK) → implémenter le mapping d’actions
 
+## Nouveau
+- [x] Transformer MIDI: Pitch Bend → Note On (même canal) avec vélocité mappée (0..127) pour compat QLC+
+- [x] Transformer MIDI: Pitch Bend → Control Change (canal cible configurable, CC par canal source)
+- [x] Bridge: transformation inverse automatique du feedback (CC/Note → Pitch Bend pour X‑Touch)
+
 ## Fait
 - [x] Sniffer MIDI natif (CLI: midi-ports, midi-open <idx|name>, midi-close, learn)
 - [x] X-Touch driver bidirectionnel (echo PitchBend, subscriptions)
