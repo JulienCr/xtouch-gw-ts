@@ -4,6 +4,7 @@ import type { AppConfig, PageConfig } from "./config";
 import { StateStore, MidiStateEntry } from "./state";
 import { applyReverseTransform } from "./midi/transform";
 import type { XTouchDriver } from "./xtouch/driver";
+import { human, hex } from "./midi/utils";
 
 export class Router {
   private config: AppConfig;
@@ -110,6 +111,15 @@ export class Router {
     const entry = StateStore.buildEntryFromRaw(appKey, raw, "app");
     if (!entry) return;
     this.state.update(appKey, entry);
+    // Trace utile pour diagnostiquer les refreshs et la reconstruction PB depuis CC/Notes
+    try {
+      const kind = entry.addr.status;
+      const ch = entry.addr.channel ?? 0;
+      const d1 = entry.addr.data1 ?? 0;
+      const val = Array.isArray(entry.value) ? `${(entry.value as Uint8Array).length}b` : String(entry.value);
+      // Niveau debug pour ne pas spammer par défaut
+      logger.debug(`State <- ${appKey}: ${human(raw)} [${hex(raw)}] → ${kind} ch=${ch} d1=${d1} val=${val}`);
+    } catch {}
     // Ne pas renvoyer immédiatement: les drivers se chargent de l'écho instantané.
     // Le Router utilise le store pour les refreshs de page.
   }
@@ -144,6 +154,11 @@ export class Router {
       }
     }
     const hasPassthrough = appKeysFromPage.length > 0;
+    logger.debug(
+      `Refresh page '${page.name}' (passthrough=${hasPassthrough}) apps=[${appKeysFromPage.join(", ")}], transforms: ${
+        Array.from(transformsByApp.entries()).map(([k, v]) => `${k}:${v.length}`).join(", ") || "none"
+      }`
+    );
     let entries: MidiStateEntry[];
     if (hasPassthrough) {
       // Rejouer l'état si présent, sinon valeurs nulles, sur PB ch1..9 et Notes 0..31 ch1..9
@@ -158,10 +173,15 @@ export class Router {
 
       for (const app of pagePriority) {
         const appEntries = this.state.listEntriesForApps([app]);
-        for (const e of appEntries) {
-          if (e.addr.status === "pb" || e.addr.status === "note") {
-            const k = keyOf(e);
-            if (!byKey.has(k)) byKey.set(k, e);
+        const transforms = transformsByApp.get(app) ?? [];
+        // Si l'app n'a PAS de transform sur cette page, on peut réutiliser ses PB/Notes existants (ex: voicemeeter)
+        // Si l'app a des transforms (ex: QLC pb->cc), on ignore ses PB/Notes stockés (souvent dérivés d'une autre page)
+        if (transforms.length === 0) {
+          for (const e of appEntries) {
+            if (e.addr.status === "pb" || e.addr.status === "note") {
+              const k = keyOf(e);
+              if (!byKey.has(k)) byKey.set(k, e);
+            }
           }
         }
       }
@@ -172,7 +192,7 @@ export class Router {
         const transforms = transformsByApp.get(app) ?? [];
         if (transforms.length === 0) continue;
         for (const e of appEntries) {
-          if (e.addr.status !== "cc") continue;
+          if (e.addr.status !== "cc" && e.addr.status !== "note") continue;
           const raw = StateStore.entryToRawForXTouch(e);
           if (!raw) continue;
           for (const t of transforms) {
@@ -182,6 +202,11 @@ export class Router {
             if (inferred && inferred.addr.status === "pb") {
               const k = keyOf(inferred);
               if (!byKey.has(k)) byKey.set(k, inferred);
+              try {
+                logger.debug(
+                  `Infer PB from ${app}: ${human(raw)} [${hex(raw)}] → ${human(rev)} [${hex(rev)}] (ch=${inferred.addr.channel}, val=${inferred.value})`
+                );
+              } catch {}
             }
           }
         }
@@ -189,16 +214,24 @@ export class Router {
 
       const now = Date.now();
       entries = [];
+      // Faders (PB) ch1..9: rejouer connus ou 0
       for (let ch = 1; ch <= 9; ch += 1) {
         const k = `pb:${ch}:0`;
         const found = byKey.get(k);
         entries.push(found ?? { addr: { status: "pb", channel: ch, data1: 0 }, value: 0, ts: now, origin: "xtouch" });
       }
+      // Notes 0..31 ch1..9: rejouer connus ou éteindre
       for (let ch = 1; ch <= 9; ch += 1) {
         for (let n = 0; n <= 31; n += 1) {
           const k = `note:${ch}:${n}`;
           const found = byKey.get(k);
           entries.push(found ?? { addr: { status: "note", channel: ch, data1: n }, value: 0, ts: now, origin: "xtouch" });
+        }
+      }
+      // CC 0..31 ch1..9: reset à 0 pour éviter les résidus visuels (rings/encoders) d'une autre page
+      for (let ch = 1; ch <= 9; ch += 1) {
+        for (let cc = 0; cc <= 31; cc += 1) {
+          entries.push({ addr: { status: "cc", channel: ch, data1: cc }, value: 0, ts: now, origin: "xtouch" });
         }
       }
     } else {
@@ -255,6 +288,11 @@ export class Router {
         // Important: n'envoyer que sur le port X-Touch; ne pas relayer ces frames vers les apps
         this.xtouch.sendRawMessage(bytes);
         this.state.markSentToXTouch(e.addr, e.value);
+        try {
+          if (e.addr.status === "pb") {
+            logger.trace(`Send PB -> X-Touch: ${human(bytes)} [${hex(bytes)}]`);
+          }
+        } catch {}
         // Cas particulier: certaines firmwares X-Touch/MCU exigent un NoteOff explicite (0x80)
         // pour éteindre les LED, alors que NoteOn vel=0 devrait suffire.
         // On envoie un NoteOff supplémentaire pour toute note mise à 0.

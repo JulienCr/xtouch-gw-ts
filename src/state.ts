@@ -69,7 +69,11 @@ export class StateStore {
     for (const a of apps) {
       const m = this.apps.get(a);
       if (!m) continue;
-      for (const v of m.values()) out.push(v);
+      // Ne pas réutiliser des entrées marquées comme provenant de la X-Touch pour reconstruire l'état applicatif
+      // (surtout au changement de page). On ne garde que ce qui vient réellement des apps.
+      for (const v of m.values()) {
+        if (v.origin === "app") out.push(v);
+      }
     }
     return out;
   }

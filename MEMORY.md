@@ -42,3 +42,7 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
     - Décision: adopter une source de vérité MIDI-only par app (Note/CC/PB/SysEx) via `StateStore` avec anti-boucle (50ms) et `lastSentToXTouch`.
     - Implémentation: capture des feedbacks depuis `VoicemeeterDriver` et `MidiBridgeDriver` vers le `Router.onMidiFromApp()`; mapping automatique de l’app (`qlc`/`voicemeeter`/`obs`) selon les ports bridge. Refresh de page ordonné (Notes→CC→LCD→Faders). Fix: `nextPage()` appelait pas `refreshPage()` → ajouté. Reset par défaut: canal 1, notes 0..31 uniquement (LED).
     - À améliorer: filtrage par mapping de page → `MidiAddr` et persistance `.state/xtouch-gw.json`.
+  - 2025-08-10 — Pages 3/4 ne se refreshent pas
+    - Symptôme: en naviguant vers P3/P4, pas de mise à jour des faders/LED.
+    - Cause: mauvaise hypothèse sur le canal cible; QLC attend les CC sur le canal 1.
+    - Fix: conserver `target_channel: 1` et clarifier `base_cc` en hex (P3: 0x45, P4: 0x50). Le feedback CC (CH1) est correctement inversé vers PB pour le refresh de page.

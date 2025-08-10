@@ -218,6 +218,8 @@ export async function startApp(): Promise<() => void> {
           if (cfg.features?.vm_sync !== false) {
             vmSync?.startSnapshotForPage(page?.name ?? "");
           }
+          // Rejouer l'état connu après (ré)initialisation des bridges et listeners
+          try { router.refreshPage(); } catch {}
         }
       }
     });
@@ -258,6 +260,8 @@ export async function startApp(): Promise<() => void> {
     }
     // Initialiser les listeners background au démarrage
     rebuildBackgroundListeners(initialPage);
+    // Forcer un refresh après l'init pour rejouer l'état connu
+    try { router.refreshPage(); } catch {}
 
     // Voicemeeter snapshot & dirty loop si activé
     if (cfg.features?.vm_sync !== false) {
