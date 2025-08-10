@@ -1,5 +1,6 @@
 import { logger, setLogLevel } from "./logger";
 import { loadConfig, findConfigPath, watchConfig, AppConfig } from "./config";
+import type { PageConfig, TransformConfig } from "./config";
 import { Router } from "./router";
 import { ConsoleDriver } from "./drivers/consoleDriver";
 import { VoicemeeterDriver } from "./drivers/voicemeeter";
@@ -7,6 +8,9 @@ import { QlcDriver } from "./drivers/qlc";
 import { ObsDriver } from "./drivers/obs";
 import { formatDecoded } from "./midi/decoder";
 import { XTouchDriver } from "./xtouch/driver";
+import { Input } from "@julusian/midi";
+import { findPortIndexByNameFragment } from "./midi/ports";
+import { applyReverseTransform } from "./midi/transform";
 import { MidiBridgeDriver } from "./drivers/midiBridge";
 import type { PagingConfig } from "./config";
 import { VoicemeeterSync } from "./apps/voicemeeterSync";
@@ -52,6 +56,8 @@ export async function startApp(): Promise<() => void> {
       } catch (e) {
         logger.debug("Hot reload LCD refresh skipped:", e as any);
       }
+      // Reconfigurer les listeners background après reload
+      try { rebuildBackgroundListeners(router.getActivePage()); } catch {}
     },
     (err) => logger.warn("Erreur hot reload config:", err as any)
   );
@@ -66,6 +72,74 @@ export async function startApp(): Promise<() => void> {
   let vmBridge: VoicemeeterDriver | null = null;
   let pageBridges: MidiBridgeDriver[] = [];
   let vmSync: VoicemeeterSync | null = null;
+  // Listeners en arrière-plan pour capter le feedback des apps hors page active
+  const backgroundInputs = new Map<string, { inp: Input; appKey: string }>();
+
+  const resolveAppKeyInternal = (toPort: string, fromPort: string): string => {
+    const to = (toPort || "").toLowerCase();
+    const from = (fromPort || "").toLowerCase();
+    const txt = `${to} ${from}`;
+    if (txt.includes("qlc")) return "qlc";
+    if (txt.includes("xtouch-gw") || txt.includes("voicemeeter")) return "voicemeeter";
+    if (txt.includes("obs")) return "obs";
+    return "midi-bridge";
+  };
+
+  const rebuildBackgroundListeners = (activePage: PageConfig | undefined) => {
+    // Ports 'from' utilisés par la page active (à ne pas écouter en doublon)
+    const activeFroms = new Set<string>();
+    const itemsActive = (activePage as any)?.passthroughs ?? ((activePage as any)?.passthrough ? [(activePage as any).passthrough] : []);
+    for (const it of (itemsActive as any[])) {
+      if (it?.from_port) activeFroms.add(it.from_port);
+    }
+    // Construire la cible: tous les from_ports des autres pages
+    const desired = new Map<string, { appKey: string; transform?: TransformConfig }>();
+    for (const p of cfg.pages ?? []) {
+      const items = (p as any).passthroughs ?? ((p as any).passthrough ? [(p as any).passthrough] : []);
+      for (const it of (items as any[])) {
+        const from = it?.from_port;
+        if (!from || activeFroms.has(from)) continue;
+        if (!desired.has(from)) desired.set(from, { appKey: resolveAppKeyInternal(it?.to_port, from), transform: it?.transform });
+      }
+    }
+    // Fermer les obsolètes
+    for (const [from, h] of backgroundInputs) {
+      if (!desired.has(from)) {
+        try { h.inp.closePort(); } catch {}
+        backgroundInputs.delete(from);
+        logger.info(`Background listener OFF: '${from}'.`);
+      }
+    }
+    // Ouvrir les nouveaux
+    for (const [from, info] of desired) {
+      if (backgroundInputs.has(from)) continue;
+      try {
+        const inp = new Input();
+        const idx = findPortIndexByNameFragment(inp, from);
+        if (idx == null) {
+          inp.closePort?.();
+          logger.warn(`Background listener: port IN introuvable '${from}'.`);
+          continue;
+        }
+        inp.ignoreTypes(false, false, false);
+        const transform = info.transform;
+        inp.on("message", (_delta, data) => {
+          try {
+            const tx = applyReverseTransform(data, transform);
+            if (tx) router.onMidiFromApp(info.appKey, tx);
+            router.onMidiFromApp(info.appKey, data);
+          } catch (err) {
+            logger.debug("Background listener error:", err as any);
+          }
+        });
+        inp.openPort(idx);
+        backgroundInputs.set(from, { inp, appKey: info.appKey });
+        logger.info(`Background listener ON: '${from}'.`);
+      } catch (err) {
+        logger.warn(`Background listener open failed '${from}':`, err as any);
+      }
+    }
+  };
   try {
     xtouch = new XTouchDriver({
       inputName: cfg.midi.input_port,
@@ -138,6 +212,8 @@ export async function startApp(): Promise<() => void> {
             }
             pageBridges = [];
           }
+          // Listeners background (apps hors page)
+          rebuildBackgroundListeners(page);
           // Snapshot ciblé si voicemeeter
           if (cfg.features?.vm_sync !== false) {
             vmSync?.startSnapshotForPage(page?.name ?? "");
@@ -180,6 +256,8 @@ export async function startApp(): Promise<() => void> {
         await b.init();
       }
     }
+    // Initialiser les listeners background au démarrage
+    rebuildBackgroundListeners(initialPage);
 
     // Voicemeeter snapshot & dirty loop si activé
     if (cfg.features?.vm_sync !== false) {
@@ -206,6 +284,7 @@ export async function startApp(): Promise<() => void> {
     try { vmBridge?.shutdown(); } catch {}
     try { vmSync?.stop(); } catch {}
     try { xtouch?.stop(); } catch {}
+    try { for (const h of backgroundInputs.values()) { h.inp.closePort(); } } catch {}
     process.exit(0);
   };
 
