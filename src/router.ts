@@ -2,6 +2,7 @@ import { logger } from "./logger";
 import type { ControlMapping, Driver, ExecutionContext } from "./types";
 import type { AppConfig, PageConfig } from "./config";
 import { StateStore, MidiStateEntry } from "./state";
+import { applyReverseTransform } from "./midi/transform";
 import type { XTouchDriver } from "./xtouch/driver";
 
 export class Router {
@@ -133,6 +134,15 @@ export class Router {
     const appKeysFromPage: string[] = Array.isArray(items)
       ? Array.from(new Set(items.map((it: any) => resolveAppKey(it?.to_port, it?.from_port))))
       : [];
+    const transformsByApp: Map<string, any[]> = new Map();
+    if (Array.isArray(items)) {
+      for (const it of items as any[]) {
+        const appKey = resolveAppKey(it?.to_port, it?.from_port);
+        const arr = transformsByApp.get(appKey) ?? [];
+        if (it?.transform) arr.push(it.transform);
+        transformsByApp.set(appKey, arr);
+      }
+    }
     const hasPassthrough = appKeysFromPage.length > 0;
     let entries: MidiStateEntry[];
     if (hasPassthrough) {
@@ -140,22 +150,54 @@ export class Router {
       // IMPORTANT: ne considérer que les apps actives pour la page courante
       const globalPriority = ["voicemeeter", "qlc", "obs", "midi-bridge"] as const;
       const pagePriority = globalPriority.filter((k) => appKeysFromPage.includes(k));
-      const pickFirst = (addr: { status: "pb"|"note"; channel: number; data1: number }): MidiStateEntry | undefined => {
-        for (const app of pagePriority) {
-          const e = this.state.get(app as any, addr);
-          if (e) return e;
+
+      // Construire un index (status,ch,data1) -> entry en piochant prioritairement PB/NOTE,
+      // et en complétant à partir des CC via applyReverseTransform selon les transforms de la page
+      const byKey = new Map<string, MidiStateEntry>();
+      const keyOf = (e: MidiStateEntry) => `${e.addr.status}:${e.addr.channel ?? 0}:${e.addr.data1 ?? 0}`;
+
+      for (const app of pagePriority) {
+        const appEntries = this.state.listEntriesForApps([app]);
+        for (const e of appEntries) {
+          if (e.addr.status === "pb" || e.addr.status === "note") {
+            const k = keyOf(e);
+            if (!byKey.has(k)) byKey.set(k, e);
+          }
         }
-        return undefined;
-      };
+      }
+
+      // Essayer d'inférer des PB depuis des CC avec les transforms de la page
+      for (const app of pagePriority) {
+        const appEntries = this.state.listEntriesForApps([app]);
+        const transforms = transformsByApp.get(app) ?? [];
+        if (transforms.length === 0) continue;
+        for (const e of appEntries) {
+          if (e.addr.status !== "cc") continue;
+          const raw = StateStore.entryToRawForXTouch(e);
+          if (!raw) continue;
+          for (const t of transforms) {
+            const rev = applyReverseTransform(raw, t);
+            if (!rev) continue;
+            const inferred = StateStore.buildEntryFromRaw(app, rev, "app");
+            if (inferred && inferred.addr.status === "pb") {
+              const k = keyOf(inferred);
+              if (!byKey.has(k)) byKey.set(k, inferred);
+            }
+          }
+        }
+      }
+
       const now = Date.now();
       entries = [];
       for (let ch = 1; ch <= 9; ch += 1) {
-        const found = pickFirst({ status: "pb", channel: ch, data1: 0 });
+        const k = `pb:${ch}:0`;
+        const found = byKey.get(k);
         entries.push(found ?? { addr: { status: "pb", channel: ch, data1: 0 }, value: 0, ts: now, origin: "xtouch" });
       }
       for (let ch = 1; ch <= 9; ch += 1) {
         for (let n = 0; n <= 31; n += 1) {
-          const found = pickFirst({ status: "note", channel: ch, data1: n });
+          const k = `note:${ch}:${n}`;
+          const found = byKey.get(k);
           entries.push(found ?? { addr: { status: "note", channel: ch, data1: n }, value: 0, ts: now, origin: "xtouch" });
         }
       }
