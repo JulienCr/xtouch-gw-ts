@@ -19,7 +19,28 @@ export class Router {
     obs: new Map(),
     "midi-bridge": new Map(),
   };
-  private readonly antiLoopWindowMs = 50;
+  /** Timestamp de la dernière action locale (X‑Touch) par cible X‑Touch (status|ch|d1). */
+  private readonly lastUserActionTs: Map<string, number> = new Map();
+  /**
+   * Fenêtres anti-echo spécifiques par type d'évènement MIDI (ms).
+   * Objectif: éviter les boucles sans retarder les feedbacks utiles.
+   */
+  private readonly antiLoopWindowMsByStatus: Record<MidiStatus, number> = {
+    note: 30,
+    cc: 50,
+    pb: 250,
+    sysex: 60,
+  } as const;
+
+  /**
+   * Mètres de latence round-trip par app/type, utilisés pour les rapports CLI.
+   */
+  private readonly latencyMeters: Record<AppKey, Record<MidiStatus, LatencyMeter>> = {
+    voicemeeter: { note: new LatencyMeter(), cc: new LatencyMeter(), pb: new LatencyMeter(), sysex: new LatencyMeter() },
+    qlc: { note: new LatencyMeter(), cc: new LatencyMeter(), pb: new LatencyMeter(), sysex: new LatencyMeter() },
+    obs: { note: new LatencyMeter(), cc: new LatencyMeter(), pb: new LatencyMeter(), sysex: new LatencyMeter() },
+    "midi-bridge": { note: new LatencyMeter(), cc: new LatencyMeter(), pb: new LatencyMeter(), sysex: new LatencyMeter() },
+  };
 
   constructor(initialConfig: AppConfig) {
     this.config = initialConfig;
@@ -150,15 +171,30 @@ export class Router {
       const appsInPage = this.getAppsForPage(page);
       if (!appsInPage.includes(app)) return;
       // Anti-echo: si on vient d'envoyer la même valeur vers l'app (shadow), ignorer
-      const k = addrKey(entry.addr);
+      const k = this.addrKeyForApp(entry.addr);
       const prev = this.appShadows[app].get(k);
       const now = Date.now();
-      if (prev && this.midiValueEquals(prev.value, entry.value) && now - prev.ts < this.antiLoopWindowMs) {
-        return;
+      if (prev) {
+        const rtt = now - prev.ts;
+        // Enregistrer la latence round-trip même si on va ignorer l'echo (utile pour diagnostiquer)
+        try {
+          this.latencyMeters[app][entry.addr.status].record(rtt);
+        } catch {}
+        const win = (this.antiLoopWindowMsByStatus as any)[entry.addr.status] ?? 60;
+        if (this.midiValueEquals(prev.value, entry.value) && rtt < win) {
+          return;
+        }
       }
       // MUTUALISATION: la même pipeline transform/emit que le refresh
       const maybeForward = this.transformAppToXTouch(page, app, entry);
       if (!maybeForward) return;
+      // Last-Write-Wins: si une action locale récente a eu lieu sur cette cible X‑Touch, ignorer un feedback plus ancien
+      const targetKey = this.addrKeyForXTouch(maybeForward.addr);
+      const lastLocal = this.lastUserActionTs.get(targetKey) ?? 0;
+      const grace = (maybeForward.addr.status === "pb" ? 300 : 80);
+      if (Date.now() - lastLocal < grace) {
+        return;
+      }
       this.emitToXTouchIfNotDuplicate(maybeForward);
     } catch {}
   }
@@ -169,9 +205,29 @@ export class Router {
       const app = appKey as AppKey;
       const e = StateStore.buildEntryFromRaw(raw, portId);
       if (!e) return;
-      const k = addrKey(e.addr);
+      const k = this.addrKeyForApp(e.addr);
       this.appShadows[app].set(k, { value: e.value, ts: Date.now() });
     } catch {}
+  }
+
+  /** Marque une action locale (X‑Touch) pour LWW/grace windows. */
+  markUserActionFromRaw(raw: number[]): void {
+    if (!raw || raw.length === 0) return;
+    const status = raw[0] ?? 0;
+    if (status >= 0xF0) return;
+    const type = (status & 0xf0) >> 4;
+    const ch = ((status & 0x0f) + 1) | 0;
+    let key: string | null = null;
+    if (type === 0xE) {
+      key = this.addrKeyForXTouch({ status: "pb", channel: ch, data1: 0 } as any);
+    } else if (type === 0xB) {
+      const cc = raw[1] ?? 0;
+      key = this.addrKeyForXTouch({ status: "cc", channel: ch, data1: cc } as any);
+    } else if (type === 0x9 || type === 0x8) {
+      const note = raw[1] ?? 0;
+      key = this.addrKeyForXTouch({ status: "note", channel: ch, data1: note } as any);
+    }
+    if (key) this.lastUserActionTs.set(key, Date.now());
   }
 
   /**
@@ -439,12 +495,14 @@ export class Router {
     const batches = [notes, ccs, syx, pbs];
     
     // Anti-boucle moteurs: ignorer les PB entrants depuis X-Touch pendant le temps d'établissement
-    try { this.xtouch?.squelchPitchBend(200); } catch {}
+    try { this.xtouch?.squelchPitchBend(120); } catch {}
     
     for (const batch of batches) {
       for (const e of batch) {
         const bytes = this.entryToRawForXTouch(e);
         if (!bytes) continue;
+        // Marquer comme action locale simulée pour protéger contre un feedback app légèrement retardé
+        try { this.lastUserActionTs.set(this.addrKeyForXTouch(e.addr), Date.now()); } catch {}
         
         this.emitToXTouchIfNotDuplicate(e, bytes);
         
@@ -454,12 +512,13 @@ export class Router {
           }
         } catch {}
         
-        // Cas particulier: NoteOff explicite pour certains firmwares → conservé, mais pas répété
+        // Cas particulier: pour éviter clignotement LED, ne pas renvoyer NoteOff (release) ici
         if (e.addr.status === "note" && (e.value as number) === 0) {
           const ch = Math.max(1, Math.min(16, e.addr.channel ?? 1));
           const note = Math.max(0, Math.min(127, e.addr.data1 ?? 0));
           const noteOff = [0x80 + (ch - 1), note, 0];
-          this.xtouch.sendRawMessage(noteOff);
+          // Laisser l'écho local gérer l'affichage; éviter re-send ici pour réduire la charge
+          // this.xtouch.sendRawMessage(noteOff);
         }
       }
     }
@@ -470,7 +529,8 @@ export class Router {
     const k = this.addrKeyForXTouch(entry.addr);
     const prev = this.xtouchShadow.get(k);
     const now = Date.now();
-    if (prev && this.midiValueEquals(prev.value, entry.value) && now - prev.ts < this.antiLoopWindowMs) {
+    const win = (this.antiLoopWindowMsByStatus as any)[entry.addr.status] ?? 60;
+    if (prev && this.midiValueEquals(prev.value, entry.value) && now - prev.ts < win) {
       return;
     }
     const bytes = prebuilt ?? this.entryToRawForXTouch(entry);
@@ -480,6 +540,14 @@ export class Router {
   }
 
   private addrKeyForXTouch(addr: MidiStateEntry["addr"]): string {
+    const s = addr.status;
+    const ch = addr.channel ?? 0;
+    const d1 = addr.data1 ?? 0;
+    return `${s}|${ch}|${d1}`;
+  }
+
+  private addrKeyForApp(addr: MidiStateEntry["addr"]): string {
+    // Clé d'anti-echo/latence côté app: ignorer le portId pour associer l'aller (to_port) et le retour (from_port)
     const s = addr.status;
     const ch = addr.channel ?? 0;
     const d1 = addr.data1 ?? 0;
@@ -515,6 +583,7 @@ export class Router {
       case "pb": {
         const ch = Math.max(1, Math.min(16, addr.channel ?? 1));
         const status = 0xE0 + (ch - 1);
+        // Deadband léger: conserver la valeur exacte pour refléter précisément le setpoint confirmé
         const v14 = typeof value === "number" ? Math.max(0, Math.min(16383, Math.floor(value))) : 8192;
         const lsb = v14 & 0x7F;
         const msb = (v14 >> 7) & 0x7F;
@@ -529,3 +598,72 @@ export class Router {
     }
   }
 }
+
+/**
+ * Petit agrégateur de latence qui garde une fenêtre glissante et calcule p50/p95/max.
+ */
+class LatencyMeter {
+  private readonly window: number[] = [];
+  private readonly maxSize = 256;
+  private lastMs = 0;
+
+  /** Enregistre une mesure (en ms). */
+  record(ms: number): void {
+    this.lastMs = ms;
+    this.window.push(ms);
+    if (this.window.length > this.maxSize) this.window.shift();
+  }
+
+  /** Réinitialise les mesures. */
+  reset(): void {
+    this.window.length = 0;
+    this.lastMs = 0;
+  }
+
+  /** Retourne un résumé {count, last, p50, p95, max}. */
+  summary(): { count: number; last: number; p50: number; p95: number; max: number } {
+    const arr = this.window.slice().sort((a, b) => a - b);
+    const n = arr.length;
+    const pct = (p: number) => (n === 0 ? 0 : arr[Math.min(n - 1, Math.max(0, Math.round((p / 100) * (n - 1))))]);
+    const mx = n === 0 ? 0 : arr[n - 1];
+    return { count: n, last: this.lastMs, p50: pct(50), p95: pct(95), max: mx };
+  }
+}
+
+/**
+ * Extensions utilitaires sur Router (report/clear latence, utilitaire anti-echo).
+ */
+export interface LatencyReportItem { count: number; last: number; p50: number; p95: number; max: number }
+export type LatencyReport = Record<AppKey, Record<MidiStatus, LatencyReportItem>>;
+
+export interface Router { getLatencyReport(): LatencyReport; resetLatency(): void; }
+
+// Implémentation des méthodes ajoutées sur le prototype
+(Router as any).prototype.getLatencyReport = function getLatencyReport(this: Router): LatencyReport {
+  const self = this as any;
+  const meters = self.latencyMeters as Record<AppKey, Record<MidiStatus, LatencyMeter>>;
+  const out: any = {};
+  for (const app of Object.keys(meters) as AppKey[]) {
+    out[app] = {} as any;
+    for (const st of ["note","cc","pb","sysex"] as MidiStatus[]) {
+      out[app][st] = meters[app][st].summary();
+    }
+  }
+  return out;
+};
+
+(Router as any).prototype.resetLatency = function resetLatency(this: Router): void {
+  const self = this as any;
+  const meters = self.latencyMeters as Record<AppKey, Record<MidiStatus, LatencyMeter>>;
+  for (const app of Object.keys(meters) as AppKey[]) {
+    for (const st of ["note","cc","pb","sysex"] as MidiStatus[]) {
+      meters[app][st].reset();
+    }
+  }
+};
+
+// Utilitaire interne
+(Router as any).prototype.getAntiLoopMs = function getAntiLoopMs(this: Router, status: MidiStatus): number {
+  const self = this as any;
+  return (self.antiLoopWindowMsByStatus?.[status] ?? 60) as number;
+};
