@@ -95,13 +95,10 @@ export class MidiBridgeDriver implements Driver {
               }
               logger.debug(`Bridge TX -> ${this.toPort}: ${human(tx)} [${hex(tx)}]`);
               this.outToTarget?.sendMessage(tx);
-              // Si on transforme PB->CC (cas QLC), programmer un setpoint moteur APRÈS une courte inactivité,
-              // pour éviter la résistance pendant le mouvement tout en figeant la nouvelle position.
+              // Programmer un setpoint moteur APRÈS une courte inactivité pour TOUT PB (QLC pb_to_cc ou VM PB natif)
               try {
-                const status2 = data[0] ?? 0;
-                const type2 = (status2 & 0xf0) >> 4;
-                if (type2 === 0xE && this.transform?.pb_to_cc) {
-                  const ch1 = (status2 & 0x0f) + 1;
+                if (typeNibble === 0xE) {
+                  const ch1 = (status & 0x0f) + 1;
                   const lsb = data[1] ?? 0;
                   const msb = data[2] ?? 0;
                   const value14 = ((msb & 0x7f) << 7) | (lsb & 0x7f);
