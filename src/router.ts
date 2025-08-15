@@ -3,7 +3,8 @@ import type { ControlMapping, Driver, ExecutionContext } from "./types";
 import type { AppConfig, PageConfig } from "./config";
 import { StateStore, MidiStateEntry, AppKey, MidiStatus, MidiValue } from "./state";
 import type { XTouchDriver } from "./xtouch/driver";
-import { human, hex, getTypeNibble, rawFromPb14 } from "./midi/utils";
+import { human, hex, getTypeNibble, rawFromPb14, isPB, isCC, isNoteOn } from "./midi/utils";
+import { addrKeyWithoutPort } from "./shared/addrKey";
 import { getAppsForPage, getChannelsForApp, resolvePbToCcMappingForApp, transformAppToXTouch } from "./router/page";
 import { LatencyMeter, attachLatencyExtensions } from "./router/latency";
 
@@ -38,22 +39,32 @@ export class Router {
     this.state = new StateStore();
   }
 
+  /**
+   * Enregistre un driver applicatif par clé (ex: "voicemeeter", "qlc", "obs").
+   */
   registerDriver(key: string, driver: Driver): void {
     this.drivers.set(key, driver);
   }
 
+  /** Retourne la page active. */
   getActivePage(): PageConfig | undefined {
     return this.config.pages[this.activePageIndex];
   }
 
+  /** Retourne le nom de la page active. */
   getActivePageName(): string {
     return this.getActivePage()?.name ?? "(none)";
   }
 
+  /** Liste les noms des pages configurées. */
   listPages(): string[] {
     return this.config.pages.map((p) => p.name);
   }
 
+  /**
+   * Définit la page active par index ou par nom et déclenche un refresh.
+   * Retourne true si la page a été changée.
+   */
   setActivePage(nameOrIndex: string | number): boolean {
     if (typeof nameOrIndex === "number") {
       if (nameOrIndex >= 0 && nameOrIndex < this.config.pages.length) {
@@ -74,6 +85,7 @@ export class Router {
     return false;
   }
 
+  /** Passe à la page suivante (circulaire) et rafraîchit. */
   nextPage(): void {
     if (this.config.pages.length === 0) return;
     this.activePageIndex = (this.activePageIndex + 1) % this.config.pages.length;
@@ -81,6 +93,7 @@ export class Router {
     this.refreshPage();
   }
 
+  /** Passe à la page précédente (circulaire) et rafraîchit. */
   prevPage(): void {
     if (this.config.pages.length === 0) return;
     this.activePageIndex =
@@ -89,6 +102,9 @@ export class Router {
     this.refreshPage();
   }
 
+  /**
+   * Exécute l'action mappée pour un contrôle logique de la page courante.
+   */
   async handleControl(controlId: string, value?: unknown): Promise<void> {
     const page = this.getActivePage();
     const mapping = page?.controls?.[controlId] as ControlMapping | undefined;
@@ -109,6 +125,7 @@ export class Router {
     }
   }
 
+  /** Met à jour la configuration et notifie les drivers. */
   async updateConfig(next: AppConfig): Promise<void> {
     this.config = next;
     if (this.activePageIndex >= this.config.pages.length) {
@@ -121,6 +138,7 @@ export class Router {
     logger.info("Router: configuration mise à jour.");
   }
 
+  /** Attache le driver X‑Touch au router. */
   attachXTouch(xt: XTouchDriver): void {
     this.xtouch = xt;
   }
@@ -128,6 +146,10 @@ export class Router {
   /**
    * Traite le feedback MIDI reçu d'un logiciel
    * SEULE SOURCE DE VÉRITÉ pour mettre à jour les states
+   */
+  /**
+   * Traite un feedback MIDI brut provenant d'une application (Voicemeeter/QLC/OBS...).
+   * Met à jour le StateStore et, si pertinent pour la page active, rejoue vers X‑Touch avec protections anti‑echo.
    */
   onMidiFromApp(appKey: string, raw: number[], portId: string): void {
     const entry = StateStore.buildEntryFromRaw(raw, portId);
@@ -183,6 +205,9 @@ export class Router {
     } catch {}
   }
 
+  /**
+   * Marque le dernier message émis vers une app (shadow) pour l'anti‑echo et la mesure de latence RTT.
+   */
   markAppShadowForOutgoing(appKey: string, raw: number[], portId: string): void {
     try {
       const app = appKey as AppKey;
@@ -193,20 +218,21 @@ export class Router {
     } catch {}
   }
 
-  /** Marque une action locale (X‑Touch) pour LWW/grace windows. */
+  /**
+   * Marque une action locale (X‑Touch) à partir d'une trame brute, pour appliquer les fenêtres de grâce LWW.
+   */
   markUserActionFromRaw(raw: number[]): void {
     if (!raw || raw.length === 0) return;
     const status = raw[0] ?? 0;
     if (status >= 0xF0) return;
-    const type = (status & 0xf0) >> 4;
     const ch = ((status & 0x0f) + 1) | 0;
     let key: string | null = null;
-    if (type === 0xE) {
+    if (isPB(status)) {
       key = this.addrKeyForXTouch({ status: "pb", channel: ch, data1: 0 } as any);
-    } else if (type === 0xB) {
+    } else if (isCC(status)) {
       const cc = raw[1] ?? 0;
       key = this.addrKeyForXTouch({ status: "cc", channel: ch, data1: cc } as any);
-    } else if (type === 0x9 || type === 0x8) {
+    } else if (isNoteOn(status) || getTypeNibble(status) === 0x8) {
       const note = raw[1] ?? 0;
       key = this.addrKeyForXTouch({ status: "note", channel: ch, data1: note } as any);
     }
@@ -217,6 +243,7 @@ export class Router {
    * Refresh complet de la page active selon la nouvelle architecture
    * Utilise UNIQUEMENT les états des logiciels stockés via feedback MIDI
    */
+  /** Rafraîchit complètement la page active (replay des états connus vers X‑Touch). */
   refreshPage(): void {
     if (!this.xtouch) return;
     const page = this.getActivePage();
@@ -396,18 +423,12 @@ export class Router {
   }
 
   private addrKeyForXTouch(addr: MidiStateEntry["addr"]): string {
-    const s = addr.status;
-    const ch = addr.channel ?? 0;
-    const d1 = addr.data1 ?? 0;
-    return `${s}|${ch}|${d1}`;
+    return addrKeyWithoutPort(addr as any);
   }
 
   private addrKeyForApp(addr: MidiStateEntry["addr"]): string {
-    // Clé d'anti-echo/latence côté app: ignorer le portId pour associer l'aller (to_port) et le retour (from_port)
-    const s = addr.status;
-    const ch = addr.channel ?? 0;
-    const d1 = addr.data1 ?? 0;
-    return `${s}|${ch}|${d1}`;
+    // Anti-echo/latence côté app: ignorer le portId pour associer l'aller (to_port) et le retour (from_port)
+    return addrKeyWithoutPort(addr as any);
   }
 
   private midiValueEquals(a: MidiValue, b: MidiValue): boolean {
