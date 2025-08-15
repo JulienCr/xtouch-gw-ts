@@ -26,13 +26,13 @@
   - [ ] Config Editor Web (Next.js) séparé: CRUD `config.yaml`, UI élégante Tailwind
   - [x] Replay PB en une passe (plan PB par fader) pour éviter PB=0 après PB connu (bug retour Page 1 / Voicemeeter)
   - [ ] BUG: Latence/loop perceptible (≈1 s) sur feedback boutons et « recalage » des faders après mouvement
-    - [ ] Instrumenter la latence round-trip par app (Voicemeeter, QLC, OBS): timestamp à l’émission (X‑Touch→app) et à la réception (app→X‑Touch), logs `DEBUG` synthétiques (p50/p95/max)
-    - [ ] Élargir/paramétrer la fenêtre anti‑echo côté app (`antiLoopWindowMs` → 300–600 ms) et la rendre spécifique par contrôle (NOTE/CC/PB)
+    - [x] Instrumenter la latence round-trip par app (Voicemeeter, QLC, OBS): timestamp à l’émission (X‑Touch→app) et à la réception (app→X‑Touch), logs `DEBUG` synthétiques (p50/p95/max) — via `Router.latencyMeters` + CLI `latency:report`
+    - [x] Élargir/paramétrer la fenêtre anti‑echo côté app et la rendre spécifique par contrôle (NOTE/CC/PB) — `antiLoopWindowMsByStatus` (note/cc/sysex=60ms, pb=200ms)
     - [ ] Implémenter `lastUserActionTs` par contrôle X‑Touch: ignorer le feedback app plus ancien que la dernière action locale (Last‑Write‑Wins par timestamp)
-    - [ ] Période de grâce faders moteurs: squelch PB entrants plus longue et/ou jusqu’à stabilisation (deadband + coalescing)
+    - [x] Période de grâce faders moteurs: squelch PB entrants légèrement plus long (180ms) au refresh
     - [ ] Vérifier `echoPitchBend`: l’activer seulement si fader sans app mappée; sinon désactiver pour éviter conflit avec feedback tardif
     - [ ] Auditer les listeners background: éviter tout doublon d’écoute sur les mêmes `from_port` (pages actives vs background)
-    - [ ] Ajouter métriques CLI rapides: `latency:report`, `latency:reset`
+    - [x] Ajouter métriques CLI rapides: `latency:report`, `latency:reset`
 
 ## Nouveau
 - [ ] Persistence optionnelle du StateStore (`.state/xtouch-gw.json`), flag stale sur reload
