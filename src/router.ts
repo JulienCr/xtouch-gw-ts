@@ -1,11 +1,10 @@
 import { logger } from "./logger";
 import type { ControlMapping, Driver, ExecutionContext } from "./types";
 import type { AppConfig, PageConfig } from "./config";
-import { StateStore, MidiStateEntry, AppKey, MidiStatus, addrKey, MidiValue } from "./state";
+import { StateStore, MidiStateEntry, AppKey, MidiStatus, MidiValue } from "./state";
 import type { XTouchDriver } from "./xtouch/driver";
 import { human, hex } from "./midi/utils";
-import { getPagePassthroughItems } from "./config/passthrough";
-import { resolveAppKey } from "./shared/appKey";
+import { getAppsForPage, getChannelsForApp, resolvePbToCcMappingForApp, transformAppToXTouch } from "./router/page";
 import { LatencyMeter, attachLatencyExtensions } from "./router/latency";
 
 export class Router {
@@ -14,14 +13,8 @@ export class Router {
   private activePageIndex = 0;
   private readonly state: StateStore;
   private xtouch?: XTouchDriver;
-  private refreshTempoMs = 1;
   private readonly xtouchShadow = new Map<string, { value: MidiValue; ts: number }>();
-  private readonly appShadows: Record<AppKey, Map<string, { value: MidiValue; ts: number }>> = {
-    voicemeeter: new Map(),
-    qlc: new Map(),
-    obs: new Map(),
-    "midi-bridge": new Map(),
-  };
+  private readonly appShadows: Map<string, Map<string, { value: MidiValue; ts: number }>> = new Map();
   /** Timestamp de la dernière action locale (X‑Touch) par cible X‑Touch (status|ch|d1). */
   private readonly lastUserActionTs: Map<string, number> = new Map();
   /**
@@ -38,12 +31,7 @@ export class Router {
   /**
    * Mètres de latence round-trip par app/type, utilisés pour les rapports CLI.
    */
-  private readonly latencyMeters: Record<AppKey, Record<MidiStatus, LatencyMeter>> = {
-    voicemeeter: { note: new LatencyMeter(), cc: new LatencyMeter(), pb: new LatencyMeter(), sysex: new LatencyMeter() },
-    qlc: { note: new LatencyMeter(), cc: new LatencyMeter(), pb: new LatencyMeter(), sysex: new LatencyMeter() },
-    obs: { note: new LatencyMeter(), cc: new LatencyMeter(), pb: new LatencyMeter(), sysex: new LatencyMeter() },
-    "midi-bridge": { note: new LatencyMeter(), cc: new LatencyMeter(), pb: new LatencyMeter(), sysex: new LatencyMeter() },
-  };
+  private readonly latencyMeters: Record<string, Record<MidiStatus, LatencyMeter>> = {};
 
   constructor(initialConfig: AppConfig) {
     this.config = initialConfig;
@@ -133,9 +121,8 @@ export class Router {
     logger.info("Router: configuration mise à jour.");
   }
 
-  attachXTouch(xt: XTouchDriver, options?: { interMsgDelayMs?: number }): void {
+  attachXTouch(xt: XTouchDriver): void {
     this.xtouch = xt;
-    this.refreshTempoMs = Math.max(0, Math.min(5, options?.interMsgDelayMs ?? 1));
   }
 
   /**
@@ -143,12 +130,6 @@ export class Router {
    * SEULE SOURCE DE VÉRITÉ pour mettre à jour les states
    */
   onMidiFromApp(appKey: string, raw: number[], portId: string): void {
-    // Valider que l'app est reconnue
-    if (!["voicemeeter", "qlc", "obs", "midi-bridge"].includes(appKey)) {
-      logger.warn(`Application '${appKey}' non reconnue, feedback ignoré`);
-      return;
-    }
-
     const entry = StateStore.buildEntryFromRaw(raw, portId);
     if (!entry) return;
 
@@ -171,17 +152,17 @@ export class Router {
       if (!this.xtouch) return;
       const page = this.getActivePage();
       if (!page) return;
-      const appsInPage = this.getAppsForPage(page);
+      const appsInPage = getAppsForPage(page);
       if (!appsInPage.includes(app)) return;
       // Anti-echo: si on vient d'envoyer la même valeur vers l'app (shadow), ignorer
       const k = this.addrKeyForApp(entry.addr);
-      const prev = this.appShadows[app].get(k);
+      const prev = this.getAppShadow(app).get(k);
       const now = Date.now();
       if (prev) {
         const rtt = now - prev.ts;
         // Enregistrer la latence round-trip même si on va ignorer l'echo (utile pour diagnostiquer)
         try {
-          this.latencyMeters[app][entry.addr.status].record(rtt);
+          this.ensureLatencyMeters(app)[entry.addr.status].record(rtt);
         } catch {}
         const win = (this.antiLoopWindowMsByStatus as any)[entry.addr.status] ?? 60;
         if (this.midiValueEquals(prev.value, entry.value) && rtt < win) {
@@ -189,7 +170,7 @@ export class Router {
         }
       }
       // MUTUALISATION: la même pipeline transform/emit que le refresh
-      const maybeForward = this.transformAppToXTouch(page, app, entry);
+      const maybeForward = transformAppToXTouch(page, app, entry);
       if (!maybeForward) return;
       // Last-Write-Wins: si une action locale récente a eu lieu sur cette cible X‑Touch, ignorer un feedback plus ancien
       const targetKey = this.addrKeyForXTouch(maybeForward.addr);
@@ -204,12 +185,11 @@ export class Router {
 
   markAppShadowForOutgoing(appKey: string, raw: number[], portId: string): void {
     try {
-      if (!(["voicemeeter", "qlc", "obs", "midi-bridge"] as string[]).includes(appKey)) return;
       const app = appKey as AppKey;
       const e = StateStore.buildEntryFromRaw(raw, portId);
       if (!e) return;
       const k = this.addrKeyForApp(e.addr);
-      this.appShadows[app].set(k, { value: e.value, ts: Date.now() });
+      this.getAppShadow(app).set(k, { value: e.value, ts: Date.now() });
     } catch {}
   }
 
@@ -247,7 +227,7 @@ export class Router {
     this.xtouchShadow.clear();
 
     // 1. Identifier les logiciels utilisés par cette page
-    const appsInPage = this.getAppsForPage(page);
+    const appsInPage = getAppsForPage(page);
     logger.debug(`Apps pour cette page: [${appsInPage.join(", ")}]`);
 
     // 2. Construire des "plans" par adresse X‑Touch pour éviter les collisions inter‑apps
@@ -279,14 +259,14 @@ export class Router {
 
     // 3. Alimenter les plans depuis chaque app avec priorités
     for (const app of appsInPage) {
-      const channels = this.getChannelsForApp(page, app);
-      const mapping = this.resolvePbToCcMappingForApp(page, app);
+      const channels = getChannelsForApp(page, app);
+      const mapping = resolvePbToCcMappingForApp(page, app);
 
       // PB plan (priorité: PB connu = 3 > CC mappé = 2 > ZERO = 1)
       for (const ch of channels) {
         const latestPb = this.state.getKnownLatestForApp(app, "pb", ch, 0);
         if (latestPb) {
-          const transformed = this.transformAppToXTouch(page, app, latestPb);
+          const transformed = transformAppToXTouch(page, app, latestPb);
           if (transformed) pushPbCandidate(ch, transformed, 3);
           continue;
         }
@@ -295,7 +275,7 @@ export class Router {
           const latestCcSameCh = this.state.getKnownLatestForApp(app, "cc", ch, ccNum);
           const latestCcAnyCh = latestCcSameCh || this.state.getKnownLatestForApp(app, "cc", undefined, ccNum);
           if (latestCcAnyCh) {
-            const transformed = this.transformAppToXTouch(page, app, latestCcAnyCh);
+            const transformed = transformAppToXTouch(page, app, latestCcAnyCh);
             if (transformed) { pushPbCandidate(ch, transformed, 2); }
           }
           // IMPORTANT: si mapping existe mais pas de valeur, NE PAS proposer PB=0 ici
@@ -312,7 +292,7 @@ export class Router {
           const latestExact = this.state.getKnownLatestForApp(app, "note", ch, note);
           const latestAnyCh = latestExact || this.state.getKnownLatestForApp(app, "note", undefined, note);
           if (latestAnyCh) {
-            const e = this.transformAppToXTouch(page, app, latestAnyCh);
+            const e = transformAppToXTouch(page, app, latestAnyCh);
             if (e) pushNoteCandidate(e, 2);
           } else {
             const addr = { portId: app, status: "note" as MidiStatus, channel: ch, data1: note };
@@ -327,7 +307,7 @@ export class Router {
           const latestExact = this.state.getKnownLatestForApp(app, "cc", ch, cc);
           const latestAnyCh = latestExact || this.state.getKnownLatestForApp(app, "cc", undefined, cc);
           if (latestAnyCh) {
-            const e = this.transformAppToXTouch(page, app, latestAnyCh);
+            const e = transformAppToXTouch(page, app, latestAnyCh);
             if (e) pushCcCandidate(e, 2);
           } else {
             const addr = { portId: app, status: "cc" as MidiStatus, channel: ch, data1: cc };
@@ -355,103 +335,6 @@ export class Router {
     }
   }
 
-  /**
-   * Identifie les logiciels utilisés par une page à partir de sa config
-   */
-  private getAppsForPage(page: PageConfig): AppKey[] {
-    const items = getPagePassthroughItems(page);
-    const appKeys: AppKey[] = Array.isArray(items)
-      ? Array.from(new Set(items.map((it: any) => resolveAppKey(it?.to_port, it?.from_port) as AppKey)))
-      : [];
-    return appKeys.length > 0 ? appKeys : ["voicemeeter"]; // fallback par défaut
-  }
-
-  private getChannelsForApp(page: PageConfig, app: AppKey): number[] {
-    const items = getPagePassthroughItems(page);
-    const relevant = (Array.isArray(items) ? items : [])
-      .filter((it: any) => (resolveAppKey(it?.to_port, it?.from_port) as AppKey) === app);
-    const channels = new Set<number>();
-    for (const it of relevant) {
-      const chs: number[] | undefined = it?.filter?.channels;
-      if (Array.isArray(chs)) for (const c of chs) if (typeof c === "number") channels.add(c);
-      const ccMap = it?.transform?.pb_to_cc?.cc_by_channel;
-      if (ccMap && typeof ccMap === "object") {
-        for (const k of Object.keys(ccMap)) {
-          const n = Number(k);
-          if (Number.isFinite(n)) channels.add(n);
-        }
-      }
-      // Si un base_cc est défini, considérer 1..9 (le dédoublonnage via Set évite les doublons)
-      if (it?.transform?.pb_to_cc?.base_cc != null) {
-        for (let i = 1; i <= 9; i++) channels.add(i);
-      }
-    }
-    if (channels.size === 0) {
-      // Fallback si rien de déclaré: couvrir 1..9
-      for (let i = 1; i <= 9; i++) channels.add(i);
-    }
-    return Array.from(channels.values()).sort((a, b) => a - b);
-  }
-
-  /**
-   * Applique les transformations nécessaires pour une page/app donnée
-   */
-  private transformAppToXTouch(page: PageConfig, app: AppKey, entry: MidiStateEntry): MidiStateEntry | null {
-    const status = entry.addr.status;
-    if (status === "note" || status === "pb" || status === "sysex") {
-      return entry;
-    }
-    if (status === "cc") {
-      const m = this.resolvePbToCcMappingForApp(page, app);
-      const map = m?.map;
-      if (!map) return null;
-      const ccNum = entry.addr.data1 ?? -1;
-      // Inverse lookup: cc -> fader channel
-      let faderChannel: number | null = null;
-      for (const [ch, cc] of map.entries()) {
-        if (cc === ccNum) { faderChannel = ch; break; }
-      }
-      if (faderChannel == null) return null;
-      const v7 = typeof entry.value === "number" ? entry.value : 0;
-      // Center CC 64 -> PB 8192, otherwise scale 0..127 -> 0..16383
-      const v7c = Math.max(0, Math.min(127, Math.floor(v7)));
-      const v14 = (v7c << 7) | (v7c & 0x01);
-      return {
-        addr: { portId: app, status: "pb", channel: faderChannel, data1: 0 },
-        value: v14,
-        ts: entry.ts,
-        origin: "app",
-        known: true,
-        stale: entry.stale,
-      };
-    }
-    return null;
-  }
-
-  private resolvePbToCcMappingForApp(page: PageConfig, app: AppKey): { map: Map<number, number>; channelForCc: Map<number, number> } | null {
-    const items = getPagePassthroughItems(page);
-    const cfg = (Array.isArray(items) ? items : [])
-      .map((it: any) => ({ app: resolveAppKey(it?.to_port, it?.from_port) as AppKey, transform: it?.transform }))
-      .find((x: any) => x.app === app);
-    const pb2cc = cfg?.transform?.pb_to_cc;
-    if (!pb2cc) return null;
-    const out = new Map<number, number>();
-    const reverse = new Map<number, number>();
-    const baseRaw = pb2cc.base_cc;
-    const base = typeof baseRaw === "string" ? parseInt(baseRaw, 16) : (typeof baseRaw === "number" ? baseRaw : undefined);
-    for (let ch = 1; ch <= 9; ch++) {
-      let cc = pb2cc.cc_by_channel?.[ch];
-      if (cc == null && base != null) {
-        // Heuristic: many configs used base_cc + (ch-1)
-        cc = base + (ch - 1);
-      }
-      if (typeof cc === "string") {
-        cc = cc.startsWith("0x") ? parseInt(cc, 16) : parseInt(cc, 10);
-      }
-      if (typeof cc === "number") { out.set(ch, cc); reverse.set(cc, ch); }
-    }
-    return out.size > 0 ? { map: out, channelForCc: reverse } : null;
-  }
 
   /**
    * Envoie les entrées vers X-Touch avec ordonnancement correct
@@ -534,6 +417,24 @@ export class Router {
       return true;
     }
     return (a as any) === (b as any);
+  }
+
+  private getAppShadow(appKey: string): Map<string, { value: MidiValue; ts: number }> {
+    let m = this.appShadows.get(appKey);
+    if (!m) {
+      m = new Map();
+      this.appShadows.set(appKey, m);
+    }
+    return m;
+  }
+
+  private ensureLatencyMeters(appKey: string): Record<MidiStatus, LatencyMeter> {
+    let m = this.latencyMeters[appKey];
+    if (!m) {
+      m = { note: new LatencyMeter(), cc: new LatencyMeter(), pb: new LatencyMeter(), sysex: new LatencyMeter() };
+      this.latencyMeters[appKey] = m;
+    }
+    return m;
   }
 
   private entryToRawForXTouch(entry: MidiStateEntry): number[] | null {

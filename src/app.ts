@@ -94,7 +94,7 @@ export async function startApp(): Promise<() => void> {
     xtouch.start();
 
     const x = xtouch as import("./xtouch/driver").XTouchDriver; // non-null après start
-    router.attachXTouch(x, { interMsgDelayMs: 0 });
+    router.attachXTouch(x);
     applyLcdForActivePage(router, x);
     // LEDs F1..F8 au démarrage
     try { updateFKeyLedsForActivePage(router, x, (cfg.paging?.channel ?? 1) | 0); } catch {}

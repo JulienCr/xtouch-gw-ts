@@ -1,4 +1,4 @@
-import type { AppKey, MidiStatus } from "../state";
+import type { MidiStatus } from "../state";
 import type { Router } from "../router";
 
 export class LatencyMeter {
@@ -27,14 +27,14 @@ export class LatencyMeter {
 }
 
 export interface LatencyReportItem { count: number; last: number; p50: number; p95: number; max: number }
-export type LatencyReport = Record<AppKey, Record<MidiStatus, LatencyReportItem>>;
+export type LatencyReport = Record<string, Record<MidiStatus, LatencyReportItem>>;
 
 export function attachLatencyExtensions(RouterClass: any): void {
 	(RouterClass as any).prototype.getLatencyReport = function getLatencyReport(this: Router): LatencyReport {
 		const self = this as any;
-		const meters = self.latencyMeters as Record<AppKey, Record<MidiStatus, LatencyMeter>>;
+		const meters = self.latencyMeters as Record<string, Record<MidiStatus, LatencyMeter>>;
 		const out: any = {};
-		for (const app of Object.keys(meters) as AppKey[]) {
+		for (const app of Object.keys(meters) as string[]) {
 			out[app] = {} as any;
 			for (const st of ["note","cc","pb","sysex"] as MidiStatus[]) {
 				out[app][st] = meters[app][st].summary();
@@ -45,8 +45,8 @@ export function attachLatencyExtensions(RouterClass: any): void {
 
 	(RouterClass as any).prototype.resetLatency = function resetLatency(this: Router): void {
 		const self = this as any;
-		const meters = self.latencyMeters as Record<AppKey, Record<MidiStatus, LatencyMeter>>;
-		for (const app of Object.keys(meters) as AppKey[]) {
+		const meters = self.latencyMeters as Record<string, Record<MidiStatus, LatencyMeter>>;
+		for (const app of Object.keys(meters) as string[]) {
 			for (const st of ["note","cc","pb","sysex"] as MidiStatus[]) {
 				meters[app][st].reset();
 			}

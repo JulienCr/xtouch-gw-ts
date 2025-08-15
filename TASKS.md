@@ -38,6 +38,7 @@
 - [x] Refactor: extraction utilitaires MIDI (`src/midi/{utils,filter,transform,ports}.ts`) et LCD (`src/ui/lcd.ts`), simplification `drivers/midiBridge.ts` (ingestion only; pas d'echo direct), mutualisation recherche ports, déduplication LCD, extraction CLI (`src/cli/`).
 - [x] Bugfix: refresh pages 3 & 4 — conserver `transform.pb_to_cc.target_channel` = 1 (QLC attend CH1) et uniformiser `base_cc` (0x45, 0x50) pour permettre la remontée d'état CC → PB et le refresh à l'arrivée sur la page.
 - [x] Suppression: Voicemeeter Sync app‑based (obsolète) — code et références retirés
+ - [x] Router cleanup & modularisation: suppression listes exhaustives d’apps dans `router`, latence et ombres par app dynamiques, extraction logique pages/transformations dans `src/router/page.ts`, typage latence générique par clé string, suppression du champ inutilisé `refreshTempoMs`, mise à jour de `attachXTouch()` et appels associés.
 
 ## Fait
 - [x] BUG: Latence/loop perceptible (≈1 s) sur feedback boutons et « recalage » des faders — métriques, anti‑echo par type, LWW, setpoints moteurs, échos locaux — 2025‑08‑15
