@@ -159,4 +159,4 @@ Ouvre ensuite `http://localhost:8123/` pour voir les messages MIDI en hex avec Î
 - VÃ©rifier les noms de ports `midi.input_port` / `midi.output_port` et les ports des bridges.
 
 ## Licence
-MIT
+MPL-2.0 (Mozilla Public License 2.0)
