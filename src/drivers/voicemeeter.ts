@@ -20,7 +20,7 @@ export class VoicemeeterDriver implements Driver {
   constructor(
     private readonly xtouch: XTouchDriver,
     private readonly cfg: VoicemeeterBridgeConfig,
-    private readonly onFeedbackFromApp?: (raw: number[]) => void
+    private readonly onFeedbackFromApp?: (appKey: string, raw: number[], portId: string) => void
   ) {}
 
   async init(): Promise<void> {
@@ -46,9 +46,10 @@ export class VoicemeeterDriver implements Driver {
     }
     inp.ignoreTypes(false, false, false);
     inp.on("message", (_delta, data) => {
-      // Mettre à jour le store via callback puis transférer tel quel vers X-Touch
-      try { this.onFeedbackFromApp?.(data); } catch {}
-      this.xtouch.sendRawMessage(data);
+      // Mettre à jour le store du state avec le feedback de Voicemeeter
+      try { 
+        this.onFeedbackFromApp?.("voicemeeter", data, this.cfg.fromVoicemeeterInName); 
+      } catch {}
     });
     inp.openPort(inIdx);
     this.inFromVM = inp;
@@ -59,6 +60,8 @@ export class VoicemeeterDriver implements Driver {
       // Transférer tel quel vers VM
       try {
         this.outToVM?.sendMessage(data);
+        // Anti-echo: marquer shadow de l'app pour ignorer l'echo immédiat côté Router
+        try { (global as any).__router__?.markAppShadowForOutgoing?.("voicemeeter", data, this.cfg.toVoicemeeterOutName); } catch {}
       } catch (err) {
         logger.warn("Voicemeeter bridge send error:", err as any);
       }

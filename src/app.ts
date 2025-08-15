@@ -10,12 +10,14 @@ import { formatDecoded } from "./midi/decoder";
 import { XTouchDriver } from "./xtouch/driver";
 import { Input } from "@julusian/midi";
 import { findPortIndexByNameFragment } from "./midi/ports";
-import { applyReverseTransform } from "./midi/transform";
+// import { applyReverseTransform } from "./midi/transform";
 import { MidiBridgeDriver } from "./drivers/midiBridge";
 import type { PagingConfig } from "./config";
 import { VoicemeeterSync } from "./apps/voicemeeterSync";
 import { applyLcdForActivePage } from "./ui/lcd";
 import { attachCli } from "./cli";
+import { promises as fs } from "fs";
+import path from "path";
 
 function toHex(bytes: number[]): string {
   return bytes.map((b) => b.toString(16).padStart(2, "0")).join(" ");
@@ -33,6 +35,45 @@ export async function startApp(): Promise<() => void> {
 
   let cfg: AppConfig = await loadConfig(configPath);
   const router = new Router(cfg);
+  // Exposer pour les bridges (anti-echo côté app)
+  (global as any).__router__ = router;
+
+  // Journal/snapshot: init persistance légère (append-only + snapshots périodiques)
+  const stateDir = path.resolve(process.cwd(), ".state");
+  const journalPath = path.join(stateDir, "journal.log");
+  const snapshotPath = path.join(stateDir, "snapshot.json");
+  try { await fs.mkdir(stateDir, { recursive: true }); } catch {}
+  const stateRef = (router as any).state as import("./state").StateStore | undefined;
+  const persistQueue: string[] = [];
+  let writing = false;
+  async function flushJournal() {
+    if (writing || persistQueue.length === 0) return;
+    writing = true;
+    try {
+      const chunk = persistQueue.splice(0, persistQueue.length).join("");
+      await fs.appendFile(journalPath, chunk, { encoding: "utf8" });
+    } catch {}
+    writing = false;
+  }
+  function onStateUpsert(entry: import("./state").MidiStateEntry, app: import("./state").AppKey) {
+    const rec = { op: "upsert", app, addr: entry.addr, value: entry.value, ts: entry.ts, origin: entry.origin, known: entry.known };
+    persistQueue.push(JSON.stringify(rec) + "\n");
+    flushJournal().catch(() => {});
+  }
+  let unsubState = () => {};
+  if (stateRef && typeof stateRef.subscribe === "function") {
+    unsubState = stateRef.subscribe(onStateUpsert);
+  }
+  // Snapshot périodique toutes 5s (compact RAM)
+  const snapshotTimer = setInterval(async () => {
+    try {
+      const dump: any = {};
+      for (const app of ["voicemeeter","qlc","obs","midi-bridge"]) {
+        dump[app] = stateRef?.listStatesForApp(app as any) ?? [];
+      }
+      await fs.writeFile(snapshotPath, JSON.stringify({ ts: Date.now(), apps: dump }), { encoding: "utf8" });
+    } catch {}
+  }, 5000);
 
   // Enregistrer et initialiser les drivers
   const drivers = [new ConsoleDriver(), new QlcDriver(), new ObsDriver()];
@@ -125,9 +166,7 @@ export async function startApp(): Promise<() => void> {
         const transform = info.transform;
         inp.on("message", (_delta, data) => {
           try {
-            const tx = applyReverseTransform(data, transform);
-            if (tx) router.onMidiFromApp(info.appKey, tx, "app");
-            router.onMidiFromApp(info.appKey, data, "app");
+            router.onMidiFromApp(info.appKey, data, from);
           } catch (err) {
             logger.debug("Background listener error:", err as any);
           }
@@ -201,7 +240,7 @@ export async function startApp(): Promise<() => void> {
                 item.filter,
                 item.transform,
                 true,
-                (raw, origin) => router.onMidiFromApp(appKey, raw, origin)
+                (appKey2, raw, portId) => router.onMidiFromApp(appKey2, raw, portId)
               );
               pageBridges.push(b);
               b.init().catch((err) => logger.warn("Bridge page init error:", err as any));
@@ -232,7 +271,7 @@ export async function startApp(): Promise<() => void> {
       vmBridge = new VoicemeeterDriver(x, {
         toVoicemeeterOutName: "xtouch-gw",
         fromVoicemeeterInName: "xtouch-gw-feedback",
-      }, (raw) => router.onMidiFromApp("voicemeeter", raw));
+      }, (appKey2, raw, portId) => router.onMidiFromApp(appKey2, raw, portId));
       await vmBridge.init();
       logger.info("Mode bridge global Voicemeeter actif (aucun passthrough par page détecté).");
     } else {
@@ -252,7 +291,7 @@ export async function startApp(): Promise<() => void> {
           item.filter,
           item.transform,
           true,
-          (raw) => router.onMidiFromApp(appKey, raw)
+          (appKey2, raw, portId) => router.onMidiFromApp(appKey2, raw, portId)
         );
         pageBridges.push(b);
         await b.init();
@@ -283,6 +322,8 @@ export async function startApp(): Promise<() => void> {
     if (isCleaningUp) return;
     isCleaningUp = true;
     logger.info("Arrêt XTouch GW");
+    try { clearInterval(snapshotTimer); } catch {}
+    try { unsubState(); } catch {}
     try { stopWatch(); } catch {}
     try { for (const b of pageBridges) b.shutdown().catch(() => {}); } catch {}
     try { vmBridge?.shutdown(); } catch {}
