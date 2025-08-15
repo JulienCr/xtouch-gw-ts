@@ -1,16 +1,15 @@
 import { logger } from "./logger";
 import type { ControlMapping, Driver, ExecutionContext } from "./types";
 import type { AppConfig, PageConfig } from "./config";
-import { StateStore, MidiStateEntry, AppKey, MidiStatus, MidiValue, buildEntryFromRaw } from "./state";
+import { StateStore, MidiStateEntry, AppKey, MidiStatus, buildEntryFromRaw } from "./state";
 import type { XTouchDriver } from "./xtouch/driver";
 import { human, hex, getTypeNibble, isPB, isCC, isNoteOn } from "./midi/utils";
-import { addrKeyWithoutPort } from "./shared/addrKey";
-import { getAppsForPage, getChannelsForApp, resolvePbToCcMappingForApp, transformAppToXTouch } from "./router/page";
+import { getAppsForPage } from "./router/page";
 import { LatencyMeter, attachLatencyExtensions } from "./router/latency";
 import { makeXTouchEmitter } from "./router/emit";
-import { midiValueEquals, getAntiLoopMs } from "./router/antiEcho";
 import { planRefresh } from "./router/planner";
 import { forwardFromApp } from "./router/forward";
+import { makeAppShadows } from "./router/shadows";
 
 /**
  * Routeur principal orchestrant la navigation de pages, l'ingestion des feedbacks
@@ -28,7 +27,7 @@ export class Router {
   private readonly state: StateStore;
   private xtouch?: XTouchDriver;
   private emitter?: ReturnType<typeof makeXTouchEmitter>;
-  private readonly appShadows: Map<string, Map<string, { value: MidiValue; ts: number }>> = new Map();
+  private readonly appShadows = makeAppShadows();
   /** Timestamp de la dernière action locale (X‑Touch) par cible X‑Touch (status|ch|d1). */
   private readonly lastUserActionTs: Map<string, number> = new Map();
   /**
@@ -69,34 +68,21 @@ export class Router {
     this.drivers.set(key, driver);
   }
 
-  /** Retourne la page active. */
-  /**
-   * Retourne la configuration de la page active.
-   */
+  /** Retourne la configuration de la page active. */
   getActivePage(): PageConfig | undefined {
     return this.config.pages[this.activePageIndex];
   }
 
-  /** Retourne le nom de la page active. */
-  /**
-   * Retourne le nom de la page active, ou "(none)" si aucune page.
-   */
+  /** Retourne le nom de la page active, ou "(none)" si aucune page. */
   getActivePageName(): string {
     return this.getActivePage()?.name ?? "(none)";
   }
 
-  /** Liste les noms des pages configurées. */
-  /**
-   * Liste les noms des pages disponibles.
-   */
+  /** Liste les noms des pages disponibles. */
   listPages(): string[] {
     return this.config.pages.map((p) => p.name);
   }
 
-  /**
-   * Définit la page active par index ou par nom et déclenche un refresh.
-   * Retourne true si la page a été changée.
-   */
   /**
    * Définit la page active par index ou par nom et déclenche un refresh.
    * @returns true si le changement a été effectué
@@ -122,9 +108,6 @@ export class Router {
   }
 
   /** Passe à la page suivante (circulaire) et rafraîchit. */
-  /**
-   * Passe à la page suivante (circulaire) et rafraîchit.
-   */
   nextPage(): void {
     if (this.config.pages.length === 0) return;
     this.activePageIndex = (this.activePageIndex + 1) % this.config.pages.length;
@@ -133,9 +116,6 @@ export class Router {
   }
 
   /** Passe à la page précédente (circulaire) et rafraîchit. */
-  /**
-   * Passe à la page précédente (circulaire) et rafraîchit.
-   */
   prevPage(): void {
     if (this.config.pages.length === 0) return;
     this.activePageIndex =
@@ -144,9 +124,6 @@ export class Router {
     this.refreshPage();
   }
 
-  /**
-   * Exécute l'action mappée pour un contrôle logique de la page courante.
-   */
   /**
    * Exécute l'action mappée pour un contrôle logique de la page courante.
    * @param controlId - Identifiant de contrôle logique (clé du mapping)
@@ -173,9 +150,6 @@ export class Router {
   }
 
   /** Met à jour la configuration et notifie les drivers. */
-  /**
-   * Met à jour la configuration et notifie les drivers.
-   */
   async updateConfig(next: AppConfig): Promise<void> {
     this.config = next;
     if (this.activePageIndex >= this.config.pages.length) {
@@ -188,28 +162,17 @@ export class Router {
     logger.info("Router: configuration mise à jour.");
   }
 
-  /** Attache le driver X‑Touch au router. */
-  /**
-   * Attache le driver X‑Touch au router et prépare l'émetteur.
-   */
+  /** Attache le driver X‑Touch au router et prépare l'émetteur. */
   attachXTouch(xt: XTouchDriver): void {
     this.xtouch = xt;
     this.emitter = makeXTouchEmitter(xt, {
       antiLoopWindows: this.antiLoopWindowMsByStatus,
-      getAddrKeyWithoutPort: (addr) => this.addrKeyForXTouch(addr),
+      getAddrKeyWithoutPort: (addr) => this.appShadows.addrKeyForXTouch(addr),
       markLocalActionTs: (key, ts) => this.lastUserActionTs.set(key, ts),
       logPitchBend: true,
     });
   }
 
-  /**
-   * Traite le feedback MIDI reçu d'un logiciel
-   * SEULE SOURCE DE VÉRITÉ pour mettre à jour les states
-   */
-  /**
-   * Traite un feedback MIDI brut provenant d'une application (Voicemeeter/QLC/OBS...).
-   * Met à jour le StateStore et, si pertinent pour la page active, rejoue vers X‑Touch avec protections anti‑echo.
-   */
   /**
    * Ingestion d'un feedback MIDI brut provenant d'une application (Voicemeeter/QLC/OBS...).
    * Met à jour le StateStore et, si pertinent pour la page active, rejoue vers X‑Touch.
@@ -237,9 +200,9 @@ export class Router {
       const deps = {
         getActivePage: () => this.getActivePage(),
         hasXTouch: () => !!this.xtouch,
-        getAppShadow: (a: string) => this.getAppShadow(a),
-        addrKeyForApp: (addr: MidiStateEntry["addr"]) => this.addrKeyForApp(addr),
-        addrKeyForXTouch: (addr: MidiStateEntry["addr"]) => this.addrKeyForXTouch(addr),
+        getAppShadow: (a: string) => this.appShadows.getAppShadow(a),
+        addrKeyForApp: (addr: MidiStateEntry["addr"]) => this.appShadows.addrKeyForApp(addr),
+        addrKeyForXTouch: (addr: MidiStateEntry["addr"]) => this.appShadows.addrKeyForXTouch(addr),
         ensureLatencyMeters: (a: string) => this.ensureLatencyMeters(a),
         antiLoopWindows: this.antiLoopWindowMsByStatus,
         lastUserActionTs: this.lastUserActionTs,
@@ -249,28 +212,18 @@ export class Router {
     } catch {}
   }
 
-  /**
-   * Marque le dernier message émis vers une app (shadow) pour l'anti‑echo et la mesure de latence RTT.
-   */
-  /**
-   * Marque le dernier message émis vers une app (shadow) pour l'anti‑echo et la latence RTT.
-   */
+  /** Marque le dernier message émis vers une app (shadow) pour l'anti‑echo et la latence RTT. */
   markAppShadowForOutgoing(appKey: string, raw: number[], portId: string): void {
     try {
       const app = appKey as AppKey;
       const e = buildEntryFromRaw(raw, portId);
       if (!e) return;
-      const k = this.addrKeyForApp(e.addr);
-      this.getAppShadow(app).set(k, { value: e.value, ts: Date.now() });
+      const k = this.appShadows.addrKeyForApp(e.addr);
+      this.appShadows.getAppShadow(app).set(k, { value: e.value, ts: Date.now() });
     } catch {}
   }
 
-  /**
-   * Marque une action locale (X‑Touch) à partir d'une trame brute, pour appliquer les fenêtres de grâce LWW.
-   */
-  /**
-   * Marque une action locale (X‑Touch) à partir d'une trame brute, pour appliquer LWW.
-   */
+  /** Marque une action locale (X‑Touch) à partir d'une trame brute, pour appliquer LWW. */
   markUserActionFromRaw(raw: number[]): void {
     if (!raw || raw.length === 0) return;
     const status = raw[0] ?? 0;
@@ -278,25 +231,18 @@ export class Router {
     const ch = ((status & 0x0f) + 1) | 0;
     let key: string | null = null;
     if (isPB(status)) {
-      key = this.addrKeyForXTouch({ status: "pb", channel: ch, data1: 0 } as any);
+      key = this.appShadows.addrKeyForXTouch({ status: "pb", channel: ch, data1: 0 } as any);
     } else if (isCC(status)) {
       const cc = raw[1] ?? 0;
-      key = this.addrKeyForXTouch({ status: "cc", channel: ch, data1: cc } as any);
+      key = this.appShadows.addrKeyForXTouch({ status: "cc", channel: ch, data1: cc } as any);
     } else if (isNoteOn(status) || getTypeNibble(status) === 0x8) {
       const note = raw[1] ?? 0;
-      key = this.addrKeyForXTouch({ status: "note", channel: ch, data1: note } as any);
+      key = this.appShadows.addrKeyForXTouch({ status: "note", channel: ch, data1: note } as any);
     }
     if (key) this.lastUserActionTs.set(key, Date.now());
   }
 
-  /**
-   * Refresh complet de la page active selon la nouvelle architecture
-   * Utilise UNIQUEMENT les états des logiciels stockés via feedback MIDI
-   */
   /** Rafraîchit complètement la page active (replay des états connus vers X‑Touch). */
-  /**
-   * Rafraîchit complètement la page active (replay des états connus vers X‑Touch).
-   */
   refreshPage(): void {
     if (!this.xtouch) return;
     const page = this.getActivePage();
@@ -306,41 +252,17 @@ export class Router {
     // Nouveau cycle: réinitialiser l'ombre X‑Touch pour autoriser la ré‑émission des valeurs cibles
     try { this.emitter?.clearShadow(); } catch {}
 
-    // 1. Identifier les logiciels utilisés par cette page
-    const appsInPage = getAppsForPage(page);
-    logger.debug(`Apps pour cette page: [${appsInPage.join(", ")}]`);
-
-    // 2-5. Construire le plan et l'émettre (Notes -> CC -> SysEx -> PB)
+    // 1-5. Construire le plan et l'émettre (Notes -> CC -> SysEx -> PB)
+    try {
+      const appsInPage = getAppsForPage(page);
+      logger.debug(`Apps pour cette page: [${appsInPage.join(", ")}]`);
+    } catch {}
     const entriesToSend = planRefresh(page, this.state);
     this.emitter?.send(entriesToSend);
-    // Anti-boucle app: marquer dans l'AppShadow ce que nous venons d'émettre vers les apps cibles (pour ignorer l'echo)
-    const now = Date.now();
-    for (const e of entriesToSend) {
-      try {
-        const app = appsInPage[0] as AppKey; // app de la boucle courante n'est pas accessible ici; marquage conservateur omis pour sécurité
-        // Note: AppShadow est déjà géré côté bridge lors des envois; ici on évite tout marquage incorrect
-      } catch {}
-    }
   }
 
 
-  private addrKeyForXTouch(addr: MidiStateEntry["addr"]): string {
-    return addrKeyWithoutPort(addr as any);
-  }
-
-  private addrKeyForApp(addr: MidiStateEntry["addr"]): string {
-    // Anti-echo/latence côté app: ignorer le portId pour associer l'aller (to_port) et le retour (from_port)
-    return addrKeyWithoutPort(addr as any);
-  }
-
-  private getAppShadow(appKey: string): Map<string, { value: MidiValue; ts: number }> {
-    let m = this.appShadows.get(appKey);
-    if (!m) {
-      m = new Map();
-      this.appShadows.set(appKey, m);
-    }
-    return m;
-  }
+  // addrKeyForXTouch/addrKeyForApp/getAppShadow extraits vers router/shadows.ts
 
   private ensureLatencyMeters(appKey: string): Record<MidiStatus, LatencyMeter> {
     let m = this.latencyMeters[appKey];

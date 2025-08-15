@@ -2,22 +2,25 @@ import { logger, setLogLevel } from "./logger";
 import { loadConfig, findConfigPath, watchConfig, AppConfig } from "./config";
 import type { PageConfig } from "./config";
 import { Router } from "./router";
-import { ConsoleDriver } from "./drivers/consoleDriver";
 import { VoicemeeterDriver } from "./drivers/voicemeeter";
-import { QlcDriver } from "./drivers/qlc";
-import { ObsDriver } from "./drivers/obs";
-import { XTouchDriver } from "./xtouch/driver";
 import { MidiBridgeDriver } from "./drivers/midiBridge";
-import type { PagingConfig } from "./config";
-import { applyLcdForActivePage } from "./ui/lcd";
 import { attachCli } from "./cli";
-import { updateFKeyLedsForActivePage } from "./xtouch/fkeys";
 import { getPagePassthroughItems } from "./config/passthrough";
 import { buildPageBridges } from "./bridges/pageBridges";
-import { BackgroundListenerManager } from "./midi/backgroundListeners";
 import { setupStatePersistence } from "./state/persistence";
-import { attachNavigation } from "./app/navigation";
+import { createBackgroundManager, initDrivers, startXTouchAndNavigation } from "./app/bootstrap";
+import { applyLcdForActivePage } from "./ui/lcd";
+import { updateFKeyLedsForActivePage } from "./xtouch/fkeys";
 
+/**
+ * Point d'entrée de l'application.
+ * - Charge la configuration, instancie le `Router`
+ * - Initialise la persistance du `StateStore`
+ * - Enregistre les drivers et démarre le X‑Touch + navigation
+ * - Active le hot‑reload de la configuration
+ *
+ * @returns Fonction de nettoyage (arrêt propre des composants)
+ */
 export async function startApp(): Promise<() => void> {
   const envLevel = (process.env.LOG_LEVEL as any) || "info";
   setLogLevel(envLevel);
@@ -37,11 +40,7 @@ export async function startApp(): Promise<() => void> {
   const persistence = await setupStatePersistence(router);
 
   // Enregistrer et initialiser les drivers
-  const drivers = [new ConsoleDriver(), new QlcDriver(), new ObsDriver()];
-  for (const d of drivers) {
-    router.registerDriver(d.name, d);
-    await d.init();
-  }
+  await initDrivers(router);
 
   // Hot reload config
   const stopWatch = watchConfig(
@@ -75,42 +74,20 @@ export async function startApp(): Promise<() => void> {
   }
 
   // X-Touch: ouvrir les ports définis dans config.yaml
-  let xtouch: XTouchDriver | null = null;
+  let xtouch: import("./xtouch/driver").XTouchDriver | null = null;
   let vmBridge: VoicemeeterDriver | null = null;
   let pageBridges: MidiBridgeDriver[] = [];
   
   // Listeners en arrière-plan pour capter le feedback des apps hors page active
-  const bgManager = new BackgroundListenerManager(router);
+  const { bgManager, rebuild } = createBackgroundManager(router);
 
   
 
-  const rebuildBackgroundListeners = (activePage: PageConfig | undefined) => {
-    bgManager.rebuild(activePage, cfg.pages);
-  };
+  const rebuildBackgroundListeners = (activePage: PageConfig | undefined) => rebuild(activePage, cfg.pages);
   try {
-    xtouch = new XTouchDriver({
-      inputName: cfg.midi.input_port,
-      outputName: cfg.midi.output_port,
-    }, { echoPitchBend: false, echoButtonsAndEncoders: true });
-    xtouch.start();
-
-    const x = xtouch as import("./xtouch/driver").XTouchDriver; // non-null après start
-    router.attachXTouch(x);
-    applyLcdForActivePage(router, x);
-    // LEDs F1..F8 au démarrage
-    try { updateFKeyLedsForActivePage(router, x, (cfg.paging?.channel ?? 1) | 0); } catch {}
-
-    const paging: Required<PagingConfig> = {
-      channel: cfg.paging?.channel ?? 1,
-      prev_note: cfg.paging?.prev_note ?? 46,
-      next_note: cfg.paging?.next_note ?? 47,
-    } as any;
-
-    const unsubNav = attachNavigation({
-      router,
-      xtouch: x,
-      paging,
-      onAfterPageChange: (page) => {
+    const { xtouch: x, unsubscribeNavigation, paging } = startXTouchAndNavigation(router, {
+      config: cfg,
+      onAfterPageChange: (x, page, paging) => {
         try { updateFKeyLedsForActivePage(router, x, paging.channel); } catch {}
         applyLcdForActivePage(router, x);
         rebuildBackgroundListeners(page);
@@ -130,6 +107,7 @@ export async function startApp(): Promise<() => void> {
         try { router.refreshPage(); } catch {}
       },
     });
+    xtouch = x;
 
     // Si aucune page ne définit de passthrough, activer le bridge global vers Voicemeeter
     const hasPagePassthrough = (cfg.pages ?? []).some(

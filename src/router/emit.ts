@@ -4,15 +4,29 @@ import type { XTouchDriver } from "../xtouch/driver";
 import { midiValueEquals, getAntiLoopMs } from "./antiEcho";
 import { logger } from "../logger";
 
+/**
+ * Options de construction de l'émetteur X‑Touch.
+ */
 export interface XTouchEmitterOptions {
+  /** Fenêtres anti‑echo (ms) par type d'évènement MIDI. */
   antiLoopWindows: Record<import("../state").MidiStatus, number>;
+  /** Génère une clé d'adresse X‑Touch sans port pour le shadow/dup detection. */
   getAddrKeyWithoutPort: (addr: MidiStateEntry["addr"]) => string;
+  /** Marque une action locale (LWW) lors d'un envoi simulé. */
   markLocalActionTs?: (key: string, ts: number) => void;
+  /** Active le log trace des PB envoyés. */
   logPitchBend?: boolean;
 }
 
 /**
  * Construit un émetteur responsable de l'ordonnancement et des protections anti-echo vers X‑Touch.
+ */
+/**
+ * Construit un émetteur responsable de l'ordonnancement et des protections anti‑echo vers X‑Touch.
+ *
+ * @param x - Driver X‑Touch cible
+ * @param options - Options de configuration de l'émetteur
+ * @returns API { send, entryToRaw, emitIfNotDuplicate, clearShadow }
  */
 export function makeXTouchEmitter(
   x: XTouchDriver,
@@ -67,6 +81,7 @@ export function makeXTouchEmitter(
     shadow.set(k, { value: entry.value, ts: now });
   }
 
+  /** Envoie une liste d'entrées avec l'ordonnancement Notes→CC→SysEx→PB. */
   function send(entries: MidiStateEntry[]): void {
     // Ordonnancement: Notes -> CC -> SysEx -> PitchBend
     const notes = entries.filter((e) => e.addr.status === "note");
@@ -93,6 +108,7 @@ export function makeXTouchEmitter(
     }
   }
 
+  /** Réinitialise l'ombre interne (autorise la ré‑émission des valeurs). */
   function clearShadow() {
     shadow.clear();
   }

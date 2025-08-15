@@ -29,9 +29,7 @@ export interface MidiStateEntry {
 /** Clés d'application connues de la GW. */
 export type AppKey = "voicemeeter" | "qlc" | "obs" | "midi-bridge";
 
-/**
- * Construit une clé unique pour une adresse MIDI (incluant le port).
- */
+/** Construit une clé unique pour une adresse MIDI (incluant le port). */
 export function addrKey(addr: MidiAddr): string {
   const port = addr.portId ?? "";
   const s = addr.status;
@@ -40,9 +38,7 @@ export function addrKey(addr: MidiAddr): string {
   return `${port}|${s}|${ch}|${d1}`;
 }
 
-/**
- * Calcule un hash SHA-1 sur un buffer SysEx pour identification/trace.
- */
+/** Calcule un hash SHA-1 sur un buffer SysEx pour identification/trace. */
 export function computeHash(data: Uint8Array): string {
   const h = crypto.createHash("sha1");
   h.update(data);

@@ -38,6 +38,9 @@ export class StateStore {
     }
   }
 
+  /**
+   * Retourne une entrée exacte d'état si présente et connue (clé complète, incluant `portId`).
+   */
   getStateForApp(app: AppKey, addr: MidiAddr): MidiStateEntry | null {
     const appState = this.appStates.get(app);
     if (!appState) return null;
@@ -46,12 +49,18 @@ export class StateStore {
     return entry && entry.known ? entry : null;
   }
 
+  /**
+   * Liste toutes les entrées d'état connues pour une application.
+   */
   listStatesForApp(app: AppKey): MidiStateEntry[] {
     const appState = this.appStates.get(app);
     if (!appState) return [];
     return Array.from(appState.values());
   }
 
+  /**
+   * Liste les entrées d'état pour plusieurs applications.
+   */
   listStatesForApps(apps: AppKey[]): Map<AppKey, MidiStateEntry[]> {
     const result = new Map<AppKey, MidiStateEntry[]>();
     for (const app of apps) {
@@ -60,6 +69,10 @@ export class StateStore {
     return result;
   }
 
+  /**
+   * Abonne un listener au flux d'entrées confirmées par application.
+   * @returns Fonction pour se désabonner
+   */
   subscribe(listener: (entry: MidiStateEntry, app: AppKey) => void): () => void {
     this.subscribers.add(listener);
     return () => this.subscribers.delete(listener);
