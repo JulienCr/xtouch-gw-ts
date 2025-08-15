@@ -58,20 +58,27 @@ Résumé exécutif
 - Commentaires/fallbacks NoteOff
   - Router: commentaire et code pour ne plus renvoyer NoteOff — cohérent. Garder aligné avec les options d’écho local dans XTouchDriver.
 
-5) Plan d’action proposé (ordonné)
-- Étape 1: Utilities MIDI
-  - Ajouter pb14FromRaw, rawFromPb14, getTypeNibble, isPB/isCC/isNote* dans src/midi/utils.ts
-  - Remplacer les occurrences dans state.ts, router.ts, drivers/midiBridge.ts
-- Étape 2: Clés d’adressage
-  - Créer src/shared/addrKey.ts avec addrKeyWithPort, addrKeyWithoutPort
-  - Remplacer addrKeyForXTouch/addrKeyForApp par utilitaires partagés
-- Étape 3: Nettoyage
-  - Revue src/midi/transform.ts pour retirer dead code reverse (si présent)
-  - Revue src/midi/sniffer.ts usage côté CLI; si non utilisé, archiver dans docs/ARCHIVES/
-  - Supprimer/mouvoir “config copy.yaml”
-- Étape 4: Lint et tests manuels
+5) Plan d’action proposé (ordonné) et avancement
+
+Avancement réalisé (2025-08-15):
+- Étape 1 (Utilities MIDI): FAIT
+  - Ajout pb14FromRaw, rawFromPb14, getTypeNibble, isPB/isCC/isNoteOn/isNoteOff (src/midi/utils.ts)
+  - Intégration dans state.ts (buildEntryFromRaw), router.ts (entryToRawForXTouch), drivers/midiBridge.ts (setpoint moteurs)
+- Étape 2 (Clés d’adressage): PARTIELLEMENT FAIT
+  - Création src/shared/addrKey.ts avec addrKeyWithoutPort (+ réexport addrKeyWithPort)
+  - Router utilise maintenant addrKeyWithoutPort (remplace les implémentations internes)
+- Étape 3 (Nettoyage): À FAIRE
+  - Revue src/midi/transform.ts pour dead code reverse
+  - Revue src/midi/sniffer.ts pour usage réel côté CLI; archiver si inutile
+  - Supprimer/mouvoir “config copy.yaml” → docs/ARCHIVES/
+- Étape 4 (Lint et tests manuels): À FAIRE
   - pnpm lint, vérifier compilation TS
-  - Test manuel de paging, echo LED, faders, latence CLI
+  - Test manuel de paging, échos LED, faders, CLI latence
+
+Reste à faire (détails):
+- Remplacer les derniers calculs/constantes littérales (fall back anti-loop 60ms) par des appels à getAntiLoopMs si nécessaire
+- Ajouter/compléter la JSDoc sur les méthodes publiques d’autres modules (drivers, utils de config) si besoin
+- Optionnel: utilitaire de logging MIDI centralisé pour harmoniser les traces (human/hex)
 
 6) Estimation d’effort
 - Étapes 1–2: ~1–2h (modifs localisées, faible risque)
@@ -79,5 +86,5 @@ Résumé exécutif
 - Étape 4: ~20–30min
 
 Notes
-- Les règles utilisateur: pnpm préféré; ne pas lancer le build/dev automatiquement — respecté. Le push a déjà été configuré sur origin/master.
+- Les règles utilisateur: pnpm préféré; ne pas lancer le build/dev automatiquement — respecté. Ne pas commiter sans l'accord de l'utilisateur.
 
