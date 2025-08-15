@@ -38,11 +38,18 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
  - 2025-08-10 — App web séparée pour l’édition de config
    - Décision: isoler un éditeur Next.js dans `web/config-editor` pour éviter toute interaction avec la GW.
    - Implémentation: API GET/PUT `/api/config` qui lit/écrit le `config.yaml` racine; UI YAML avec validation et preview JSON.
-  - 2025-08-10 — State virtuel MIDI & multipage
-    - Décision: adopter une source de vérité MIDI-only par app (Note/CC/PB/SysEx) via `StateStore` avec anti-boucle (50ms) et `lastSentToXTouch`.
-    - Implémentation: capture des feedbacks depuis `VoicemeeterDriver` et `MidiBridgeDriver` vers le `Router.onMidiFromApp()`; mapping automatique de l’app (`qlc`/`voicemeeter`/`obs`) selon les ports bridge. Refresh de page ordonné (Notes→CC→LCD→Faders). Fix: `nextPage()` appelait pas `refreshPage()` → ajouté. Reset par défaut: canal 1, notes 0..31 uniquement (LED).
-    - À améliorer: filtrage par mapping de page → `MidiAddr` et persistance `.state/xtouch-gw.json`.
-  - 2025-08-10 — Pages 3/4 ne se refreshent pas
-    - Symptôme: en naviguant vers P3/P4, pas de mise à jour des faders/LED.
-    - Cause: mauvaise hypothèse sur le canal cible; QLC attend les CC sur le canal 1.
-    - Fix: conserver `target_channel: 1` et clarifier `base_cc` en hex (P3: 0x45, P4: 0x50). Le feedback CC (CH1) est correctement inversé vers PB pour le refresh de page.
+ - 2025-08-10 — State virtuel MIDI & multipage
+   - Décision: adopter une source de vérité MIDI-only par app (Note/CC/PB/SysEx) via `StateStore` avec anti-boucle (50ms) et `lastSentToXTouch`.
+   - Implémentation: capture des feedbacks depuis `VoicemeeterDriver` et `MidiBridgeDriver` vers le `Router.onMidiFromApp()`; mapping automatique de l’app (`qlc`/`voicemeeter`/`obs`) selon les ports bridge. Refresh de page ordonné (Notes→CC→LCD→Faders). Fix: `nextPage()` appelait pas `refreshPage()` → ajouté. Reset par défaut: canal 1, notes 0..31 uniquement (LED).
+   - À améliorer: filtrage par mapping de page → `MidiAddr` et persistance `.state/xtouch-gw.json`.
+ - 2025-08-10 — Pages 3/4 ne se refreshent pas
+   - Symptôme: en naviguant vers P3/P4, pas de mise à jour des faders/LED.
+   - Cause: mauvaise hypothèse sur le canal cible; QLC attend les CC sur le canal 1.
+   - Fix: conserver `target_channel: 1` et clarifier `base_cc` en hex (P3: 0x45, P4: 0x50). Le feedback CC (CH1) est correctement inversé vers PB pour le refresh de page.
+- 2025-08-15 — Refactor State MIDI-only + Reset→Replay (nouvelle spec)
+  - Changements majeurs: `MidiAddr` {portId,status,channel,data1}, `MidiStateEntry` {known,origin,stale?}; suppression des defaults dans le state; transforms “in/out” centralisées dans le Router; anti-boucle via `XTouchShadow` (valeur+ts) et `AppShadow`.
+  - Persistance légère: `.state/journal.log` (append-only) + `.state/snapshot.json` (RAM périodique) pour debug.
+  - Reset→Replay: Notes OFF/CC 0 pour unknown; PB=0 (spéc révisée) si aucun PB/CC mappé connu; SysEx HOLD.
+  - Mapping CC→PB: support `base_cc` (1..9) + `cc_by_channel`; lookup CC par canal puis global.
+  - Correction appliquée: construction d’un plan PB par fader (priorités PB connu > CC→PB > 0) et émission en une seule passe. Évite les PB=0 après des PB connus au retour sur Page 1 (Voicemeeter+QLC). Les mutes Notes sont rejouées via plan Notes.
+  - Observation: latence importante (~1 s) sur le feedback (LED/mutes) et recalage des faders après mouvement. Hypothèses: latence cumulée des bridges, fenêtre anti‑echo trop courte, echoPitchBend en conflit, listeners doublons. Actions listées dans `TASKS.md`.
