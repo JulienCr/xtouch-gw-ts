@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { getTypeNibble, pb14FromRaw } from "./midi/utils";
 
 export type MidiStatus = "note" | "cc" | "pb" | "sysex";
 
@@ -119,6 +120,13 @@ export class StateStore {
     return best;
   }
 
+/**
+   * Construit une entrée de state à partir d'une trame MIDI brute.
+   * - NoteOn/NoteOff → value = vélocité (0 = off)
+   * - CC → value = 0..127
+   * - PB → value = 0..16383 (14 bits)
+   * - SysEx → value = Uint8Array (payload complet)
+   */
   static buildEntryFromRaw(raw: number[], portId: string): MidiStateEntry | null {
     if (raw.length === 0) return null;
     const status = raw[0];
@@ -139,7 +147,7 @@ export class StateStore {
     }
     if (status >= 0xF0) return null;
 
-    const typeNibble = (status & 0xF0) >> 4;
+    const typeNibble = getTypeNibble(status);
     const channel = (status & 0x0F) + 1;
 
     if (typeNibble === 0x9 || typeNibble === 0x8) {
@@ -164,7 +172,7 @@ export class StateStore {
       };
     }
     if (typeNibble === 0xE) {
-      const value14 = ((d2 & 0x7F) << 7) | (d1 & 0x7F);
+      const value14 = pb14FromRaw(d1, d2);
       return {
         addr: { portId, status: "pb", channel, data1: 0 },
         value: value14,

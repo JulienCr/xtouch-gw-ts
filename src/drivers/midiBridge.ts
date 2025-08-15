@@ -3,7 +3,7 @@ import { logger } from "../logger";
 import type { Driver, ExecutionContext } from "../types";
 import type { XTouchDriver } from "../xtouch/driver";
 import type { MidiFilterConfig, TransformConfig } from "../config";
-import { hex, human } from "../midi/utils";
+import { hex, human, isPB, pb14FromRaw } from "../midi/utils";
 import { matchFilter } from "../midi/filter";
 import { applyTransform } from "../midi/transform";
 import { findPortIndexByNameFragment } from "../midi/ports";
@@ -81,9 +81,8 @@ export class MidiBridgeDriver implements Driver {
           try {
             // Bloquer temporairement l'émission des PB du X‑Touch vers la cible pendant squelch
             const status = data[0] ?? 0;
-            const typeNibble = (status & 0xf0) >> 4;
-            const isPB = typeNibble === 0xE;
-            if (isPB && (this.xtouch as any).isPitchBendSquelched?.()) {
+            const isPBMsg = isPB(status);
+            if (isPBMsg && (this.xtouch as any).isPitchBendSquelched?.()) {
               logger.debug(`Bridge DROP (PB squelched) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
               return;
             }
@@ -98,11 +97,11 @@ export class MidiBridgeDriver implements Driver {
               this.outToTarget?.sendMessage(tx);
               // Programmer un setpoint moteur APRÈS une courte inactivité pour TOUT PB (QLC pb_to_cc ou VM PB natif)
               try {
-                if (typeNibble === 0xE) {
+                if (isPBMsg) {
                   const ch1 = (status & 0x0f) + 1;
                   const lsb = data[1] ?? 0;
                   const msb = data[2] ?? 0;
-                  const value14 = ((msb & 0x7f) << 7) | (lsb & 0x7f);
+                  const value14 = pb14FromRaw(lsb, msb);
                   this.lastPbValue14.set(ch1, value14);
                   const prev = this.faderSetpointTimers.get(ch1);
                   if (prev) {

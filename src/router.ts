@@ -3,7 +3,7 @@ import type { ControlMapping, Driver, ExecutionContext } from "./types";
 import type { AppConfig, PageConfig } from "./config";
 import { StateStore, MidiStateEntry, AppKey, MidiStatus, MidiValue } from "./state";
 import type { XTouchDriver } from "./xtouch/driver";
-import { human, hex } from "./midi/utils";
+import { human, hex, getTypeNibble, rawFromPb14 } from "./midi/utils";
 import { getAppsForPage, getChannelsForApp, resolvePbToCcMappingForApp, transformAppToXTouch } from "./router/page";
 import { LatencyMeter, attachLatencyExtensions } from "./router/latency";
 
@@ -456,11 +456,8 @@ export class Router {
       }
       case "pb": {
         const ch = Math.max(1, Math.min(16, addr.channel ?? 1));
-        const status = 0xE0 + (ch - 1);
-        // Deadband léger: conserver la valeur exacte pour refléter précisément le setpoint confirmé
         const v14 = typeof value === "number" ? Math.max(0, Math.min(16383, Math.floor(value))) : 8192;
-        const lsb = v14 & 0x7F;
-        const msb = (v14 >> 7) & 0x7F;
+        const [status, lsb, msb] = rawFromPb14(ch, v14);
         return [status, lsb, msb];
       }
       case "sysex": {
