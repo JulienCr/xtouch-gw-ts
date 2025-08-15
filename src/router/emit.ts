@@ -21,7 +21,6 @@ export interface XTouchEmitterOptions {
 /**
  * Construit un émetteur responsable de l'ordonnancement et des protections anti-echo vers X‑Touch.
  */
-/**
  * Construit un émetteur responsable de l'ordonnancement et des protections anti‑echo vers X‑Touch.
  *
  * @param x - Driver X‑Touch cible
