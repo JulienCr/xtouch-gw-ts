@@ -4,6 +4,9 @@ import type { AppConfig, PageConfig } from "./config";
 import { StateStore, MidiStateEntry, AppKey, MidiStatus, addrKey, MidiValue } from "./state";
 import type { XTouchDriver } from "./xtouch/driver";
 import { human, hex } from "./midi/utils";
+import { getPagePassthroughItems } from "./config/passthrough";
+import { resolveAppKey } from "./shared/appKey";
+import { LatencyMeter, attachLatencyExtensions } from "./router/latency";
 
 export class Router {
   private config: AppConfig;
@@ -356,38 +359,17 @@ export class Router {
    * Identifie les logiciels utilisés par une page à partir de sa config
    */
   private getAppsForPage(page: PageConfig): AppKey[] {
-    const items = (page as any).passthroughs ?? ((page as any).passthrough ? [(page as any).passthrough] : []);
-    
-    const resolveAppKey = (toPort: string, fromPort: string): AppKey => {
-      const to = (toPort || "").toLowerCase();
-      const from = (fromPort || "").toLowerCase();
-      const txt = `${to} ${from}`;
-      if (txt.includes("qlc")) return "qlc";
-      if (txt.includes("xtouch-gw") || txt.includes("voicemeeter")) return "voicemeeter";
-      if (txt.includes("obs")) return "obs";
-      return "midi-bridge";
-    };
-
+    const items = getPagePassthroughItems(page);
     const appKeys: AppKey[] = Array.isArray(items)
-      ? Array.from(new Set(items.map((it: any) => resolveAppKey(it?.to_port, it?.from_port))))
+      ? Array.from(new Set(items.map((it: any) => resolveAppKey(it?.to_port, it?.from_port) as AppKey)))
       : [];
-
     return appKeys.length > 0 ? appKeys : ["voicemeeter"]; // fallback par défaut
   }
 
   private getChannelsForApp(page: PageConfig, app: AppKey): number[] {
-    const items = (page as any).passthroughs ?? ((page as any).passthrough ? [(page as any).passthrough] : []);
-    const resolveAppKey = (toPort: string, fromPort: string): AppKey => {
-      const to = (toPort || "").toLowerCase();
-      const from = (fromPort || "").toLowerCase();
-      const txt = `${to} ${from}`;
-      if (txt.includes("qlc")) return "qlc";
-      if (txt.includes("xtouch-gw") || txt.includes("voicemeeter")) return "voicemeeter";
-      if (txt.includes("obs")) return "obs";
-      return "midi-bridge";
-    };
+    const items = getPagePassthroughItems(page);
     const relevant = (Array.isArray(items) ? items : [])
-      .filter((it: any) => resolveAppKey(it?.to_port, it?.from_port) === app);
+      .filter((it: any) => (resolveAppKey(it?.to_port, it?.from_port) as AppKey) === app);
     const channels = new Set<number>();
     for (const it of relevant) {
       const chs: number[] | undefined = it?.filter?.channels;
@@ -447,18 +429,9 @@ export class Router {
   }
 
   private resolvePbToCcMappingForApp(page: PageConfig, app: AppKey): { map: Map<number, number>; channelForCc: Map<number, number> } | null {
-    const items = (page as any).passthroughs ?? ((page as any).passthrough ? [(page as any).passthrough] : []);
-    const resolveAppKey = (toPort: string, fromPort: string): AppKey => {
-      const to = (toPort || "").toLowerCase();
-      const from = (fromPort || "").toLowerCase();
-      const txt = `${to} ${from}`;
-      if (txt.includes("qlc")) return "qlc";
-      if (txt.includes("xtouch-gw") || txt.includes("voicemeeter")) return "voicemeeter";
-      if (txt.includes("obs")) return "obs";
-      return "midi-bridge";
-    };
+    const items = getPagePassthroughItems(page);
     const cfg = (Array.isArray(items) ? items : [])
-      .map((it: any) => ({ app: resolveAppKey(it?.to_port, it?.from_port), transform: it?.transform }))
+      .map((it: any) => ({ app: resolveAppKey(it?.to_port, it?.from_port) as AppKey, transform: it?.transform }))
       .find((x: any) => x.app === app);
     const pb2cc = cfg?.transform?.pb_to_cc;
     if (!pb2cc) return null;
@@ -599,71 +572,5 @@ export class Router {
   }
 }
 
-/**
- * Petit agrégateur de latence qui garde une fenêtre glissante et calcule p50/p95/max.
- */
-class LatencyMeter {
-  private readonly window: number[] = [];
-  private readonly maxSize = 256;
-  private lastMs = 0;
-
-  /** Enregistre une mesure (en ms). */
-  record(ms: number): void {
-    this.lastMs = ms;
-    this.window.push(ms);
-    if (this.window.length > this.maxSize) this.window.shift();
-  }
-
-  /** Réinitialise les mesures. */
-  reset(): void {
-    this.window.length = 0;
-    this.lastMs = 0;
-  }
-
-  /** Retourne un résumé {count, last, p50, p95, max}. */
-  summary(): { count: number; last: number; p50: number; p95: number; max: number } {
-    const arr = this.window.slice().sort((a, b) => a - b);
-    const n = arr.length;
-    const pct = (p: number) => (n === 0 ? 0 : arr[Math.min(n - 1, Math.max(0, Math.round((p / 100) * (n - 1))))]);
-    const mx = n === 0 ? 0 : arr[n - 1];
-    return { count: n, last: this.lastMs, p50: pct(50), p95: pct(95), max: mx };
-  }
-}
-
-/**
- * Extensions utilitaires sur Router (report/clear latence, utilitaire anti-echo).
- */
-export interface LatencyReportItem { count: number; last: number; p50: number; p95: number; max: number }
-export type LatencyReport = Record<AppKey, Record<MidiStatus, LatencyReportItem>>;
-
-export interface Router { getLatencyReport(): LatencyReport; resetLatency(): void; }
-
-// Implémentation des méthodes ajoutées sur le prototype
-(Router as any).prototype.getLatencyReport = function getLatencyReport(this: Router): LatencyReport {
-  const self = this as any;
-  const meters = self.latencyMeters as Record<AppKey, Record<MidiStatus, LatencyMeter>>;
-  const out: any = {};
-  for (const app of Object.keys(meters) as AppKey[]) {
-    out[app] = {} as any;
-    for (const st of ["note","cc","pb","sysex"] as MidiStatus[]) {
-      out[app][st] = meters[app][st].summary();
-    }
-  }
-  return out;
-};
-
-(Router as any).prototype.resetLatency = function resetLatency(this: Router): void {
-  const self = this as any;
-  const meters = self.latencyMeters as Record<AppKey, Record<MidiStatus, LatencyMeter>>;
-  for (const app of Object.keys(meters) as AppKey[]) {
-    for (const st of ["note","cc","pb","sysex"] as MidiStatus[]) {
-      meters[app][st].reset();
-    }
-  }
-};
-
-// Utilitaire interne
-(Router as any).prototype.getAntiLoopMs = function getAntiLoopMs(this: Router, status: MidiStatus): number {
-  const self = this as any;
-  return (self.antiLoopWindowMsByStatus?.[status] ?? 60) as number;
-};
+// Étend la classe Router avec des utilitaires de latence (séparés pour DRY/tailles)
+attachLatencyExtensions(Router as any);

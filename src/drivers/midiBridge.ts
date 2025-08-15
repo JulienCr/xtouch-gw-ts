@@ -7,6 +7,7 @@ import { hex, human } from "../midi/utils";
 import { matchFilter } from "../midi/filter";
 import { applyTransform } from "../midi/transform";
 import { findPortIndexByNameFragment } from "../midi/ports";
+import { resolveAppKeyFromPort } from "../shared/appKey";
 
 // findPortIndexByNameFragment désormais importé depuis src/midi/ports.ts
 
@@ -60,8 +61,8 @@ export class MidiBridgeDriver implements Driver {
         inp.on("message", (_delta, data) => {
           logger.debug(`Bridge RX <- ${this.fromPort}: ${human(data)} [${hex(data)}]`);
           try {
-            // Déterminer l'app key selon le port
-            const appKey = this.resolveAppKeyFromPort(this.fromPort);
+            // Déterminer l'app key selon le port (mutualisé)
+            const appKey = resolveAppKeyFromPort(this.fromPort);
             
             // Mettre à jour le state avec le feedback original
             try {
@@ -121,7 +122,7 @@ export class MidiBridgeDriver implements Driver {
                 }
               } catch {}
               // Marquer shadow app pour anti-echo côté router (exposé globalement par app.ts)
-              try { (global as any).__router__?.markAppShadowForOutgoing?.(this.resolveAppKeyFromPort(this.toPort), tx, this.toPort); } catch {}
+              try { (global as any).__router__?.markAppShadowForOutgoing?.(resolveAppKeyFromPort(this.toPort), tx, this.toPort); } catch {}
               // Note: On ne met pas à jour le state avec les commandes sortantes
               // Le state ne doit être mis à jour QUE par les feedbacks entrants
             } else {
@@ -142,16 +143,7 @@ export class MidiBridgeDriver implements Driver {
 
   async execute(action: string, params: unknown[], context?: ExecutionContext): Promise<void> {}
 
-  /**
-   * Résout l'app key selon le nom du port
-   */
-  private resolveAppKeyFromPort(port: string): string {
-    const portLower = port.toLowerCase();
-    if (portLower.includes("qlc")) return "qlc";
-    if (portLower.includes("xtouch-gw") || portLower.includes("voicemeeter")) return "voicemeeter";
-    if (portLower.includes("obs")) return "obs";
-    return "midi-bridge";
-  }
+  // Résolution appKey mutualisée dans src/shared/appKey.ts
 
   async shutdown(): Promise<void> {
     try { this.inFromTarget?.closePort(); } catch {}
