@@ -31,6 +31,7 @@ export class XTouchDriver {
   private output: Output | null = null;
   private handlers: Set<MessageHandler> = new Set();
   private readonly options: Required<XTouchOptions>;
+  private suppressPitchBendUntilMs = 0;
 
   constructor(private readonly ports: XTouchPortsConfig, options?: XTouchOptions) {
     this.options = {
@@ -66,11 +67,19 @@ export class XTouchDriver {
     inp.ignoreTypes(false, false, false);
     inp.on("message", (deltaSeconds: number, data: number[]) => {
       // Notifier callbacks (bridge, sniffer, etc.)
-      for (const h of this.handlers) {
-        try {
-          h(deltaSeconds, data);
-        } catch (err) {
-          logger.warn("X-Touch handler error:", err as any);
+      const now = Date.now();
+      const status = data[0] ?? 0;
+      const typeNibble = (status & 0xf0) >> 4;
+      const isPitchBend = typeNibble === 0xE;
+
+      // Squelch des PB entrants (mouvements moteurs) pendant une petite fenêtre
+      if (!(isPitchBend && now < this.suppressPitchBendUntilMs)) {
+        for (const h of this.handlers) {
+          try {
+            h(deltaSeconds, data);
+          } catch (err) {
+            logger.warn("X-Touch handler error:", err as any);
+          }
         }
       }
 
@@ -88,6 +97,17 @@ export class XTouchDriver {
     inp.openPort(inIdx);
     this.input = inp;
     logger.info(`X-Touch INPUT connecté sur '${inp.getPortName(inIdx)}' (#${inIdx}).`);
+  }
+
+  /**
+   * Ignore les PitchBend entrants pendant `ms` millisecondes (anti-boucle moteurs → QLC).
+   */
+  squelchPitchBend(ms: number): void {
+    this.suppressPitchBendUntilMs = Math.max(this.suppressPitchBendUntilMs, Date.now() + Math.max(0, ms));
+  }
+
+  isPitchBendSquelched(): boolean {
+    return Date.now() < this.suppressPitchBendUntilMs;
   }
 
   subscribe(handler: MessageHandler): () => void {

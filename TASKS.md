@@ -16,15 +16,36 @@
 
 ## En cours
 - [ ] Router (pages OK) → implémenter le mapping d’actions
- - [ ] Config Editor Web (Next.js) séparé: CRUD `config.yaml`, UI élégante Tailwind
+  - [x] StateStore MIDI-only refactor: `MidiAddr` inclut `portId`; `MidiStateEntry` {known, origin, stale?}; suppression des défauts; stockage feedback only
+  - [x] Anti-boucle déplacé côté Router: `XTouchShadow` + fenêtre 50ms; `AppShadow` réservé pour echo app
+  - [x] Intégration refresh de page (ordonnancement Notes→CC→LCD→Faders) + Reset→Replay: OFF/0 pour unknown; PB/LCD HOLD
+  - [ ] Filtrage par mapping page → MidiAddr (à faire)
+  - [x] Navigation next/prev: forcer `refreshPage()` sur les deux (fix next)
+  - [x] Page passthrough: les feedbacks des bridges alimentent `StateStore` avec l’app correcte (qlc/voicemeeter/obs)
+  - [x] Reset page "Default": Note OFF limité à canal 1, notes 0..31 (au lieu de 0,8,16,24 sur 1..9)
+  - [ ] Config Editor Web (Next.js) séparé: CRUD `config.yaml`, UI élégante Tailwind
+  - [x] Replay PB en une passe (plan PB par fader) pour éviter PB=0 après PB connu (bug retour Page 1 / Voicemeeter)
+  - [ ] BUG: Latence/loop perceptible (≈1 s) sur feedback boutons et « recalage » des faders après mouvement
+    - [ ] Instrumenter la latence round-trip par app (Voicemeeter, QLC, OBS): timestamp à l’émission (X‑Touch→app) et à la réception (app→X‑Touch), logs `DEBUG` synthétiques (p50/p95/max)
+    - [ ] Élargir/paramétrer la fenêtre anti‑echo côté app (`antiLoopWindowMs` → 300–600 ms) et la rendre spécifique par contrôle (NOTE/CC/PB)
+    - [ ] Implémenter `lastUserActionTs` par contrôle X‑Touch: ignorer le feedback app plus ancien que la dernière action locale (Last‑Write‑Wins par timestamp)
+    - [ ] Période de grâce faders moteurs: squelch PB entrants plus longue et/ou jusqu’à stabilisation (deadband + coalescing)
+    - [ ] Vérifier `echoPitchBend`: l’activer seulement si fader sans app mappée; sinon désactiver pour éviter conflit avec feedback tardif
+    - [ ] Auditer les listeners background: éviter tout doublon d’écoute sur les mêmes `from_port` (pages actives vs background)
+    - [ ] Ajouter métriques CLI rapides: `latency:report`, `latency:reset`
 
 ## Nouveau
+- [ ] Persistence optionnelle du StateStore (`.state/xtouch-gw.json`), flag stale sur reload
 - [x] Transformer MIDI: Pitch Bend → Note On (même canal) avec vélocité mappée (0..127) pour compat QLC+
 - [x] Transformer MIDI: Pitch Bend → Control Change (canal cible configurable, CC par canal source)
 - [x] Bridge: transformation inverse automatique du feedback (CC/Note → Pitch Bend pour X‑Touch)
- - [x] Refactor: extraction utilitaires MIDI (`src/midi/{utils,filter,transform,ports}.ts`) et LCD (`src/ui/lcd.ts`), simplification `drivers/midiBridge.ts`, mutualisation recherche ports, déduplication LCD, extraction CLI (`src/cli/`).
+ - [x] Passthrough pages – fallback d’état: au refresh, utiliser les valeurs du state si présentes pour PB ch 1..9 et Notes 0..31 (ch1), sinon envoyer des valeurs nulles (0), comme sur la page "Default".
+ - [x] Refactor: extraction utilitaires MIDI (`src/midi/{utils,filter,transform,ports}.ts`) et LCD (`src/ui/lcd.ts`), simplification `drivers/midiBridge.ts` (ingestion only; pas d'echo direct), mutualisation recherche ports, déduplication LCD, extraction CLI (`src/cli/`).
+ - [x] Bugfix: refresh pages 3 & 4 — conserver `transform.pb_to_cc.target_channel` = 1 (QLC attend CH1) et uniformiser `base_cc` (0x45, 0x50) pour permettre la remontée d'état CC → PB et le refresh à l'arrivée sur la page.
 
 ## Fait
+- [x] Page "Lum Latéraux": fader 9 forcé sur CC 78 via `cc_by_channel` – 2025-08-10
+- [x] Pages 3 et 4 configurées: P3 "Néons Latéraux RGB" (base_cc 0x45, ch=2, fader 9→CC78), P4 "Néons Contres RGB" (base_cc 0x50, ch=2, fader 9→CC78) – 2025-08-10
 - [x] Scaffold app Next.js séparée `web/config-editor` + API GET/PUT `/api/config` + UI YAML/JSON preview – 2025-08-10
 - [x] README: documentation fonctionnelle mise à jour (pages/paging, passthroughs, LCD, CLI, sniffer, vm_sync) – 2025-08-10
 - [x] LCD: libellés configurables par page dans `config.yaml` (`pages[].lcd.labels[0..7]`, string ou {upper,lower}). Application au démarrage et lors du changement de page.
