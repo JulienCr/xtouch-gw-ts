@@ -28,6 +28,8 @@
   - [ ] Config Editor Web (Next.js) séparé: CRUD `config.yaml`, UI élégante Tailwind
   - [x] Replay PB en une passe (plan PB par fader) pour éviter PB=0 après PB connu (bug retour Page 1 / Voicemeeter)
   - [x] Refactor `app.ts`: déduplication helpers (resolveAppKey, F1..F8 LEDs, construction bridges, accès `passthrough(s)`) – 2025‑08‑15
+  - [x] Centralisation anti-echo fallback via `getAntiLoopMs()` (remplace `?? 60` en dur) – 2025‑08‑15
+  - [x] `src/midi/transform.ts`: utiliser `pb14FromRaw`/`rawFromPb14`; suppression des reverse transforms (gérées par `router/page.ts`) – 2025‑08‑15
 
 ## Nouveau
 - [x] Stack docs JSDoc/TypeDoc: config `typedoc.json`, scripts pnpm (`docs`, `docs:clean`), sortie Markdown `docs/api` – 2025-08-15

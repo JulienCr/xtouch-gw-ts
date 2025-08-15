@@ -186,7 +186,7 @@ export class Router {
         try {
           this.ensureLatencyMeters(app)[entry.addr.status].record(rtt);
         } catch {}
-        const win = (this.antiLoopWindowMsByStatus as any)[entry.addr.status] ?? 60;
+        const win = (this as any).getAntiLoopMs?.(entry.addr.status) ?? ((this.antiLoopWindowMsByStatus as any)[entry.addr.status] ?? 60);
         if (this.midiValueEquals(prev.value, entry.value) && rtt < win) {
           return;
         }
@@ -412,7 +412,7 @@ export class Router {
     const k = this.addrKeyForXTouch(entry.addr);
     const prev = this.xtouchShadow.get(k);
     const now = Date.now();
-    const win = (this.antiLoopWindowMsByStatus as any)[entry.addr.status] ?? 60;
+    const win = (this as any).getAntiLoopMs?.(entry.addr.status) ?? ((this.antiLoopWindowMsByStatus as any)[entry.addr.status] ?? 60);
     if (prev && this.midiValueEquals(prev.value, entry.value) && now - prev.ts < win) {
       return;
     }
