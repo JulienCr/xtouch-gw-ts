@@ -16,6 +16,7 @@ import { getPagePassthroughItems } from "./config/passthrough";
 import { buildPageBridges } from "./bridges/pageBridges";
 import { BackgroundListenerManager } from "./midi/backgroundListeners";
 import { setupStatePersistence } from "./state/persistence";
+import { attachNavigation } from "./app/navigation";
 
 export async function startApp(): Promise<() => void> {
   const envLevel = (process.env.LOG_LEVEL as any) || "info";
@@ -105,50 +106,13 @@ export async function startApp(): Promise<() => void> {
       next_note: cfg.paging?.next_note ?? 47,
     } as any;
 
-    
-
-    // Navigation de pages via NoteOn (prev/next + F1..F8) avec anti-rebond
-    let navCooldownUntil = 0;
-    const unsubNav = x.subscribe((_delta, data) => {
-      const status = data[0] ?? 0;
-      const type = (status & 0xf0) >> 4;
-      const ch = (status & 0x0f) + 1;
-      if (type === 0x9 && ch === paging.channel) {
-        const note = data[1] ?? 0;
-        const vel = data[2] ?? 0;
-        const now = Date.now();
-        if (vel <= 0) return;
-        if (now < navCooldownUntil) return;
-
-        // 1) Prev / Next
-        if (note === paging.prev_note || note === paging.next_note) {
-          const goingPrev = note === paging.prev_note;
-          const goingNext = note === paging.next_note;
-          if (!goingPrev && !goingNext) return;
-          if (goingPrev) router.prevPage();
-          if (goingNext) router.nextPage();
-        } else {
-          // 2) F1..F8 → pages[0..7]
-          const idx = [54,55,56,57,58,59,60,61].indexOf(note);
-          if (idx >= 0) {
-            const pages = router.listPages();
-            if (idx < pages.length) {
-              router.setActivePage(idx);
-            }
-          } else {
-            return;
-          }
-        }
-
-        // Anti-bounce après changement de page
-        navCooldownUntil = now + 250;
-
-        // LEDs F1..F8
+    const unsubNav = attachNavigation({
+      router,
+      xtouch: x,
+      paging,
+      onAfterPageChange: (page) => {
         try { updateFKeyLedsForActivePage(router, x, paging.channel); } catch {}
-
-        // LCD + bridges + refresh
         applyLcdForActivePage(router, x);
-        const page = router.getActivePage();
         rebuildBackgroundListeners(page);
         if (page?.passthrough || page?.passthroughs) {
           for (const b of pageBridges) {
@@ -163,9 +127,8 @@ export async function startApp(): Promise<() => void> {
           }
           pageBridges = [];
         }
-        
         try { router.refreshPage(); } catch {}
-      }
+      },
     });
 
     // Si aucune page ne définit de passthrough, activer le bridge global vers Voicemeeter
