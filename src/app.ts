@@ -20,6 +20,17 @@ import { attachCli } from "./cli";
 import { promises as fs } from "fs";
 import path from "path";
 
+function updateFunctionKeyLeds(x: XTouchDriver, channel1to16: number, notes: number[], activeIndex: number): void {
+  const ch = Math.max(1, Math.min(16, channel1to16)) | 0;
+  for (let i = 0; i < notes.length; i += 1) {
+    const note = notes[i] | 0;
+    const on = i === activeIndex ? 1 : 0;
+    // Note On / Off (vel 0 pour off) sur le canal configuré
+    const status = 0x90 + (ch - 1);
+    x.sendRawMessage([status, Math.max(0, Math.min(127, note)), on ? 0x7F : 0x00]);
+  }
+}
+
 function toHex(bytes: number[]): string {
   return bytes.map((b) => b.toString(16).padStart(2, "0")).join(" ");
 }
@@ -94,6 +105,14 @@ export async function startApp(): Promise<() => void> {
         if (xtouch) {
           const x = xtouch as import("./xtouch/driver").XTouchDriver;
           applyLcdForActivePage(router, x);
+          // Mettre à jour l'état des LEDs F1..F8 après reload
+          try {
+            const pages = router.listPages();
+            const activeIdx = Math.max(0, pages.findIndex((n) => n === router.getActivePageName()));
+            const pagingCh = (cfg.paging?.channel ?? 1) | 0;
+            const fNotes = [54,55,56,57,58,59,60,61];
+            updateFunctionKeyLeds(x, pagingCh, fNotes, Math.min(activeIdx, fNotes.length - 1));
+          } catch {}
         }
       } catch (e) {
         logger.debug("Hot reload LCD refresh skipped:", e as any);
@@ -242,6 +261,14 @@ export async function startApp(): Promise<() => void> {
     const x = xtouch as import("./xtouch/driver").XTouchDriver; // non-null après start
     router.attachXTouch(x, { interMsgDelayMs: 0 });
     applyLcdForActivePage(router, x);
+    // LEDs F1..F8 au démarrage
+    try {
+      const pages = router.listPages();
+      const activeIdx = Math.max(0, pages.findIndex((n) => n === router.getActivePageName()));
+      const pagingCh = (cfg.paging?.channel ?? 1) | 0;
+      const fNotes = [54,55,56,57,58,59,60,61];
+      updateFunctionKeyLeds(x, pagingCh, fNotes, Math.min(activeIdx, fNotes.length - 1));
+    } catch {}
 
     const paging: Required<PagingConfig> = {
       channel: cfg.paging?.channel ?? 1,
@@ -259,7 +286,7 @@ export async function startApp(): Promise<() => void> {
       return "midi-bridge";
     };
 
-    // Navigation de pages via NoteOn (avec anti-rebond)
+    // Navigation de pages via NoteOn (prev/next + F1..F8) avec anti-rebond
     let navCooldownUntil = 0;
     const unsubNav = x.subscribe((_delta, data) => {
       const status = data[0] ?? 0;
@@ -270,21 +297,45 @@ export async function startApp(): Promise<() => void> {
         const vel = data[2] ?? 0;
         const now = Date.now();
         if (vel <= 0) return;
-        if (note !== paging.prev_note && note !== paging.next_note) return; // Ne naviguer que sur les touches dédiées
         if (now < navCooldownUntil) return;
-        const goingPrev = note === paging.prev_note;
-        const goingNext = note === paging.next_note;
-        if (!goingPrev && !goingNext) return;
-        if (goingPrev) router.prevPage();
-        if (goingNext) router.nextPage();
-        navCooldownUntil = now + 250; // anti-bounce après changement de page
+
+        // 1) Prev / Next
+        if (note === paging.prev_note || note === paging.next_note) {
+          const goingPrev = note === paging.prev_note;
+          const goingNext = note === paging.next_note;
+          if (!goingPrev && !goingNext) return;
+          if (goingPrev) router.prevPage();
+          if (goingNext) router.nextPage();
+        } else {
+          // 2) F1..F8 → pages[0..7]
+          const fNotes = [54,55,56,57,58,59,60,61];
+          const idx = fNotes.indexOf(note);
+          if (idx >= 0) {
+            const pages = router.listPages();
+            if (idx < pages.length) {
+              router.setActivePage(idx);
+            }
+          } else {
+            return;
+          }
+        }
+
+        // Anti-bounce après changement de page
+        navCooldownUntil = now + 250;
+
+        // LEDs F1..F8
+        try {
+          const pages = router.listPages();
+          const activeIdx = Math.max(0, pages.findIndex((n) => n === router.getActivePageName()));
+          const fNotes = [54,55,56,57,58,59,60,61];
+          updateFunctionKeyLeds(x, paging.channel, fNotes, Math.min(activeIdx, fNotes.length - 1));
+        } catch {}
+
+        // LCD + bridges + refresh
         applyLcdForActivePage(router, x);
         const page = router.getActivePage();
-        // Mettre à jour les listeners background AVANT d'ouvrir les bridges de page
         rebuildBackgroundListeners(page);
-        // (Re)créer le bridge de page si besoin
         if (page?.passthrough || page?.passthroughs) {
-          // Fermer anciens bridges
           for (const b of pageBridges) {
             try { b.shutdown().catch((err) => logger.warn("Bridge shutdown error:", err as any)); } catch {}
           }
@@ -310,12 +361,9 @@ export async function startApp(): Promise<() => void> {
           }
           pageBridges = [];
         }
-        // Listeners background déjà mis à jour plus haut
-        // Snapshot ciblé si voicemeeter
         if (cfg.features?.vm_sync !== false) {
           vmSync?.startSnapshotForPage(page?.name ?? "");
         }
-        // Rejouer l'état connu après (ré)initialisation des bridges et listeners
         try { router.refreshPage(); } catch {}
       }
     });

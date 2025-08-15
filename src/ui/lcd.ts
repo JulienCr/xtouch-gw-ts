@@ -7,6 +7,7 @@ export function applyLcdForActivePage(router: Router, x: XTouchDriver): void {
   const page = router.getActivePage();
   const labels = (page as any)?.lcd?.labels as PageLcdLabel[] | undefined;
   const colorsRaw = (page as any)?.lcd?.colors as Array<number | string> | undefined;
+  const pageName = router.getActivePageName?.() ?? (page as any)?.name ?? "";
   // Always start by clearing all strips to avoid leaks from previous pages
   for (let i = 0; i < 8; i += 1) {
     x.sendLcdStripText(i, "", "");
@@ -37,6 +38,11 @@ export function applyLcdForActivePage(router: Router, x: XTouchDriver): void {
     for (let i = 0; i < 8; i += 1) colors.push(0);
   }
   x.setLcdColors(colors);
+
+  // Grand afficheur 7-segments: afficher le nom de la page centré (si supporté)
+  try {
+    x.setSevenSegmentText(pageName);
+  } catch {}
 }
 
 

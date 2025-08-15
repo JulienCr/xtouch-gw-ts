@@ -174,6 +174,17 @@ export function attachCli(ctx: CliContext): () => void {
           logger.info(`LCD[${strip}] ← '${upper}' | '${lower}'`);
           break;
         }
+        case "sevenseg":
+        case "time": {
+          const text = rest.join(" ") || "";
+          if (!ctx.xtouch) {
+            logger.warn("X-Touch non connecté");
+            break;
+          }
+          ctx.xtouch.setSevenSegmentText(text);
+          logger.info(`7-seg ← '${text}'`);
+          break;
+        }
         case "help":
           logger.info("help: page <idx|name> | pages | emit <controlId> [value] | midi-ports | midi-open <idx|name> | midi-close | learn <id> | fader <ch> <0..16383> | latency:report | latency:reset | exit");
           break;

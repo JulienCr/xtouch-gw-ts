@@ -171,6 +171,32 @@ export class XTouchDriver {
     this.output.sendMessage([0xF0, 0x00, 0x00, 0x66, 0x14, 0x72, ...payload, 0xF7]);
   }
 
+  /**
+   * Met à jour le grand afficheur 7-segments (zone timecode) via trame vendor Behringer.
+   *
+   * Format: F0 00 20 32 dd 37 s1..s12 d1 d2 F7
+   * - dd: device id (X‑Touch 0x14, Extender 0x15)
+   * - s1..s12: masques 7-segments (bit0=a … bit6=g) pour chaque digit
+   * - d1: dots digits 1..7 (bit0 => digit1, …, bit6 => digit7)
+   * - d2: dots digits 8..12 (bit0 => digit8, …, bit4 => digit12)
+   *
+   * Affiche le texte centré/tronqué à 12 caractères. Les caractères non supportés sont rendus vides.
+   */
+  setSevenSegmentText(text: string, options?: { deviceId?: number; dots1?: number; dots2?: number }): void {
+    if (!this.output) return;
+    const dots1 = (options?.dots1 ?? 0x00) & 0x7F;
+    const dots2 = (options?.dots2 ?? 0x00) & 0x7F;
+    const normalized = (text ?? "").toString();
+    const centered = centerToLength(normalized, 12);
+    const chars = centered.slice(0, 12).split("");
+    const segs = chars.map((c) => sevenSegForChar(c));
+    const deviceIds = options?.deviceId != null ? [options.deviceId & 0x7F] : [0x14, 0x15];
+    for (const dd of deviceIds) {
+      const msg: number[] = [0xF0, 0x00, 0x20, 0x32, dd, 0x37, ...segs, dots1, dots2, 0xF7];
+      this.output.sendMessage(msg);
+    }
+  }
+
   stop(): void {
     try {
       this.input?.closePort();
@@ -183,4 +209,55 @@ export class XTouchDriver {
     this.handlers.clear();
     logger.info("X-Touch: ports MIDI fermés.");
   }
+}
+
+/**
+ * Encode un caractère vers son masque 7-segments (bit0=a … bit6=g).
+ * Les lettres sont mappées en majuscules lorsque pertinent.
+ */
+function sevenSegForChar(ch: string): number {
+  const c = (ch || " ").toUpperCase();
+  switch (c) {
+    case "0": return 0x3F;
+    case "1": return 0x06;
+    case "2": return 0x5B;
+    case "3": return 0x4F;
+    case "4": return 0x66;
+    case "5": return 0x6D;
+    case "6": return 0x7D;
+    case "7": return 0x07;
+    case "8": return 0x7F;
+    case "9": return 0x6F;
+    case "A": return 0x77;
+    case "B": return 0x7C; // 'b'
+    case "C": return 0x39;
+    case "D": return 0x5E; // 'd'
+    case "E": return 0x79;
+    case "F": return 0x71;
+    case "G": return 0x3D;
+    case "H": return 0x76;
+    case "I": return 0x06; // même que '1'
+    case "J": return 0x1E;
+    case "L": return 0x38;
+    case "N": return 0x37; // approx
+    case "O": return 0x3F;
+    case "P": return 0x73;
+    case "S": return 0x6D;
+    case "T": return 0x78; // 't'
+    case "U": return 0x3E;
+    case "Y": return 0x6E;
+    case "-": return 0x40;
+    case "_": return 0x08;
+    case " ": return 0x00;
+    default: return 0x00;
+  }
+}
+
+function centerToLength(s: string, targetLen: number): string {
+  const str = s ?? "";
+  if (str.length >= targetLen) return str.slice(0, targetLen);
+  const totalPad = targetLen - str.length;
+  const left = Math.floor(totalPad / 2);
+  const right = totalPad - left;
+  return " ".repeat(left) + str + " ".repeat(right);
 }

@@ -15,6 +15,8 @@
 - [ ] CI basique (lint, build)
 
 ## En cours
+- [x] Indiquer le nom de la page sur le grand afficheur 7-segments
+- [x] Utilise les boutons F1 -> F8 pour naviguer entre les pages (notes channel 1 64..57) et LED active sur la page courante
 - [ ] Router (pages OK) → implémenter le mapping d’actions
   - [x] StateStore MIDI-only refactor: `MidiAddr` inclut `portId`; `MidiStateEntry` {known, origin, stale?}; suppression des défauts; stockage feedback only
   - [x] Anti-boucle déplacé côté Router: `XTouchShadow` + fenêtres anti‑echo par type (`antiLoopWindowMsByStatus`)
@@ -31,7 +33,6 @@
 - [ ] Reload au démarrage depuis snapshot avec flag `stale` sur les entrées reconstruites
 - [x] Transformer MIDI: Pitch Bend → Note On (même canal) avec vélocité mappée (0..127) pour compat QLC+
 - [x] Transformer MIDI: Pitch Bend → Control Change (canal cible configurable, CC par canal source)
-- [ ] Bridge: reverse transform automatique du feedback (CC/Note → Pitch Bend) — abandonné, remplacé par anti‑echo et setpoint moteurs via `midiBridge` + `Router`
 - [x] Passthrough pages – fallback d’état: au refresh, utiliser les valeurs du state si présentes pour PB ch 1..9 et Notes 0..31 (ch1), sinon envoyer des valeurs nulles (0), comme sur la page "Default".
 - [x] Refactor: extraction utilitaires MIDI (`src/midi/{utils,filter,transform,ports}.ts`) et LCD (`src/ui/lcd.ts`), simplification `drivers/midiBridge.ts` (ingestion only; pas d'echo direct), mutualisation recherche ports, déduplication LCD, extraction CLI (`src/cli/`).
 - [x] Bugfix: refresh pages 3 & 4 — conserver `transform.pb_to_cc.target_channel` = 1 (QLC attend CH1) et uniformiser `base_cc` (0x45, 0x50) pour permettre la remontée d'état CC → PB et le refresh à l'arrivée sur la page.
@@ -52,3 +53,4 @@
 - [x] Création du système de gestion de projet (`TASKS.md`, `MEMORY.md`)
 - [x] Ajout d’un squelette Node.js + TypeScript
 - [x] Initialisation du projet (structure, scripts pnpm, TypeScript) 
+- ~~ [ ] Bridge: reverse transform automatique du feedback (CC/Note → Pitch Bend)~~ — abandonné, remplacé par anti‑echo et setpoint moteurs via `midiBridge` + `Router`
