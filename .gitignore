@@ -14,3 +14,6 @@ Thumbs.db
 
 # Local runtime state (do not commit)
 .state/
+ 
+# Generated docs
+docs/api/

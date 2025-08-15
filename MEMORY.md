@@ -53,3 +53,6 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Mapping CC→PB: support `base_cc` (1..9) + `cc_by_channel`; lookup CC par canal puis global.
   - Correction appliquée: construction d’un plan PB par fader (priorités PB connu > CC→PB > 0) et émission en une seule passe. Évite les PB=0 après des PB connus au retour sur Page 1 (Voicemeeter+QLC). Les mutes Notes sont rejouées via plan Notes.
   - Observation: latence importante (~1 s) sur le feedback (LED/mutes) et recalage des faders après mouvement. Hypothèses: latence cumulée des bridges, fenêtre anti‑echo trop courte, echoPitchBend en conflit, listeners doublons. Actions listées dans `TASKS.md`.
+ - 2025-08-15 — Documentation JSDoc/TypeDoc
+   - Décision: générer la doc API avec TypeDoc + plugin Markdown, sortie `docs/api` dans le repo pour lecture hors-ligne.
+   - Implémentation: `typedoc.json`, scripts `pnpm run docs`, `pnpm run docs:clean`. Les warnings TypeDoc sur des types non inclus sont acceptés pour l’instant.

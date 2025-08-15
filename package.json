@@ -15,7 +15,10 @@
     "start": "node dist/index.js",
     "check:types": "tsc --noEmit",
     "clean": "rimraf dist",
-    "sniff:web": "tsx src/sniffer-server.ts"
+    "sniff:web": "tsx src/sniffer-server.ts",
+    "docs": "typedoc",
+    "docs:clean": "rimraf docs/api",
+    "docs:open": "pwsh -NoProfile -Command \"Start-Process docs/api/README.md\""
   },
   "dependencies": {
     "@julusian/midi": "^3.6.1",
@@ -28,6 +31,8 @@
     "@types/node": "^20.11.20",
     "rimraf": "^5.0.5",
     "tsx": "^4.15.7",
+    "typedoc": "^0.28.10",
+    "typedoc-plugin-markdown": "^4.8.1",
     "typescript": "^5.5.4"
   }
 }
