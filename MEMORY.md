@@ -55,4 +55,8 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Observation: latence importante (~1 s) sur le feedback (LED/mutes) et recalage des faders après mouvement. Hypothèses: latence cumulée des bridges, fenêtre anti‑echo trop courte, echoPitchBend en conflit, listeners doublons. Actions listées dans `TASKS.md`.
  - 2025-08-15 — Documentation JSDoc/TypeDoc
    - Décision: générer la doc API avec TypeDoc + plugin Markdown, sortie `docs/api` dans le repo pour lecture hors-ligne.
-   - Implémentation: `typedoc.json`, scripts `pnpm run docs`, `pnpm run docs:clean`. Les warnings TypeDoc sur des types non inclus sont acceptés pour l’instant.
+   - Implémentation: `typedoc.json`, scripts `pnpm run docs`, `pnpm run docs:clean`. Warnings supprimés en ajoutant `src/config.ts` aux entry points et en exportant `MessageHandler`; JSDoc complétée sur `config.ts` et `xtouch/driver.ts`.
+ - 2025-08-15 — Refactors anti-echo & transforms
+   - Nettoyage: suppression des reverse transforms dans `src/midi/transform.ts`; ces miroirs sont gérés par `router/page.ts` (mapping CC→PB lors du refresh/replay).
+   - Robustesse: remplacement des littéraux `?? 60` par `getAntiLoopMs(status)` dans `router` pour cohérence des fenêtres anti-echo.
+   - Archivage: déplacement de `config copy.yaml` vers `docs/ARCHIVES/` pour éviter les doubles sources de config.

@@ -1,21 +1,33 @@
 import { logger } from "./logger";
 import type { ControlMapping, Driver, ExecutionContext } from "./types";
 import type { AppConfig, PageConfig } from "./config";
-import { StateStore, MidiStateEntry, AppKey, MidiStatus, MidiValue } from "./state";
+import { StateStore, MidiStateEntry, AppKey, MidiStatus, buildEntryFromRaw } from "./state";
 import type { XTouchDriver } from "./xtouch/driver";
-import { human, hex, getTypeNibble, rawFromPb14, isPB, isCC, isNoteOn } from "./midi/utils";
-import { addrKeyWithoutPort } from "./shared/addrKey";
-import { getAppsForPage, getChannelsForApp, resolvePbToCcMappingForApp, transformAppToXTouch } from "./router/page";
+import { human, hex, getTypeNibble, isPB, isCC, isNoteOn } from "./midi/utils";
+import { getAppsForPage } from "./router/page";
 import { LatencyMeter, attachLatencyExtensions } from "./router/latency";
+import { makeXTouchEmitter } from "./router/emit";
+import { planRefresh } from "./router/planner";
+import { forwardFromApp } from "./router/forward";
+import { makeAppShadows } from "./router/shadows";
 
+/**
+ * Routeur principal orchestrant la navigation de pages, l'ingestion des feedbacks
+ * applicatifs et la restitution vers le X‑Touch.
+ *
+ * Invariants clés:
+ * - La source de vérité des états applicatifs est alimentée uniquement par `onMidiFromApp()`
+ * - Le refresh de page rejoue les états connus (Notes→CC→SysEx→PB) sans doublons (anti‑echo)
+ * - La politique Last‑Write‑Wins protège les actions utilisateur locales récentes
+ */
 export class Router {
   private config: AppConfig;
   private readonly drivers: Map<string, Driver> = new Map();
   private activePageIndex = 0;
   private readonly state: StateStore;
   private xtouch?: XTouchDriver;
-  private readonly xtouchShadow = new Map<string, { value: MidiValue; ts: number }>();
-  private readonly appShadows: Map<string, Map<string, { value: MidiValue; ts: number }>> = new Map();
+  private emitter?: ReturnType<typeof makeXTouchEmitter>;
+  private readonly appShadows = makeAppShadows();
   /** Timestamp de la dernière action locale (X‑Touch) par cible X‑Touch (status|ch|d1). */
   private readonly lastUserActionTs: Map<string, number> = new Map();
   /**
@@ -34,6 +46,11 @@ export class Router {
    */
   private readonly latencyMeters: Record<string, Record<MidiStatus, LatencyMeter>> = {};
 
+  /**
+   * Crée un `Router` avec une configuration d'app (pages, mapping, paging, etc.).
+   *
+   * @param initialConfig - Configuration applicative initiale
+   */
   constructor(initialConfig: AppConfig) {
     this.config = initialConfig;
     this.state = new StateStore();
@@ -42,28 +59,33 @@ export class Router {
   /**
    * Enregistre un driver applicatif par clé (ex: "voicemeeter", "qlc", "obs").
    */
+  /**
+   * Enregistre un driver applicatif, disponible pour `handleControl()`.
+   * @param key - Clé d'application (ex: "voicemeeter", "qlc", "obs")
+   * @param driver - Implémentation de driver
+   */
   registerDriver(key: string, driver: Driver): void {
     this.drivers.set(key, driver);
   }
 
-  /** Retourne la page active. */
+  /** Retourne la configuration de la page active. */
   getActivePage(): PageConfig | undefined {
     return this.config.pages[this.activePageIndex];
   }
 
-  /** Retourne le nom de la page active. */
+  /** Retourne le nom de la page active, ou "(none)" si aucune page. */
   getActivePageName(): string {
     return this.getActivePage()?.name ?? "(none)";
   }
 
-  /** Liste les noms des pages configurées. */
+  /** Liste les noms des pages disponibles. */
   listPages(): string[] {
     return this.config.pages.map((p) => p.name);
   }
 
   /**
    * Définit la page active par index ou par nom et déclenche un refresh.
-   * Retourne true si la page a été changée.
+   * @returns true si le changement a été effectué
    */
   setActivePage(nameOrIndex: string | number): boolean {
     if (typeof nameOrIndex === "number") {
@@ -104,6 +126,8 @@ export class Router {
 
   /**
    * Exécute l'action mappée pour un contrôle logique de la page courante.
+   * @param controlId - Identifiant de contrôle logique (clé du mapping)
+   * @param value - Valeur facultative associée
    */
   async handleControl(controlId: string, value?: unknown): Promise<void> {
     const page = this.getActivePage();
@@ -138,21 +162,23 @@ export class Router {
     logger.info("Router: configuration mise à jour.");
   }
 
-  /** Attache le driver X‑Touch au router. */
+  /** Attache le driver X‑Touch au router et prépare l'émetteur. */
   attachXTouch(xt: XTouchDriver): void {
     this.xtouch = xt;
+    this.emitter = makeXTouchEmitter(xt, {
+      antiLoopWindows: this.antiLoopWindowMsByStatus,
+      getAddrKeyWithoutPort: (addr) => this.appShadows.addrKeyForXTouch(addr),
+      markLocalActionTs: (key, ts) => this.lastUserActionTs.set(key, ts),
+      logPitchBend: true,
+    });
   }
 
   /**
-   * Traite le feedback MIDI reçu d'un logiciel
-   * SEULE SOURCE DE VÉRITÉ pour mettre à jour les states
-   */
-  /**
-   * Traite un feedback MIDI brut provenant d'une application (Voicemeeter/QLC/OBS...).
-   * Met à jour le StateStore et, si pertinent pour la page active, rejoue vers X‑Touch avec protections anti‑echo.
+   * Ingestion d'un feedback MIDI brut provenant d'une application (Voicemeeter/QLC/OBS...).
+   * Met à jour le StateStore et, si pertinent pour la page active, rejoue vers X‑Touch.
    */
   onMidiFromApp(appKey: string, raw: number[], portId: string): void {
-    const entry = StateStore.buildEntryFromRaw(raw, portId);
+    const entry = buildEntryFromRaw(raw, portId);
     if (!entry) return;
 
     const app = appKey as AppKey;
@@ -171,56 +197,33 @@ export class Router {
 
     // Si la page active implique cette app, envisager un forward immédiat vers X‑Touch (replay live)
     try {
-      if (!this.xtouch) return;
-      const page = this.getActivePage();
-      if (!page) return;
-      const appsInPage = getAppsForPage(page);
-      if (!appsInPage.includes(app)) return;
-      // Anti-echo: si on vient d'envoyer la même valeur vers l'app (shadow), ignorer
-      const k = this.addrKeyForApp(entry.addr);
-      const prev = this.getAppShadow(app).get(k);
-      const now = Date.now();
-      if (prev) {
-        const rtt = now - prev.ts;
-        // Enregistrer la latence round-trip même si on va ignorer l'echo (utile pour diagnostiquer)
-        try {
-          this.ensureLatencyMeters(app)[entry.addr.status].record(rtt);
-        } catch {}
-        const win = (this.antiLoopWindowMsByStatus as any)[entry.addr.status] ?? 60;
-        if (this.midiValueEquals(prev.value, entry.value) && rtt < win) {
-          return;
-        }
-      }
-      // MUTUALISATION: la même pipeline transform/emit que le refresh
-      const maybeForward = transformAppToXTouch(page, app, entry);
-      if (!maybeForward) return;
-      // Last-Write-Wins: si une action locale récente a eu lieu sur cette cible X‑Touch, ignorer un feedback plus ancien
-      const targetKey = this.addrKeyForXTouch(maybeForward.addr);
-      const lastLocal = this.lastUserActionTs.get(targetKey) ?? 0;
-      const grace = (maybeForward.addr.status === "pb" ? 300 : 80);
-      if (Date.now() - lastLocal < grace) {
-        return;
-      }
-      this.emitToXTouchIfNotDuplicate(maybeForward);
+      const deps = {
+        getActivePage: () => this.getActivePage(),
+        hasXTouch: () => !!this.xtouch,
+        getAppShadow: (a: string) => this.appShadows.getAppShadow(a),
+        addrKeyForApp: (addr: MidiStateEntry["addr"]) => this.appShadows.addrKeyForApp(addr),
+        addrKeyForXTouch: (addr: MidiStateEntry["addr"]) => this.appShadows.addrKeyForXTouch(addr),
+        ensureLatencyMeters: (a: string) => this.ensureLatencyMeters(a),
+        antiLoopWindows: this.antiLoopWindowMsByStatus,
+        lastUserActionTs: this.lastUserActionTs,
+        emitIfNotDuplicate: (e: MidiStateEntry) => this.emitter?.emitIfNotDuplicate(e),
+      } as const;
+      forwardFromApp(deps, app, entry);
     } catch {}
   }
 
-  /**
-   * Marque le dernier message émis vers une app (shadow) pour l'anti‑echo et la mesure de latence RTT.
-   */
+  /** Marque le dernier message émis vers une app (shadow) pour l'anti‑echo et la latence RTT. */
   markAppShadowForOutgoing(appKey: string, raw: number[], portId: string): void {
     try {
       const app = appKey as AppKey;
-      const e = StateStore.buildEntryFromRaw(raw, portId);
+      const e = buildEntryFromRaw(raw, portId);
       if (!e) return;
-      const k = this.addrKeyForApp(e.addr);
-      this.getAppShadow(app).set(k, { value: e.value, ts: Date.now() });
+      const k = this.appShadows.addrKeyForApp(e.addr);
+      this.appShadows.getAppShadow(app).set(k, { value: e.value, ts: Date.now() });
     } catch {}
   }
 
-  /**
-   * Marque une action locale (X‑Touch) à partir d'une trame brute, pour appliquer les fenêtres de grâce LWW.
-   */
+  /** Marque une action locale (X‑Touch) à partir d'une trame brute, pour appliquer LWW. */
   markUserActionFromRaw(raw: number[]): void {
     if (!raw || raw.length === 0) return;
     const status = raw[0] ?? 0;
@@ -228,21 +231,17 @@ export class Router {
     const ch = ((status & 0x0f) + 1) | 0;
     let key: string | null = null;
     if (isPB(status)) {
-      key = this.addrKeyForXTouch({ status: "pb", channel: ch, data1: 0 } as any);
+      key = this.appShadows.addrKeyForXTouch({ status: "pb", channel: ch, data1: 0 } as any);
     } else if (isCC(status)) {
       const cc = raw[1] ?? 0;
-      key = this.addrKeyForXTouch({ status: "cc", channel: ch, data1: cc } as any);
+      key = this.appShadows.addrKeyForXTouch({ status: "cc", channel: ch, data1: cc } as any);
     } else if (isNoteOn(status) || getTypeNibble(status) === 0x8) {
       const note = raw[1] ?? 0;
-      key = this.addrKeyForXTouch({ status: "note", channel: ch, data1: note } as any);
+      key = this.appShadows.addrKeyForXTouch({ status: "note", channel: ch, data1: note } as any);
     }
     if (key) this.lastUserActionTs.set(key, Date.now());
   }
 
-  /**
-   * Refresh complet de la page active selon la nouvelle architecture
-   * Utilise UNIQUEMENT les états des logiciels stockés via feedback MIDI
-   */
   /** Rafraîchit complètement la page active (replay des états connus vers X‑Touch). */
   refreshPage(): void {
     if (!this.xtouch) return;
@@ -251,203 +250,19 @@ export class Router {
 
     logger.debug(`Refresh page '${page.name}'`);
     // Nouveau cycle: réinitialiser l'ombre X‑Touch pour autoriser la ré‑émission des valeurs cibles
-    this.xtouchShadow.clear();
+    try { this.emitter?.clearShadow(); } catch {}
 
-    // 1. Identifier les logiciels utilisés par cette page
-    const appsInPage = getAppsForPage(page);
-    logger.debug(`Apps pour cette page: [${appsInPage.join(", ")}]`);
-
-    // 2. Construire des "plans" par adresse X‑Touch pour éviter les collisions inter‑apps
-    type PlanEntry = { entry: MidiStateEntry; priority: number };
-    const notePlan = new Map<string, PlanEntry>(); // key: note|ch|d1
-    const ccPlan = new Map<string, PlanEntry>();   // key: cc|ch|d1
-    const pbPlan = new Map<number, PlanEntry>();   // key: fader channel (1..9)
-
-    const pushNoteCandidate = (e: MidiStateEntry, prio: number) => {
-      const k = `note|${e.addr.channel ?? 0}|${e.addr.data1 ?? 0}`;
-      const cur = notePlan.get(k);
-      if (!cur || prio > cur.priority || (prio === cur.priority && (e.ts ?? 0) > (cur.entry.ts ?? 0))) {
-        notePlan.set(k, { entry: e, priority: prio });
-      }
-    };
-    const pushCcCandidate = (e: MidiStateEntry, prio: number) => {
-      const k = `cc|${e.addr.channel ?? 0}|${e.addr.data1 ?? 0}`;
-      const cur = ccPlan.get(k);
-      if (!cur || prio > cur.priority || (prio === cur.priority && (e.ts ?? 0) > (cur.entry.ts ?? 0))) {
-        ccPlan.set(k, { entry: e, priority: prio });
-      }
-    };
-    const pushPbCandidate = (ch: number, e: MidiStateEntry, prio: number) => {
-      const cur = pbPlan.get(ch);
-      if (!cur || prio > cur.priority || (prio === cur.priority && (e.ts ?? 0) > (cur.entry.ts ?? 0))) {
-        pbPlan.set(ch, { entry: e, priority: prio });
-      }
-    };
-
-    // 3. Alimenter les plans depuis chaque app avec priorités
-    for (const app of appsInPage) {
-      const channels = getChannelsForApp(page, app);
-      const mapping = resolvePbToCcMappingForApp(page, app);
-
-      // PB plan (priorité: PB connu = 3 > CC mappé = 2 > ZERO = 1)
-      for (const ch of channels) {
-        const latestPb = this.state.getKnownLatestForApp(app, "pb", ch, 0);
-        if (latestPb) {
-          const transformed = transformAppToXTouch(page, app, latestPb);
-          if (transformed) pushPbCandidate(ch, transformed, 3);
-          continue;
-        }
-        const ccNum = mapping?.map.get(ch);
-        if (ccNum != null) {
-          const latestCcSameCh = this.state.getKnownLatestForApp(app, "cc", ch, ccNum);
-          const latestCcAnyCh = latestCcSameCh || this.state.getKnownLatestForApp(app, "cc", undefined, ccNum);
-          if (latestCcAnyCh) {
-            const transformed = transformAppToXTouch(page, app, latestCcAnyCh);
-            if (transformed) { pushPbCandidate(ch, transformed, 2); }
-          }
-          // IMPORTANT: si mapping existe mais pas de valeur, NE PAS proposer PB=0 ici
-          continue;
-        }
-        // Aucun état connu et pas de mapping → proposer PB=0 (faible priorité)
-        const zero: MidiStateEntry = { addr: { portId: app, status: "pb", channel: ch, data1: 0 }, value: 0, ts: Date.now(), origin: "xtouch", known: false };
-        pushPbCandidate(ch, zero, 1);
-      }
-
-      // Notes: 0..31 sur canaux pertinents (priorité: connu = 2 > reset OFF = 1)
-      for (const ch of channels) {
-        for (let note = 0; note <= 31; note++) {
-          const latestExact = this.state.getKnownLatestForApp(app, "note", ch, note);
-          const latestAnyCh = latestExact || this.state.getKnownLatestForApp(app, "note", undefined, note);
-          if (latestAnyCh) {
-            const e = transformAppToXTouch(page, app, latestAnyCh);
-            if (e) pushNoteCandidate(e, 2);
-          } else {
-            const addr = { portId: app, status: "note" as MidiStatus, channel: ch, data1: note };
-            pushNoteCandidate({ addr, value: 0, ts: Date.now(), origin: "xtouch", known: false }, 1);
-          }
-        }
-      }
-
-      // CC (rings): 0..31 sur canaux pertinents (priorité: connu = 2 > reset 0 = 1)
-      for (const ch of channels) {
-        for (let cc = 0; cc <= 31; cc++) {
-          const latestExact = this.state.getKnownLatestForApp(app, "cc", ch, cc);
-          const latestAnyCh = latestExact || this.state.getKnownLatestForApp(app, "cc", undefined, cc);
-          if (latestAnyCh) {
-            const e = transformAppToXTouch(page, app, latestAnyCh);
-            if (e) pushCcCandidate(e, 2);
-          } else {
-            const addr = { portId: app, status: "cc" as MidiStatus, channel: ch, data1: cc };
-            pushCcCandidate({ addr, value: 0, ts: Date.now(), origin: "xtouch", known: false }, 1);
-          }
-        }
-      }
-    }
-
-    // 4. Matérialiser les plans en une liste unique d'entrées à envoyer
-    const entriesToSend: MidiStateEntry[] = [];
-    for (const { entry } of notePlan.values()) entriesToSend.push(entry);
-    for (const { entry } of ccPlan.values()) entriesToSend.push(entry);
-    for (const { entry } of pbPlan.values()) entriesToSend.push(entry);
-
-    // 5. Ordonnancement et envoi (Notes -> CC -> SysEx -> PB)
-    this.sendEntriesToXTouch(entriesToSend);
-    // Anti-boucle app: marquer dans l'AppShadow ce que nous venons d'émettre vers les apps cibles (pour ignorer l'echo)
-    const now = Date.now();
-    for (const e of entriesToSend) {
-      try {
-        const app = appsInPage[0] as AppKey; // app de la boucle courante n'est pas accessible ici; marquage conservateur omis pour sécurité
-        // Note: AppShadow est déjà géré côté bridge lors des envois; ici on évite tout marquage incorrect
-      } catch {}
-    }
+    // 1-5. Construire le plan et l'émettre (Notes -> CC -> SysEx -> PB)
+    try {
+      const appsInPage = getAppsForPage(page);
+      logger.debug(`Apps pour cette page: [${appsInPage.join(", ")}]`);
+    } catch {}
+    const entriesToSend = planRefresh(page, this.state);
+    this.emitter?.send(entriesToSend);
   }
 
 
-  /**
-   * Envoie les entrées vers X-Touch avec ordonnancement correct
-   */
-  private sendEntriesToXTouch(entries: MidiStateEntry[]): void {
-    if (!this.xtouch) return;
-
-    // Ordonnancement: Notes -> CC -> SysEx -> PitchBend
-    const notes = entries.filter((e) => e.addr.status === "note");
-    const ccs = entries.filter((e) => e.addr.status === "cc");
-    const syx = entries.filter((e) => e.addr.status === "sysex");
-    const pbs = entries.filter((e) => e.addr.status === "pb");
-
-    const batches = [notes, ccs, syx, pbs];
-    
-    // Anti-boucle moteurs: ignorer les PB entrants depuis X-Touch pendant le temps d'établissement
-    try { this.xtouch?.squelchPitchBend(120); } catch {}
-    
-    for (const batch of batches) {
-      for (const e of batch) {
-        const bytes = this.entryToRawForXTouch(e);
-        if (!bytes) continue;
-        // Marquer comme action locale simulée pour protéger contre un feedback app légèrement retardé
-        try { this.lastUserActionTs.set(this.addrKeyForXTouch(e.addr), Date.now()); } catch {}
-        
-        this.emitToXTouchIfNotDuplicate(e, bytes);
-        
-        try {
-          if (e.addr.status === "pb") {
-            logger.trace(`Send PB -> X-Touch: ${human(bytes)} [${hex(bytes)}]`);
-          }
-        } catch {}
-        
-        // Cas particulier: pour éviter clignotement LED, ne pas renvoyer NoteOff (release) ici
-        if (e.addr.status === "note" && (e.value as number) === 0) {
-          const ch = Math.max(1, Math.min(16, e.addr.channel ?? 1));
-          const note = Math.max(0, Math.min(127, e.addr.data1 ?? 0));
-          const noteOff = [0x80 + (ch - 1), note, 0];
-          // Laisser l'écho local gérer l'affichage; éviter re-send ici pour réduire la charge
-          // this.xtouch.sendRawMessage(noteOff);
-        }
-      }
-    }
-  }
-
-  private emitToXTouchIfNotDuplicate(entry: MidiStateEntry, prebuilt?: number[]): void {
-    if (!this.xtouch) return;
-    const k = this.addrKeyForXTouch(entry.addr);
-    const prev = this.xtouchShadow.get(k);
-    const now = Date.now();
-    const win = (this.antiLoopWindowMsByStatus as any)[entry.addr.status] ?? 60;
-    if (prev && this.midiValueEquals(prev.value, entry.value) && now - prev.ts < win) {
-      return;
-    }
-    const bytes = prebuilt ?? this.entryToRawForXTouch(entry);
-    if (!bytes) return;
-    this.xtouch.sendRawMessage(bytes);
-    this.xtouchShadow.set(k, { value: entry.value, ts: now });
-  }
-
-  private addrKeyForXTouch(addr: MidiStateEntry["addr"]): string {
-    return addrKeyWithoutPort(addr as any);
-  }
-
-  private addrKeyForApp(addr: MidiStateEntry["addr"]): string {
-    // Anti-echo/latence côté app: ignorer le portId pour associer l'aller (to_port) et le retour (from_port)
-    return addrKeyWithoutPort(addr as any);
-  }
-
-  private midiValueEquals(a: MidiValue, b: MidiValue): boolean {
-    if (a instanceof Uint8Array && b instanceof Uint8Array) {
-      if (a.length !== b.length) return false;
-      for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
-      return true;
-    }
-    return (a as any) === (b as any);
-  }
-
-  private getAppShadow(appKey: string): Map<string, { value: MidiValue; ts: number }> {
-    let m = this.appShadows.get(appKey);
-    if (!m) {
-      m = new Map();
-      this.appShadows.set(appKey, m);
-    }
-    return m;
-  }
+  // addrKeyForXTouch/addrKeyForApp/getAppShadow extraits vers router/shadows.ts
 
   private ensureLatencyMeters(appKey: string): Record<MidiStatus, LatencyMeter> {
     let m = this.latencyMeters[appKey];
@@ -458,37 +273,7 @@ export class Router {
     return m;
   }
 
-  private entryToRawForXTouch(entry: MidiStateEntry): number[] | null {
-    const { addr, value } = entry;
-    switch (addr.status) {
-      case "note": {
-        const ch = Math.max(1, Math.min(16, addr.channel ?? 1));
-        const status = 0x90 + (ch - 1);
-        const note = Math.max(0, Math.min(127, addr.data1 ?? 0));
-        const vel = typeof value === "number" ? Math.max(0, Math.min(127, Math.floor(value))) : 0;
-        return [status, note, vel];
-      }
-      case "cc": {
-        const ch = Math.max(1, Math.min(16, addr.channel ?? 1));
-        const status = 0xB0 + (ch - 1);
-        const cc = Math.max(0, Math.min(127, addr.data1 ?? 0));
-        const v = typeof value === "number" ? Math.max(0, Math.min(127, Math.floor(value))) : 0;
-        return [status, cc, v];
-      }
-      case "pb": {
-        const ch = Math.max(1, Math.min(16, addr.channel ?? 1));
-        const v14 = typeof value === "number" ? Math.max(0, Math.min(16383, Math.floor(value))) : 8192;
-        const [status, lsb, msb] = rawFromPb14(ch, v14);
-        return [status, lsb, msb];
-      }
-      case "sysex": {
-        if (value instanceof Uint8Array) return Array.from(value);
-        return null;
-      }
-      default:
-        return null;
-    }
-  }
+  // entryToRawForXTouch/emit/send extraits vers router/emit.ts
 }
 
 // Étend la classe Router avec des utilitaires de latence (séparés pour DRY/tailles)

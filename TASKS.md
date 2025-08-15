@@ -28,9 +28,12 @@
   - [ ] Config Editor Web (Next.js) séparé: CRUD `config.yaml`, UI élégante Tailwind
   - [x] Replay PB en une passe (plan PB par fader) pour éviter PB=0 après PB connu (bug retour Page 1 / Voicemeeter)
   - [x] Refactor `app.ts`: déduplication helpers (resolveAppKey, F1..F8 LEDs, construction bridges, accès `passthrough(s)`) – 2025‑08‑15
+  - [x] Centralisation anti-echo fallback via `getAntiLoopMs()` (remplace `?? 60` en dur) – 2025‑08‑15
+  - [x] `src/midi/transform.ts`: utiliser `pb14FromRaw`/`rawFromPb14`; suppression des reverse transforms (gérées par `router/page.ts`) – 2025‑08‑15
 
 ## Nouveau
 - [x] Stack docs JSDoc/TypeDoc: config `typedoc.json`, scripts pnpm (`docs`, `docs:clean`), sortie Markdown `docs/api` – 2025-08-15
+- [x] Docs: suppression des warnings TypeDoc en ajoutant `src/config.ts` aux entry points et en exportant `MessageHandler`; JSDoc enrichie (`config.ts`, `xtouch/driver.ts`) – 2025-08-15
 - [x] Persistance légère du StateStore: `.state/journal.log` + `.state/snapshot.json` (append-only + snapshot périodique)
 - [ ] Reload au démarrage depuis snapshot avec flag `stale` sur les entrées reconstruites
 - [x] Transformer MIDI: Pitch Bend → Note On (même canal) avec vélocité mappée (0..127) pour compat QLC+
@@ -40,6 +43,7 @@
 - [x] Bugfix: refresh pages 3 & 4 — conserver `transform.pb_to_cc.target_channel` = 1 (QLC attend CH1) et uniformiser `base_cc` (0x45, 0x50) pour permettre la remontée d'état CC → PB et le refresh à l'arrivée sur la page.
 - [x] Suppression: Voicemeeter Sync app‑based (obsolète) — code et références retirés
  - [x] Router cleanup & modularisation: suppression listes exhaustives d’apps dans `router`, latence et ombres par app dynamiques, extraction logique pages/transformations dans `src/router/page.ts`, typage latence générique par clé string, suppression du champ inutilisé `refreshTempoMs`, mise à jour de `attachXTouch()` et appels associés.
+ - [x] M1 — Extraction `src/router/emit.ts` et `src/router/antiEcho.ts`, délégation depuis `src/router.ts`, build/tsc OK — 2025‑08‑15
 
 ## Fait
 - [x] BUG: Latence/loop perceptible (≈1 s) sur feedback boutons et « recalage » des faders — métriques, anti‑echo par type, LWW, setpoints moteurs, échos locaux — 2025‑08‑15

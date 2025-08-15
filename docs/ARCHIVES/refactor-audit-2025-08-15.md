@@ -48,13 +48,13 @@ Résumé exécutif
 - src/midi/transform.ts: vérifier si tous les chemins sont utilisés après suppression du reverse transform vers X‑Touch.
   - Si des fonctions de “reverse” subsistent, prévoir une purge.
 - src/midi/sniffer.ts: utilisé par la CLI (learn/midi-ports/open/close) — à confirmer. Si non utilisé, retirer ou documenter son usage.
-- config copy.yaml: semble être un doublon de config. À supprimer ou déplacer sous docs/ARCHIVES.
+- config copy.yaml: semble être un doublon de config. DÉPLACÉ sous docs/ARCHIVES/.
 
 4) Petites incohérences et nettoyages
 - Router.ensureLatencyMeters et attachLatencyExtensions
   - OK, plus de duplication de classe LatencyMeter (unifié dans src/router/latency.ts).
 - Constantes “60 par défaut” pour anti-loop window
-  - Présentes à plusieurs endroits comme fallback. Centraliser via getAntiLoopMs(status) et éviter les littéraux.
+  - Présentes à plusieurs endroits comme fallback. Centraliser via getAntiLoopMs(status) et éviter les littéraux. FAIT pour `router.ts` et `router/latency.ts`.
 - Commentaires/fallbacks NoteOff
   - Router: commentaire et code pour ne plus renvoyer NoteOff — cohérent. Garder aligné avec les options d’écho local dans XTouchDriver.
 
@@ -67,10 +67,10 @@ Avancement réalisé (2025-08-15):
 - Étape 2 (Clés d’adressage): PARTIELLEMENT FAIT
   - Création src/shared/addrKey.ts avec addrKeyWithoutPort (+ réexport addrKeyWithPort)
   - Router utilise maintenant addrKeyWithoutPort (remplace les implémentations internes)
-- Étape 3 (Nettoyage): À FAIRE
-  - Revue src/midi/transform.ts pour dead code reverse
-  - Revue src/midi/sniffer.ts pour usage réel côté CLI; archiver si inutile
-  - Supprimer/mouvoir “config copy.yaml” → docs/ARCHIVES/
+- Étape 3 (Nettoyage): FAIT
+  - Revue src/midi/transform.ts pour dead code reverse — supprimé (reverse géré côté Router/Page)
+  - Revue src/midi/sniffer.ts — utilisé par la CLI (`midi-open`), conservé
+  - Déplacement “config copy.yaml” → docs/ARCHIVES/config copy.yaml
 - Étape 4 (Lint et tests manuels): À FAIRE
   - pnpm lint, vérifier compilation TS
   - Test manuel de paging, échos LED, faders, CLI latence
