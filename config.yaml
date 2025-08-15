@@ -39,7 +39,7 @@ pages:
         transform:
           pb_to_cc:
             target_channel: 1   # Envoyer vers canal 1 (QLC+)
-            base_cc: "0x45"     # Mapping: ch1→0x46, ch2→0x47, ch3→0x48, ch4→0x49, etc.
+            base_cc: "0x46"     # Mapping: ch1→0x46, ch2→0x47, ch3→0x48, ch4→0x49, etc.
     controls: {}
   - name: "Lum Latéraux"
     lcd:
@@ -60,7 +60,7 @@ pages:
         transform:
           pb_to_cc:
             target_channel: 1   # Envoyer vers canal 1 (QLC+)
-            base_cc: "0x50"     # Mapping: ch1→0x46, ch2→0x47, ch3→0x48, ch4→0x49, etc.
+            base_cc: 81     # Mapping: ch1→0x46, ch2→0x47, ch3→0x48, ch4→0x49, etc.
             cc_by_channel:
               9: 78  # Master Dimmer
   - name: "Néons Latéraux RGB"
@@ -82,7 +82,7 @@ pages:
         transform:
           pb_to_cc:
             target_channel: 1   # P3 = même CC que P1 mais sur canal MIDI 2 (QLC+ = +128)
-            base_cc: 89     # Base CC P1 (69) → P3 = 198–205 en QLC
+            base_cc: 90     # Base CC P1 (69) → P3 = 198–205 en QLC
             cc_by_channel:
               9: 78  # Master Dimmer (Fader 9)
 
@@ -105,7 +105,7 @@ pages:
         transform:
           pb_to_cc:
             target_channel: 1   # P4 = même CC que P2 mais sur canal MIDI 2 (QLC+ = +128)
-            base_cc: 95     # Base CC P2 (80) → P4 = 209–216 en QLC
+            base_cc: 96     # Base CC P2 (80) → P4 = 209–216 en QLC
             cc_by_channel:
               9: 78  # Master Dimmer (Fader 9)
   - name: "Default"
