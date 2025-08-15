@@ -16,6 +16,9 @@ export class MidiBridgeDriver implements Driver {
   private outToTarget: Output | null = null;
   private inFromTarget: Input | null = null;
   private unsubXTouch?: () => void;
+  // Debounce pour setpoint moteurs: éviter de renvoyer PB pendant le mouvement → ne fixer qu'à l'arrêt
+  private faderSetpointTimers: Map<number, NodeJS.Timeout> = new Map();
+  private lastPbValue14: Map<number, number> = new Map();
 
   constructor(
     private readonly xtouch: XTouchDriver,
@@ -83,6 +86,7 @@ export class MidiBridgeDriver implements Driver {
               logger.debug(`Bridge DROP (PB squelched) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
               return;
             }
+            try { (global as any).__router__?.markUserActionFromRaw?.(data); } catch {}
             if (matchFilter(data, this.filter)) {
                const tx = applyTransform(data, this.transform);
               if (!tx) {
@@ -91,6 +95,34 @@ export class MidiBridgeDriver implements Driver {
               }
               logger.debug(`Bridge TX -> ${this.toPort}: ${human(tx)} [${hex(tx)}]`);
               this.outToTarget?.sendMessage(tx);
+              // Si on transforme PB->CC (cas QLC), programmer un setpoint moteur APRÈS une courte inactivité,
+              // pour éviter la résistance pendant le mouvement tout en figeant la nouvelle position.
+              try {
+                const status2 = data[0] ?? 0;
+                const type2 = (status2 & 0xf0) >> 4;
+                if (type2 === 0xE && this.transform?.pb_to_cc) {
+                  const ch1 = (status2 & 0x0f) + 1;
+                  const lsb = data[1] ?? 0;
+                  const msb = data[2] ?? 0;
+                  const value14 = ((msb & 0x7f) << 7) | (lsb & 0x7f);
+                  this.lastPbValue14.set(ch1, value14);
+                  const prev = this.faderSetpointTimers.get(ch1);
+                  if (prev) {
+                    try { clearTimeout(prev); } catch {}
+                  }
+                  const t = setTimeout(() => {
+                    const v = this.lastPbValue14.get(ch1);
+                    if (v != null) {
+                      try {
+                        logger.trace(`Setpoint PB -> X-Touch: ch=${ch1} val14=${v}`);
+                        this.xtouch.setFader14(ch1, v);
+                      } catch {}
+                    }
+                    this.faderSetpointTimers.delete(ch1);
+                  }, 90);
+                  this.faderSetpointTimers.set(ch1, t);
+                }
+              } catch {}
               // Marquer shadow app pour anti-echo côté router (exposé globalement par app.ts)
               try { (global as any).__router__?.markAppShadowForOutgoing?.(this.resolveAppKeyFromPort(this.toPort), tx, this.toPort); } catch {}
               // Note: On ne met pas à jour le state avec les commandes sortantes
@@ -129,7 +161,7 @@ export class MidiBridgeDriver implements Driver {
     try { this.outToTarget?.closePort(); } catch {}
     this.inFromTarget = null;
     this.outToTarget = null;
-    this.unsubXTouch?.();
+    try { this.unsubXTouch?.(); } catch {}
     this.unsubXTouch = undefined;
     logger.info("MidiBridge arrêté.");
   }

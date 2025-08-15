@@ -7,6 +7,7 @@ import { VoicemeeterDriver } from "./drivers/voicemeeter";
 import { QlcDriver } from "./drivers/qlc";
 import { ObsDriver } from "./drivers/obs";
 import { formatDecoded } from "./midi/decoder";
+import { human, hex } from "./midi/utils";
 import { XTouchDriver } from "./xtouch/driver";
 import { Input } from "@julusian/midi";
 import { findPortIndexByNameFragment } from "./midi/ports";
@@ -115,6 +116,7 @@ export async function startApp(): Promise<() => void> {
   let vmSync: VoicemeeterSync | null = null;
   // Listeners en arrière-plan pour capter le feedback des apps hors page active
   const backgroundInputs = new Map<string, { inp: Input; appKey: string }>();
+  const bgRetryTimers = new Map<string, { count: number; timer: NodeJS.Timeout }>();
 
   const resolveAppKeyInternal = (toPort: string, fromPort: string): string => {
     const to = (toPort || "").toLowerCase();
@@ -124,6 +126,54 @@ export async function startApp(): Promise<() => void> {
     if (txt.includes("xtouch-gw") || txt.includes("voicemeeter")) return "voicemeeter";
     if (txt.includes("obs")) return "obs";
     return "midi-bridge";
+  };
+
+  const scheduleBgRetry = (from: string, info: { appKey: string; transform?: TransformConfig }) => {
+    const prev = bgRetryTimers.get(from);
+    const nextCount = (prev?.count ?? 0) + 1;
+    if (nextCount > 5) {
+      logger.warn(`Background listener retry abandonné '${from}' après ${nextCount - 1} tentatives.`);
+      return;
+    }
+    if (prev) {
+      try { clearTimeout(prev.timer); } catch {}
+    }
+    const timer = setTimeout(() => {
+      try {
+        const inp = new Input();
+        const idx = findPortIndexByNameFragment(inp, from);
+        if (idx == null) {
+          inp.closePort?.();
+          logger.warn(`Background listener (retry): port IN introuvable '${from}'.`);
+          scheduleBgRetry(from, info);
+          return;
+        }
+        inp.ignoreTypes(false, false, false);
+        const transform = info.transform;
+        inp.on("message", (_delta, data) => {
+          try {
+            try { logger.debug(`Background RX <- ${from}: ${human(data)} [${hex(data)}] (app=${info.appKey})`); } catch {}
+            router.onMidiFromApp(info.appKey, data, from);
+          } catch (err) {
+            logger.debug("Background listener error:", err as any);
+          }
+        });
+        inp.openPort(idx);
+        backgroundInputs.set(from, { inp, appKey: info.appKey });
+        try { logger.info(`Background listener ON (retry ${nextCount}): '${from}'.`); } catch {}
+        // Clear retry timer on success
+        const cur = bgRetryTimers.get(from);
+        if (cur) {
+          try { clearTimeout(cur.timer); } catch {}
+          bgRetryTimers.delete(from);
+        }
+      } catch (err) {
+        logger.warn(`Background listener retry failed '${from}':`, err as any);
+        scheduleBgRetry(from, info);
+      }
+    }, Math.min(2000, 200 * nextCount));
+    bgRetryTimers.set(from, { count: nextCount, timer });
+    logger.info(`Background listener RETRY ${nextCount}: '${from}' dans ${Math.min(2000, 200 * nextCount)}ms.`);
   };
 
   const rebuildBackgroundListeners = (activePage: PageConfig | undefined) => {
@@ -160,12 +210,14 @@ export async function startApp(): Promise<() => void> {
         if (idx == null) {
           inp.closePort?.();
           logger.warn(`Background listener: port IN introuvable '${from}'.`);
+          scheduleBgRetry(from, info);
           continue;
         }
         inp.ignoreTypes(false, false, false);
         const transform = info.transform;
         inp.on("message", (_delta, data) => {
           try {
+            try { logger.debug(`Background RX <- ${from}: ${human(data)} [${hex(data)}] (app=${info.appKey})`); } catch {}
             router.onMidiFromApp(info.appKey, data, from);
           } catch (err) {
             logger.debug("Background listener error:", err as any);
@@ -176,6 +228,7 @@ export async function startApp(): Promise<() => void> {
         logger.info(`Background listener ON: '${from}'.`);
       } catch (err) {
         logger.warn(`Background listener open failed '${from}':`, err as any);
+        scheduleBgRetry(from, info);
       }
     }
   };
@@ -183,11 +236,11 @@ export async function startApp(): Promise<() => void> {
     xtouch = new XTouchDriver({
       inputName: cfg.midi.input_port,
       outputName: cfg.midi.output_port,
-    }, { echoPitchBend: true });
+    }, { echoPitchBend: false, echoButtonsAndEncoders: true });
     xtouch.start();
 
     const x = xtouch as import("./xtouch/driver").XTouchDriver; // non-null après start
-    router.attachXTouch(x, { interMsgDelayMs: 1 });
+    router.attachXTouch(x, { interMsgDelayMs: 0 });
     applyLcdForActivePage(router, x);
 
     const paging: Required<PagingConfig> = {
@@ -216,50 +269,54 @@ export async function startApp(): Promise<() => void> {
         const note = data[1] ?? 0;
         const vel = data[2] ?? 0;
         const now = Date.now();
+        if (vel <= 0) return;
+        if (note !== paging.prev_note && note !== paging.next_note) return; // Ne naviguer que sur les touches dédiées
         if (now < navCooldownUntil) return;
-        if (vel > 0) {
-          if (note === paging.prev_note) router.prevPage();
-          if (note === paging.next_note) router.nextPage();
-          navCooldownUntil = now + 250; // anti-bounce après changement de page
-          applyLcdForActivePage(router, x);
-          const page = router.getActivePage();
-          // (Re)créer le bridge de page si besoin
-          if (page?.passthrough || page?.passthroughs) {
-            // Fermer anciens bridges
-            for (const b of pageBridges) {
-              b.shutdown().catch((err) => logger.warn("Bridge shutdown error:", err as any));
-            }
-            pageBridges = [];
-            const items = page.passthroughs ?? (page.passthrough ? [page.passthrough] : []);
-            for (const item of items) {
-              const appKey = resolveAppKeyForBridge(item.to_port, item.from_port);
-              const b = new MidiBridgeDriver(
-                x,
-                item.to_port,
-                item.from_port,
-                item.filter,
-                item.transform,
-                true,
-                (appKey2, raw, portId) => router.onMidiFromApp(appKey2, raw, portId)
-              );
-              pageBridges.push(b);
-              b.init().catch((err) => logger.warn("Bridge page init error:", err as any));
-            }
-          } else {
-            for (const b of pageBridges) {
-              b.shutdown().catch((err) => logger.warn("Bridge shutdown error:", err as any));
-            }
-            pageBridges = [];
+        const goingPrev = note === paging.prev_note;
+        const goingNext = note === paging.next_note;
+        if (!goingPrev && !goingNext) return;
+        if (goingPrev) router.prevPage();
+        if (goingNext) router.nextPage();
+        navCooldownUntil = now + 250; // anti-bounce après changement de page
+        applyLcdForActivePage(router, x);
+        const page = router.getActivePage();
+        // Mettre à jour les listeners background AVANT d'ouvrir les bridges de page
+        rebuildBackgroundListeners(page);
+        // (Re)créer le bridge de page si besoin
+        if (page?.passthrough || page?.passthroughs) {
+          // Fermer anciens bridges
+          for (const b of pageBridges) {
+            try { b.shutdown().catch((err) => logger.warn("Bridge shutdown error:", err as any)); } catch {}
           }
-          // Listeners background (apps hors page)
-          rebuildBackgroundListeners(page);
-          // Snapshot ciblé si voicemeeter
-          if (cfg.features?.vm_sync !== false) {
-            vmSync?.startSnapshotForPage(page?.name ?? "");
+          pageBridges = [];
+          const items = page.passthroughs ?? (page.passthrough ? [page.passthrough] : []);
+          for (const item of items) {
+            const appKey = resolveAppKeyForBridge(item.to_port, item.from_port);
+            const b = new MidiBridgeDriver(
+              x,
+              item.to_port,
+              item.from_port,
+              item.filter,
+              item.transform,
+              true,
+              (appKey2, raw, portId) => router.onMidiFromApp(appKey2, raw, portId)
+            );
+            pageBridges.push(b);
+            b.init().catch((err) => logger.warn("Bridge page init error:", err as any));
           }
-          // Rejouer l'état connu après (ré)initialisation des bridges et listeners
-          try { router.refreshPage(); } catch {}
+        } else {
+          for (const b of pageBridges) {
+            b.shutdown().catch((err) => logger.warn("Bridge shutdown error:", err as any));
+          }
+          pageBridges = [];
         }
+        // Listeners background déjà mis à jour plus haut
+        // Snapshot ciblé si voicemeeter
+        if (cfg.features?.vm_sync !== false) {
+          vmSync?.startSnapshotForPage(page?.name ?? "");
+        }
+        // Rejouer l'état connu après (ré)initialisation des bridges et listeners
+        try { router.refreshPage(); } catch {}
       }
     });
 

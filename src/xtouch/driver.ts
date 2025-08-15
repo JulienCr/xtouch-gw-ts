@@ -10,6 +10,7 @@ export interface XTouchPortsConfig {
 
 export interface XTouchOptions {
   echoPitchBend?: boolean; // écho local pour stabiliser les faders quand aucun feedback externe
+  echoButtonsAndEncoders?: boolean; // écho local Note/CC pour LED/encoders immédiats
 }
 
 type MessageHandler = (deltaSeconds: number, data: number[]) => void;
@@ -36,6 +37,7 @@ export class XTouchDriver {
   constructor(private readonly ports: XTouchPortsConfig, options?: XTouchOptions) {
     this.options = {
       echoPitchBend: options?.echoPitchBend ?? true,
+      echoButtonsAndEncoders: options?.echoButtonsAndEncoders ?? true,
     };
   }
 
@@ -83,13 +85,30 @@ export class XTouchDriver {
         }
       }
 
-      // Écho PitchBend local si activé
+      // Écho PitchBend local si activé (désactivé par défaut via app.ts pour éviter conflit feedback)
       if (this.options.echoPitchBend) {
         const decoded = decodeMidi(data);
         if (decoded.type === "pitchBend") {
           const pb = decoded as PitchBendEvent;
           if (pb.channel) {
             this.setFader14(pb.channel, pb.value14);
+          }
+        }
+      }
+
+      // Écho Note/CC local pour retour LED/anneaux immédiat
+      if (this.options.echoButtonsAndEncoders) {
+        const status2 = data[0] ?? 0;
+        const typeNibble2 = (status2 & 0xf0) >> 4;
+        if (typeNibble2 === 0xB) {
+          // CC: écho tel quel (anneaux/encoders)
+          try { this.output?.sendMessage(data); } catch {}
+        } else if (typeNibble2 === 0x9 || typeNibble2 === 0x8) {
+          // Notes: n'écho que les press (NoteOn vel>0). Ne pas écho les releases pour éviter le clignotement.
+          const vel = data[2] ?? 0;
+          const isPress = typeNibble2 === 0x9 && vel > 0;
+          if (isPress) {
+            try { this.output?.sendMessage(data); } catch {}
           }
         }
       }
