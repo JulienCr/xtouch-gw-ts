@@ -3,17 +3,33 @@ import { logger } from "../logger";
 import { decodeMidi, PitchBendEvent } from "../midi/decoder";
 import { findPortIndexByNameFragment } from "../midi/ports";
 
+/**
+ * Ports MIDI à utiliser pour se connecter à la X‑Touch.
+ * Les noms sont des fragments (sous-chaînes) utilisés pour retrouver l'index du port.
+ */
 export interface XTouchPortsConfig {
-  inputName: string; // sous-chaîne à chercher
-  outputName: string; // sous-chaîne à chercher
+  /** Sous-chaîne à rechercher dans la liste des entrées MIDI */
+  inputName: string;
+  /** Sous-chaîne à rechercher dans la liste des sorties MIDI */
+  outputName: string;
 }
 
+/**
+ * Options de comportement du driver X‑Touch.
+ */
 export interface XTouchOptions {
-  echoPitchBend?: boolean; // écho local pour stabiliser les faders quand aucun feedback externe
-  echoButtonsAndEncoders?: boolean; // écho local Note/CC pour LED/encoders immédiats
+  /** Écho local des Pitch Bend pour stabiliser les faders en l'absence de feedback externe (défaut: true) */
+  echoPitchBend?: boolean;
+  /** Écho local des Notes/CC pour un retour LED/anneaux immédiat (défaut: true) */
+  echoButtonsAndEncoders?: boolean;
 }
 
-type MessageHandler = (deltaSeconds: number, data: number[]) => void;
+/**
+ * Callback appelé à chaque message MIDI entrant de la X‑Touch.
+ * @param deltaSeconds Temps en secondes depuis le message précédent
+ * @param data Trame MIDI brute (3 octets typiquement, plus pour SysEx)
+ */
+export type MessageHandler = (deltaSeconds: number, data: number[]) => void;
 
 
 function ascii7(text: string, length = 7): number[] {
@@ -27,6 +43,9 @@ function ascii7(text: string, length = 7): number[] {
   return bytes;
 }
 
+/**
+ * Driver bas niveau pour dialoguer avec la Behringer X‑Touch (MIDI in/out, LCD, afficheur 7‑segments).
+ */
 export class XTouchDriver {
   private input: Input | null = null;
   private output: Output | null = null;
@@ -41,6 +60,10 @@ export class XTouchDriver {
     };
   }
 
+  /**
+   * Ouvre les ports MIDI et démarre l'écoute des messages entrants.
+   * @throws Erreur si l'un des ports configurés est introuvable
+   */
   start(): void {
     // Ouvrir Output d'abord pour pouvoir envoyer du feedback immédiatement
     const out = new Output();
@@ -121,24 +144,39 @@ export class XTouchDriver {
   /**
    * Ignore les PitchBend entrants pendant `ms` millisecondes (anti-boucle moteurs → QLC).
    */
+  /** Ignore temporairement les Pitch Bend entrants (anti‑boucle moteurs → QLC).
+   * @param ms Durée d'ignorance en millisecondes
+   */
   squelchPitchBend(ms: number): void {
     this.suppressPitchBendUntilMs = Math.max(this.suppressPitchBendUntilMs, Date.now() + Math.max(0, ms));
   }
 
+  /** Indique si les Pitch Bend entrants sont actuellement ignorés. */
   isPitchBendSquelched(): boolean {
     return Date.now() < this.suppressPitchBendUntilMs;
   }
 
+  /**
+   * S'abonne aux messages MIDI entrants de la X‑Touch.
+   * @param handler Callback recevant le delta temps et les octets MIDI
+   * @returns Une fonction de désinscription
+   */
   subscribe(handler: MessageHandler): () => void {
     this.handlers.add(handler);
     return () => this.handlers.delete(handler);
   }
 
+  /** Envoie une trame MIDI brute vers la X‑Touch. */
   sendRawMessage(bytes: number[]): void {
     if (!this.output) return;
     this.output.sendMessage(bytes);
   }
 
+  /**
+   * Positionne un fader via un Pitch Bend 14 bits.
+   * @param channel1to16 Canal MIDI (1..16)
+   * @param value14 Valeur 14 bits (0..16383)
+   */
   setFader14(channel1to16: number, value14: number): void {
     if (!this.output) return;
     const ch = Math.max(1, Math.min(16, channel1to16));
@@ -151,6 +189,12 @@ export class XTouchDriver {
   }
 
   // MCU LCD text: F0 00 00 66 14 12 pos <7 bytes> F7
+  /**
+   * Écrit du texte sur un strip LCD (ligne haute et basse).
+   * @param stripIndex0to7 Index du strip (0..7)
+   * @param upper Ligne haute (7 caractères max)
+   * @param lower Ligne basse (7 caractères max)
+   */
   sendLcdStripText(stripIndex0to7: number, upper: string, lower = ""): void {
     if (!this.output) return;
     const strip = Math.max(0, Math.min(7, Math.floor(stripIndex0to7)));
@@ -164,6 +208,7 @@ export class XTouchDriver {
   }
 
   // MCU LCD colors (firmware >= 1.22): F0 00 00 66 14 72 <8 bytes colors> F7
+  /** Définis les couleurs des 8 LCD (firmware >= 1.22). */
   setLcdColors(colors: number[]): void {
     if (!this.output) return;
     const payload = colors.slice(0, 8);
@@ -197,6 +242,7 @@ export class XTouchDriver {
     }
   }
 
+  /** Ferme proprement les ports MIDI et vide les abonnements. */
   stop(): void {
     try {
       this.input?.closePort();

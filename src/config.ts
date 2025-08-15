@@ -3,16 +3,29 @@ import path from "path";
 import YAML from "yaml";
 import chokidar from "chokidar";
 
+/**
+ * Configuration de la pagination (navigation entre pages) depuis la X‑Touch.
+ */
 export interface PagingConfig {
-  channel?: number; // défaut 1
-  prev_note?: number; // défaut 46
-  next_note?: number; // défaut 47
+  /** Canal MIDI à utiliser pour les notes Prev/Next (défaut: 1) */
+  channel?: number;
+  /** Note MIDI pour la navigation vers la page précédente (défaut: 46) */
+  prev_note?: number;
+  /** Note MIDI pour la navigation vers la page suivante (défaut: 47) */
+  next_note?: number;
 }
 
+/**
+ * Drapeaux d'activation des fonctionnalités optionnelles.
+ */
 export interface FeaturesConfig {
-  vm_sync?: boolean; // true par défaut; si false, désactive la synchronisation Voicemeeter
+  /** Active la synchronisation Voicemeeter (défaut: true) */
+  vm_sync?: boolean;
 }
 
+/**
+ * Noms des types d'événements MIDI supportés par les filtres.
+ */
 export type MidiEventTypeName =
   | "noteOn"
   | "noteOff"
@@ -22,31 +35,48 @@ export type MidiEventTypeName =
   | "polyAftertouch"
   | "pitchBend";
 
+/**
+ * Filtre applicables aux messages MIDI sortants vers une application cible.
+ */
 export interface MidiFilterConfig {
-  channels?: number[]; // 1..16
-  types?: MidiEventTypeName[]; // types autorisés (si défini)
-  includeNotes?: number[]; // si défini, ne laisser passer que ces notes (pour noteOn/noteOff)
-  excludeNotes?: number[]; // si défini, bloquer ces notes (pour noteOn/noteOff)
+  /** Canaux autorisés (1..16) */
+  channels?: number[];
+  /** Types d'événements autorisés (si défini) */
+  types?: MidiEventTypeName[];
+  /** N'autoriser que ces notes (pour noteOn/noteOff) */
+  includeNotes?: number[];
+  /** Bloquer ces notes (pour noteOn/noteOff) */
+  excludeNotes?: number[];
 }
 
+/**
+ * Décrit un pont (passthrough) entre la X‑Touch et une application cible.
+ */
 export interface PassthroughConfig {
-  driver: string; // "midi" | "voicemeeter" | etc.
-  to_port: string; // vers appli cible (ex: "xtouch-gw")
-  from_port: string; // feedback depuis appli (ex: "xtouch-gw-feedback")
-  filter?: MidiFilterConfig; // filtre coté XTouch -> target
-  optional?: boolean; // si true, ignore proprement si ports absents
-  transform?: TransformConfig; // transformations des messages sortants vers la cible
+  /** Type de driver cible (ex: "midi", "voicemeeter") */
+  driver: string;
+  /** Nom du port de sortie (vers l'application cible) */
+  to_port: string;
+  /** Nom du port d'entrée (feedback depuis l'application) */
+  from_port: string;
+  /** Filtre appliqué aux messages sortants vers la cible */
+  filter?: MidiFilterConfig;
+  /** Si true, ignorer proprement si les ports n'existent pas */
+  optional?: boolean;
+  /** Transformations à appliquer aux messages sortants */
+  transform?: TransformConfig;
 }
 
+/**
+ * Transformations applicables aux messages MIDI sortants.
+ */
 export interface TransformConfig {
   /**
    * Convertit les messages Pitch Bend (14 bits) en Note On sur le même canal, avec vélocité mappée 0..127.
    * Utile pour QLC+ qui ne gère pas Pitch Bend.
    */
   pb_to_note?: {
-    /**
-     * Numéro de note à utiliser (0..127). Par défaut 0 si non fourni.
-     */
+    /** Numéro de note à utiliser (0..127). Par défaut 0 si non fourni. */
     note?: number;
   };
 
@@ -62,50 +92,57 @@ export interface TransformConfig {
      * Exemple: base_cc=45 → ch1→46, ch2→47, ch3→48, ch4→49, etc.
      * Défaut: 45 pour coller à l'exemple utilisateur.
      */
-    base_cc?: number | string; // accepte décimal (ex: 69) ou hex (ex: "0x45" ou "45h")
-    /**
-     * Mapping explicite: priorité sur base_cc si défini.
-     * Ex: { 1: 46, 2: 47, 4: 49 }
-     */
-    cc_by_channel?: Record<number, number | string>; // valeurs acceptent décimal ou hex
+    base_cc?: number | string;
+    /** Mapping explicite prioritaire si défini. Ex: { 1: 46, 2: 47, 4: 49 } */
+    cc_by_channel?: Record<number, number | string>;
   };
 }
 
+/**
+ * Décrit une page de contrôle X‑Touch: nom, ponts, contrôles et LCD.
+ */
 export interface PageConfig {
+  /** Nom lisible de la page */
   name: string;
-  passthrough?: PassthroughConfig; // compat: une seule entrée
-  passthroughs?: PassthroughConfig[]; // préféré: plusieurs entrées
+  /** Pont unique (compatibilité) */
+  passthrough?: PassthroughConfig;
+  /** Liste de ponts (préféré) */
+  passthroughs?: PassthroughConfig[];
+  /** Définition des contrôles (spécifique aux apps) */
   controls: Record<string, unknown>;
-  /**
-   * Configuration des LCD de la X-Touch pour cette page.
-   */
+  /** Configuration des LCD de la X‑Touch pour cette page. */
   lcd?: {
-    /**
-     * Libellés des 8 écrans LCD (index 0..7). Chaque entrée peut être:
-     * - une chaîne (ligne du haut seulement)
-     * - un objet { upper, lower } pour deux lignes
-     */
+    /** Libellés des 8 LCD (haut seulement ou {upper,lower}) */
     labels?: Array<string | { upper?: string; lower?: string }>;
-    /**
-     * Couleurs LCD (0..7) pour chaque strip, longueur 8.
-     * Valeurs acceptées: nombre (0..7) ou chaîne convertible en nombre.
-     */
+    /** Couleurs LCD par strip (0..7) */
     colors?: Array<number | string>;
   };
 }
 
+/**
+ * Configuration racine de l'application.
+ */
 export interface AppConfig {
+  /** Ports MIDI X‑Touch */
   midi: {
     input_port: string;
     output_port: string;
   };
+  /** Fonctionnalités optionnelles */
   features?: FeaturesConfig;
+  /** Navigation entre pages */
   paging?: PagingConfig;
+  /** Liste des pages définies */
   pages: Array<PageConfig>;
 }
 
 const DEFAULT_PATHS = ["config.yaml", path.join("config", "config.yaml")];
 
+/**
+ * Recherche un fichier de configuration existant parmi les chemins par défaut ou un chemin fourni.
+ * @param customPath Chemin explicite à tester en priorité
+ * @returns Le chemin trouvé ou null
+ */
 export async function findConfigPath(customPath?: string): Promise<string | null> {
   const candidates = customPath ? [customPath, ...DEFAULT_PATHS] : DEFAULT_PATHS;
   for (const p of candidates) {
@@ -119,6 +156,11 @@ export async function findConfigPath(customPath?: string): Promise<string | null
   return null;
 }
 
+/**
+ * Charge et parse le fichier YAML de configuration.
+ * @param filePath Chemin explicite; sinon, recherche via {@link findConfigPath}
+ * @throws Erreur si aucun fichier n'est trouvé
+ */
 export async function loadConfig(filePath?: string): Promise<AppConfig> {
   const p = (await findConfigPath(filePath)) ?? null;
   if (!p) {
@@ -128,6 +170,13 @@ export async function loadConfig(filePath?: string): Promise<AppConfig> {
   return YAML.parse(raw) as AppConfig;
 }
 
+/**
+ * Observe un fichier de configuration YAML et notifie en cas de modification.
+ * @param filePath Chemin du fichier à surveiller
+ * @param onChange Callback appelée avec la nouvelle configuration
+ * @param onError Callback d'erreur facultative
+ * @returns Fonction pour arrêter l'observation
+ */
 export function watchConfig(
   filePath: string,
   onChange: (cfg: AppConfig) => void,

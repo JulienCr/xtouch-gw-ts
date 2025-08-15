@@ -33,6 +33,7 @@
 
 ## Nouveau
 - [x] Stack docs JSDoc/TypeDoc: config `typedoc.json`, scripts pnpm (`docs`, `docs:clean`), sortie Markdown `docs/api` – 2025-08-15
+- [x] Docs: suppression des warnings TypeDoc en ajoutant `src/config.ts` aux entry points et en exportant `MessageHandler`; JSDoc enrichie (`config.ts`, `xtouch/driver.ts`) – 2025-08-15
 - [x] Persistance légère du StateStore: `.state/journal.log` + `.state/snapshot.json` (append-only + snapshot périodique)
 - [ ] Reload au démarrage depuis snapshot avec flag `stale` sur les entrées reconstruites
 - [x] Transformer MIDI: Pitch Bend → Note On (même canal) avec vélocité mappée (0..127) pour compat QLC+
