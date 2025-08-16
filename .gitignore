@@ -22,3 +22,8 @@ docs/api/coverage/
 coverage/
 docs/api/
 pr_body.txt
+
+# Generated artifacts
+coverage/
+docs/api/
+pr_body.txt
