@@ -56,7 +56,7 @@ export function startXTouchAndNavigation(router: Router, options: StartXTouchOpt
   const xtouch = new XTouchDriver({
     inputName: config.midi.input_port,
     outputName: config.midi.output_port,
-  }, { echoPitchBend: false, echoButtonsAndEncoders: true });
+  }, { echoPitchBend: false, echoButtonsAndEncoders: false });
   xtouch.start();
 
   router.attachXTouch(xtouch);

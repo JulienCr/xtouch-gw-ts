@@ -48,7 +48,7 @@ export function forwardFromApp(
 
   const targetKey = deps.addrKeyForXTouch(maybeForward.addr);
   const lastLocal = deps.lastUserActionTs.get(targetKey) ?? 0;
-  const grace = (maybeForward.addr.status === "pb" ? 300 : 80);
+  const grace = (maybeForward.addr.status === "pb" ? 300 : (maybeForward.addr.status === "cc" ? 50 : 0));
   if (Date.now() - lastLocal < grace) {
     return;
   }

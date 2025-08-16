@@ -35,7 +35,7 @@ export class Router {
    * Objectif: éviter les boucles sans retarder les feedbacks utiles.
    */
   private readonly antiLoopWindowMsByStatus: Record<MidiStatus, number> = {
-    note: 30,
+    note: 10,
     cc: 50,
     pb: 250,
     sysex: 60,
