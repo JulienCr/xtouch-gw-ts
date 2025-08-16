@@ -2,6 +2,8 @@ import { Input, Output } from "@julusian/midi";
 import { logger } from "../logger";
 import { decodeMidi, PitchBendEvent } from "../midi/decoder";
 import { findPortIndexByNameFragment } from "../midi/ports";
+import * as xtapi from "./api";
+// LCD/7-seg helpers déportés dans xtouch/api
 
 /**
  * Ports MIDI à utiliser pour se connecter à la X‑Touch.
@@ -32,16 +34,7 @@ export interface XTouchOptions {
 export type MessageHandler = (deltaSeconds: number, data: number[]) => void;
 
 
-function ascii7(text: string, length = 7): number[] {
-  const padded = (text ?? "").padEnd(length).slice(0, length);
-  const bytes: number[] = [];
-  for (let i = 0; i < padded.length; i += 1) {
-    const code = padded.charCodeAt(i);
-    // Conserver ASCII imprimable, sinon espace
-    bytes.push(code >= 0x20 && code <= 0x7e ? code : 0x20);
-  }
-  return bytes;
-}
+// ascii7/text helpers déplacés dans xtouch/api
 
 /**
  * Driver bas niveau pour dialoguer avec la Behringer X‑Touch (MIDI in/out, LCD, afficheur 7‑segments).
@@ -91,50 +84,7 @@ export class XTouchDriver {
     }
     inp.ignoreTypes(false, false, false);
     inp.on("message", (deltaSeconds: number, data: number[]) => {
-      // Notifier callbacks (bridge, sniffer, etc.)
-      const now = Date.now();
-      const status = data[0] ?? 0;
-      const typeNibble = (status & 0xf0) >> 4;
-      const isPitchBend = typeNibble === 0xE;
-
-      // Squelch des PB entrants (mouvements moteurs) pendant une petite fenêtre
-      if (!(isPitchBend && now < this.suppressPitchBendUntilMs)) {
-        for (const h of this.handlers) {
-          try {
-            h(deltaSeconds, data);
-          } catch (err) {
-            logger.warn("X-Touch handler error:", err as any);
-          }
-        }
-      }
-
-      // Écho PitchBend local si activé (désactivé par défaut via app.ts pour éviter conflit feedback)
-      if (this.options.echoPitchBend) {
-        const decoded = decodeMidi(data);
-        if (decoded.type === "pitchBend") {
-          const pb = decoded as PitchBendEvent;
-          if (pb.channel) {
-            this.setFader14(pb.channel, pb.value14);
-          }
-        }
-      }
-
-      // Écho Note/CC local pour retour LED/anneaux immédiat
-      if (this.options.echoButtonsAndEncoders) {
-        const status2 = data[0] ?? 0;
-        const typeNibble2 = (status2 & 0xf0) >> 4;
-        if (typeNibble2 === 0xB) {
-          // CC: écho tel quel (anneaux/encoders)
-          try { this.output?.sendMessage(data); } catch {}
-        } else if (typeNibble2 === 0x9 || typeNibble2 === 0x8) {
-          // Notes: n'écho que les press (NoteOn vel>0). Ne pas écho les releases pour éviter le clignotement.
-          const vel = data[2] ?? 0;
-          const isPress = typeNibble2 === 0x9 && vel > 0;
-          if (isPress) {
-            try { this.output?.sendMessage(data); } catch {}
-          }
-        }
-      }
+      this.handleIncomingMessage(deltaSeconds, data);
     });
     inp.openPort(inIdx);
     this.input = inp;
@@ -172,6 +122,101 @@ export class XTouchDriver {
     this.output.sendMessage(bytes);
   }
 
+  sendNoteOn(channel: number, note: number, velocity: number): void {
+    if (!this.output) return;
+    xtapi.sendNoteOn(this, channel, note, velocity);
+  }
+
+  /**
+   * Envoie un Control Change (0..127) sur un canal donné.
+   * @param channel Canal MIDI 1..16
+   * @param controller Numéro de CC 0..127
+   * @param value Valeur 0..127
+   */
+  sendControlChange(channel: number, controller: number, value: number): void {
+    if (!this.output) return;
+    xtapi.sendControlChange(this, channel, controller, value);
+  }
+
+  /**
+   * Envoie un Pitch Bend 14 bits (0..16383) sur un canal.
+   * Alias générique de {@link setFader14}.
+   */
+  sendPitchBend14(channel1to16: number, value14: number): void {
+    this.setFader14(channel1to16, value14);
+  }
+
+  /**
+   * Envoie un Pitch Bend (alias convivial) – redirige vers sendPitchBend14.
+   * @param channel Canal MIDI 1..16
+   * @param value14 Valeur 14 bits 0..16383
+   */
+  sendPitchBend(channel: number, value14: number): void { this.sendPitchBend14(channel, value14); }
+
+  /**
+   * Envoie un Note Off (équivalent à Note On vélocité 0 selon les firmwares).
+   * @param channel Canal MIDI 1..16
+   * @param note Note 0..127
+   */
+  sendNoteOff(channel: number, note: number): void {
+    this.sendNoteOn(channel, note, 0);
+  }
+
+  /**
+   * Allume une plage de notes à la vélocité donnée (par défaut 127).
+   */
+  async setButtonsOnRange(
+    channel = 1,
+    firstNote = 0,
+    lastNote = 101,
+    velocity = 127,
+    interMessageDelayMs = 2,
+  ): Promise<void> {
+    await this.setAllButtonsVelocity(channel, firstNote, lastNote, velocity, interMessageDelayMs);
+  }
+
+  /**
+   * Éteint une plage de notes (vel=0).
+   */
+  async setButtonsOffRange(
+    channel = 1,
+    firstNote = 0,
+    lastNote = 101,
+    interMessageDelayMs = 2,
+  ): Promise<void> {
+    await this.setAllButtonsVelocity(channel, firstNote, lastNote, 0, interMessageDelayMs);
+  }
+
+  /**
+   * Règle toutes les notes d'un intervalle à une même vélocité (par défaut 0 = OFF).
+   * @param channel Canal MIDI 1..16 (défaut 1)
+   * @param firstNote Première note (défaut 0)
+   * @param lastNote Dernière note incluse (défaut 101)
+   * @param velocity Vélocité 0..127 (défaut 0)
+   * @param interMessageDelayMs Délai entre messages, pour éviter le flood (défaut 2ms)
+   */
+  async setAllButtonsVelocity(channel = 1, firstNote = 0, lastNote = 101, velocity = 0, interMessageDelayMs = 2): Promise<void> {
+    if (!this.output) return;
+    await xtapi.setAllButtonsVelocity(this, channel, firstNote, lastNote, velocity, interMessageDelayMs);
+  }
+
+  /**
+   * Met à zéro plusieurs faders (Pitch Bend = 0) pour les canaux donnés (défaut 1..9).
+   */
+  async resetFadersToZero(channels: number[] = [1,2,3,4,5,6,7,8,9]): Promise<void> {
+    if (!this.output) return;
+    await xtapi.resetFadersToZero(this, channels);
+  }
+
+  /**
+   * Réinitialise l'état de la surface: éteint tous les boutons et remet les faders à 0.
+   * @param options Paramètres du reset (canal/notes/faders)
+   */
+  async resetAll(options?: { buttonsChannel?: number; firstNote?: number; lastNote?: number; interMessageDelayMs?: number; faderChannels?: number[]; }): Promise<void> {
+    if (!this.output) return;
+    await xtapi.resetAll(this, options);
+  }
+
   /**
    * Positionne un fader via un Pitch Bend 14 bits.
    * @param channel1to16 Canal MIDI (1..16)
@@ -188,58 +233,22 @@ export class XTouchDriver {
     this.output.sendMessage([status, lsb, msb]);
   }
 
-  // MCU LCD text: F0 00 00 66 14 12 pos <7 bytes> F7
-  /**
-   * Écrit du texte sur un strip LCD (ligne haute et basse).
-   * @param stripIndex0to7 Index du strip (0..7)
-   * @param upper Ligne haute (7 caractères max)
-   * @param lower Ligne basse (7 caractères max)
-   */
+  /** Écrit du texte sur un strip LCD (ligne haute/basse). */
   sendLcdStripText(stripIndex0to7: number, upper: string, lower = ""): void {
     if (!this.output) return;
-    const strip = Math.max(0, Math.min(7, Math.floor(stripIndex0to7)));
-    const up = ascii7(upper, 7);
-    const lo = ascii7(lower, 7);
-    const header = [0xF0, 0x00, 0x00, 0x66, 0x14, 0x12];
-    const posTop = 0x00 + strip * 7;
-    const posBot = 0x38 + strip * 7;
-    this.output.sendMessage([...header, posTop, ...up, 0xF7]);
-    this.output.sendMessage([...header, posBot, ...lo, 0xF7]);
+    xtapi.sendLcdStripText(this, stripIndex0to7, upper, lower);
   }
 
-  // MCU LCD colors (firmware >= 1.22): F0 00 00 66 14 72 <8 bytes colors> F7
   /** Définis les couleurs des 8 LCD (firmware >= 1.22). */
   setLcdColors(colors: number[]): void {
     if (!this.output) return;
-    const payload = colors.slice(0, 8);
-    while (payload.length < 8) payload.push(0);
-    this.output.sendMessage([0xF0, 0x00, 0x00, 0x66, 0x14, 0x72, ...payload, 0xF7]);
+    xtapi.setLcdColors(this, colors);
   }
 
-  /**
-   * Met à jour le grand afficheur 7-segments (zone timecode) via trame vendor Behringer.
-   *
-   * Format: F0 00 20 32 dd 37 s1..s12 d1 d2 F7
-   * - dd: device id (X‑Touch 0x14, Extender 0x15)
-   * - s1..s12: masques 7-segments (bit0=a … bit6=g) pour chaque digit
-   * - d1: dots digits 1..7 (bit0 => digit1, …, bit6 => digit7)
-   * - d2: dots digits 8..12 (bit0 => digit8, …, bit4 => digit12)
-   *
-   * Affiche le texte centré/tronqué à 12 caractères. Les caractères non supportés sont rendus vides.
-   */
+  /** Met à jour le grand afficheur 7-segments (timecode). */
   setSevenSegmentText(text: string, options?: { deviceId?: number; dots1?: number; dots2?: number }): void {
     if (!this.output) return;
-    const dots1 = (options?.dots1 ?? 0x00) & 0x7F;
-    const dots2 = (options?.dots2 ?? 0x00) & 0x7F;
-    const normalized = (text ?? "").toString();
-    const centered = centerToLength(normalized, 12);
-    const chars = centered.slice(0, 12).split("");
-    const segs = chars.map((c) => sevenSegForChar(c));
-    const deviceIds = options?.deviceId != null ? [options.deviceId & 0x7F] : [0x14, 0x15];
-    for (const dd of deviceIds) {
-      const msg: number[] = [0xF0, 0x00, 0x20, 0x32, dd, 0x37, ...segs, dots1, dots2, 0xF7];
-      this.output.sendMessage(msg);
-    }
+    xtapi.setSevenSegmentText(this, text, options);
   }
 
   /** Ferme proprement les ports MIDI et vide les abonnements. */
@@ -255,55 +264,43 @@ export class XTouchDriver {
     this.handlers.clear();
     logger.info("X-Touch: ports MIDI fermés.");
   }
-}
 
-/**
- * Encode un caractère vers son masque 7-segments (bit0=a … bit6=g).
- * Les lettres sont mappées en majuscules lorsque pertinent.
- */
-function sevenSegForChar(ch: string): number {
-  const c = (ch || " ").toUpperCase();
-  switch (c) {
-    case "0": return 0x3F;
-    case "1": return 0x06;
-    case "2": return 0x5B;
-    case "3": return 0x4F;
-    case "4": return 0x66;
-    case "5": return 0x6D;
-    case "6": return 0x7D;
-    case "7": return 0x07;
-    case "8": return 0x7F;
-    case "9": return 0x6F;
-    case "A": return 0x77;
-    case "B": return 0x7C; // 'b'
-    case "C": return 0x39;
-    case "D": return 0x5E; // 'd'
-    case "E": return 0x79;
-    case "F": return 0x71;
-    case "G": return 0x3D;
-    case "H": return 0x76;
-    case "I": return 0x06; // même que '1'
-    case "J": return 0x1E;
-    case "L": return 0x38;
-    case "N": return 0x37; // approx
-    case "O": return 0x3F;
-    case "P": return 0x73;
-    case "S": return 0x6D;
-    case "T": return 0x78; // 't'
-    case "U": return 0x3E;
-    case "Y": return 0x6E;
-    case "-": return 0x40;
-    case "_": return 0x08;
-    case " ": return 0x00;
-    default: return 0x00;
+  /** Traite un message MIDI entrant (échos locaux + callbacks). */
+  private handleIncomingMessage(deltaSeconds: number, data: number[]): void {
+    // Notifier callbacks (bridge, sniffer, etc.)
+    const now = Date.now();
+    const status = data[0] ?? 0;
+    const typeNibble = (status & 0xf0) >> 4;
+    const isPitchBend = typeNibble === 0xE;
+
+    if (!(isPitchBend && now < this.suppressPitchBendUntilMs)) {
+      for (const h of this.handlers) {
+        try { h(deltaSeconds, data); } catch (err) { logger.warn("X-Touch handler error:", err as any); }
+      }
+    }
+
+    // Écho PitchBend local si activé
+    if (this.options.echoPitchBend) {
+      const decoded = decodeMidi(data);
+      if (decoded.type === "pitchBend") {
+        const pb = decoded as PitchBendEvent;
+        if (pb.channel) this.setFader14(pb.channel, pb.value14);
+      }
+    }
+
+    // Écho Note/CC local
+    if (this.options.echoButtonsAndEncoders) {
+      const status2 = data[0] ?? 0;
+      const typeNibble2 = (status2 & 0xf0) >> 4;
+      if (typeNibble2 === 0xB) {
+        try { this.output?.sendMessage(data); } catch {}
+      } else if (typeNibble2 === 0x9 || typeNibble2 === 0x8) {
+        const vel = data[2] ?? 0;
+        const isPress = typeNibble2 === 0x9 && vel > 0;
+        if (isPress) { try { this.output?.sendMessage(data); } catch {} }
+      }
+    }
   }
 }
 
-function centerToLength(s: string, targetLen: number): string {
-  const str = s ?? "";
-  if (str.length >= targetLen) return str.slice(0, targetLen);
-  const totalPad = targetLen - str.length;
-  const left = Math.floor(totalPad / 2);
-  const right = totalPad - left;
-  return " ".repeat(left) + str + " ".repeat(right);
-}
+

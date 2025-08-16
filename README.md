@@ -57,6 +57,8 @@ pnpm install
 pnpm dev         # lancement en développement (tsx watch)
 pnpm build       # transpile TypeScript → dist/
 pnpm start       # exécute dist/index.js
+pnpm test        # tests unitaires (Vitest) + couverture
+pnpm test:watch  # tests en mode watch
 ```
 
 Pour activer des logs détaillés (PowerShell):
@@ -72,9 +74,6 @@ Fichier lu au démarrage, avec hot‑reload. Exemple réaliste aligné sur le co
 midi:
   input_port: "UM-One"
   output_port: "UM-One"
-
-features:
-  vm_sync: true   # aligne les faders sur Voicemeeter (snapshot + dirty loop)
 
 paging:
   channel: 1      # canal NoteOn pour la navigation
@@ -120,7 +119,7 @@ pages:
 Comportement:
 - Si au moins une page définit `passthrough`/`passthroughs`, le mode passthrough par page est actif. À chaque changement de page, les bridges de la page sont (ré)ouverts.
 - Sinon, un bridge global X‑Touch ⇄ Voicemeeter est activé automatiquement (`xtouch-gw`/`xtouch-gw-feedback`).
-- Si `features.vm_sync` est actif, un snapshot faders Voicemeeter est appliqué au boot et à chaque changement de page, puis une boucle « dirty » maintient la synchro.
+ 
 
 ## Pages, LCD et navigation
 - Navigation entre pages via NoteOn sur `paging.channel` (par défaut ch=1) avec `prev_note` (46) et `next_note` (47).

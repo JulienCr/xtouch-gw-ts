@@ -30,7 +30,7 @@
 
   <pre id="log"></pre>
 
-  <script>
+  	<script>
     const status = document.getElementById('status');
     const inputs = document.getElementById('inputs');
     const logEl = document.getElementById('log');
@@ -49,6 +49,28 @@
 
     function hex(bytes) {
       return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+    }
+
+    function decodeMidi(bytes) {
+      if (bytes.length === 0) return 'Empty';
+      const status = bytes[0];
+      const type = (status & 0xF0) >> 4;
+      const channel = (status & 0x0F) + 1;
+      
+      switch (type) {
+        case 0x8: // Note Off
+          return `NoteOff ch=${channel} note=${bytes[1]} (0x${bytes[1].toString(16)}) vel=${bytes[2]} (0x${bytes[2].toString(16)})`;
+        case 0x9: // Note On
+          return `NoteOn ch=${channel} note=${bytes[1]} (0x${bytes[1].toString(16)}) vel=${bytes[2]} (0x${bytes[2].toString(16)})`;
+        case 0xB: // Control Change
+          return `CC ch=${channel} cc=${bytes[1]} (0x${bytes[1].toString(16)}) val=${bytes[2]} (0x${bytes[2].toString(16)})`;
+        case 0xE: // Pitch Bend
+          const value14 = ((bytes[2] & 0x7F) << 7) | (bytes[1] & 0x7F);
+          const normalized = (value14 - 8192) / 8191;
+          return `PitchBend ch=${channel} val14=${value14} norm=${normalized.toFixed(3)}`;
+        default:
+          return `Unknown type=0x${type.toString(16)} ch=${channel}`;
+      }
     }
 
     async function init() {
@@ -84,7 +106,9 @@
       const delta = (now - lastTs) / 1000;
       lastTs = now;
       const data = new Uint8Array(ev.data);
+      const decoded = decodeMidi(data);
       line(`${new Date().toISOString()} [Δ=${delta.toFixed(3)}s] ${hex(data)}`);
+      line(`  → ${decoded}`);
     }
 
     function start() {

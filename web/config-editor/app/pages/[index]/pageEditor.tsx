@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import YAML from "yaml";
-import type { AppConfig, PageConfig, PassthroughConfig, MidiEventTypeName } from "@/types/config";
+import type { AppConfig, PageConfig, PassthroughConfig, MidiEventTypeName, MidiFilterConfig, TransformConfig } from "@/types/config";
 import { useMidiPorts } from "@/hooks/useMidiPorts";
 import LcdEditor from "@/components/LcdEditor";
 
@@ -152,7 +152,7 @@ function MidiPortSelect({ label, value, onChange, kind }: { label: string; value
   );
 }
 
-function FiltersEditor({ value, onChange }: { value: PageConfig["passthroughs"] extends (infer U)[] ? U["filter"] : any; onChange: (v: any) => void }) {
+function FiltersEditor({ value, onChange }: { value: MidiFilterConfig | undefined; onChange: (v: MidiFilterConfig | undefined) => void }) {
   const filter = value || {};
   const [channels, setChannels] = useState<string>(Array.isArray(filter.channels) ? filter.channels.join(",") : "");
   const ALL_TYPES: MidiEventTypeName[] = [
@@ -209,13 +209,13 @@ function FiltersEditor({ value, onChange }: { value: PageConfig["passthroughs"] 
   );
 }
 
-function TransformsEditor({ value, onChange }: { value: PageConfig["passthroughs"] extends (infer U)[] ? U["transform"] : any; onChange: (v: any) => void }) {
+function TransformsEditor({ value, onChange }: { value: TransformConfig | undefined; onChange: (v: TransformConfig | undefined) => void }) {
   const t = value || {};
   const [pbNoteEnabled, setPbNoteEnabled] = useState<boolean>(!!t.pb_to_note);
-  const [pbNote, setPbNote] = useState<string>(t.pb_to_note?.note ?? "");
+  const [pbNote, setPbNote] = useState<string>(t.pb_to_note?.note != null ? String(t.pb_to_note.note) : "");
   const [pbCcEnabled, setPbCcEnabled] = useState<boolean>(!!t.pb_to_cc);
-  const [pbCcTargetChannel, setPbCcTargetChannel] = useState<string>(t.pb_to_cc?.target_channel ?? "");
-  const [pbCcBase, setPbCcBase] = useState<string>(t.pb_to_cc?.base_cc ?? "");
+  const [pbCcTargetChannel, setPbCcTargetChannel] = useState<string>(t.pb_to_cc?.target_channel != null ? String(t.pb_to_cc.target_channel) : "");
+  const [pbCcBase, setPbCcBase] = useState<string>(t.pb_to_cc?.base_cc != null ? String(t.pb_to_cc.base_cc) : "");
 
   useEffect(() => {
     onChange({

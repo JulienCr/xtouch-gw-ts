@@ -2,6 +2,15 @@ midi:
   input_port: "UM-One"
   output_port: "UM-One"
 
+xtouch:
+  # Mode X‑Touch: "mcu" (faders en Pitch Bend) ou "ctrl" (faders en CC)
+  mode: "mcu"
+
+paging:
+  channel: 1
+  prev_note: 46
+  next_note: 47
+
 pages:
   - name: "Voicemeeter Main"
     controls:

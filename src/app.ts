@@ -11,6 +11,7 @@ import { setupStatePersistence } from "./state/persistence";
 import { createBackgroundManager, initDrivers, startXTouchAndNavigation } from "./app/bootstrap";
 import { applyLcdForActivePage } from "./ui/lcd";
 import { updateFKeyLedsForActivePage } from "./xtouch/fkeys";
+import * as xtapi from "./xtouch/api";
 
 /**
  * Point d'entrée de l'application.
@@ -26,6 +27,7 @@ export async function startApp(): Promise<() => void> {
   setLogLevel(envLevel);
 
   logger.info("Démarrage XTouch GW…");
+  logger.info("LOG_LEVEL:", process.env.LOG_LEVEL);
   const configPath = await findConfigPath();
   if (!configPath) {
     throw new Error("config.yaml introuvable. Copiez config.example.yaml → config.yaml");
@@ -109,6 +111,14 @@ export async function startApp(): Promise<() => void> {
     });
     xtouch = x;
 
+    // Reset complet de la surface au démarrage (LED OFF, faders 0, LCD/7-seg clear)
+    try {
+      await xtapi.resetAll(x, { clearLcds: true });
+      logger.info("X‑Touch réinitialisé au démarrage.");
+    } catch (e) {
+      logger.warn("Reset X‑Touch au démarrage: ignoré (", (e as any)?.message ?? e, ")");
+    }
+
     // Si aucune page ne définit de passthrough, activer le bridge global vers Voicemeeter
     const hasPagePassthrough = (cfg.pages ?? []).some(
       (p) => !!p.passthrough || (Array.isArray((p as any).passthroughs) && (p as any).passthroughs.length > 0)
@@ -138,9 +148,8 @@ export async function startApp(): Promise<() => void> {
     logger.warn("X-Touch/Voicemeeter non connecté:", (err as any)?.message ?? err);
   }
 
-  // CLI de développement
-  const detachCli = attachCli({ router, xtouch });
-
+  // CLI & arrêt propre
+  let detachCli: () => void = () => {};
   let isCleaningUp = false;
   const cleanup = () => {
     if (isCleaningUp) return;
@@ -156,6 +165,9 @@ export async function startApp(): Promise<() => void> {
     try { bgManager.shutdown(); } catch {}
     process.exit(0);
   };
+
+  // CLI de développement (permet 'exit'/'quit' pour arrêter proprement)
+  detachCli = attachCli({ router, xtouch, onExit: cleanup });
 
   const onSig = () => {
     try { detachCli(); } catch {}

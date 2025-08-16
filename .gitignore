@@ -16,4 +16,4 @@ Thumbs.db
 .state/
  
 # Generated docs
-docs/api/
+docs/api/coverage/

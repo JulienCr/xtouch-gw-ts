@@ -30,8 +30,17 @@
   - [x] Refactor `app.ts`: déduplication helpers (resolveAppKey, F1..F8 LEDs, construction bridges, accès `passthrough(s)`) – 2025‑08‑15
   - [x] Centralisation anti-echo fallback via `getAntiLoopMs()` (remplace `?? 60` en dur) – 2025‑08‑15
   - [x] `src/midi/transform.ts`: utiliser `pb14FromRaw`/`rawFromPb14`; suppression des reverse transforms (gérées par `router/page.ts`) – 2025‑08‑15
+  - [ ] Tests P0 (unitaires)
+    - [x] src/midi/utils.ts
+    - [x] src/midi/transform.ts
+    - [x] src/state/store.ts
+    - [x] src/router/planner.ts
+    - [x] src/router/emit.ts
+    - [x] src/router/forward.ts
+    - [x] src/config.ts (load/find)
 
 ## Nouveau
+- [x] Infra de tests (Lot 0): Vitest + couverture v8, scripts pnpm (`test`, `test:watch`, `test:unit`, `test:integration`, `lint`, `format`), convention de placement des tests sous `_tests` (ex: `src/**/_tests/*.test.ts`) – 2025-08-16
 - [x] Stack docs JSDoc/TypeDoc: config `typedoc.json`, scripts pnpm (`docs`, `docs:clean`), sortie Markdown `docs/api` – 2025-08-15
 - [x] Docs: suppression des warnings TypeDoc en ajoutant `src/config.ts` aux entry points et en exportant `MessageHandler`; JSDoc enrichie (`config.ts`, `xtouch/driver.ts`) – 2025-08-15
 - [x] Persistance légère du StateStore: `.state/journal.log` + `.state/snapshot.json` (append-only + snapshot périodique)
@@ -44,6 +53,8 @@
 - [x] Suppression: Voicemeeter Sync app‑based (obsolète) — code et références retirés
  - [x] Router cleanup & modularisation: suppression listes exhaustives d’apps dans `router`, latence et ombres par app dynamiques, extraction logique pages/transformations dans `src/router/page.ts`, typage latence générique par clé string, suppression du champ inutilisé `refreshTempoMs`, mise à jour de `attachXTouch()` et appels associés.
  - [x] M1 — Extraction `src/router/emit.ts` et `src/router/antiEcho.ts`, délégation depuis `src/router.ts`, build/tsc OK — 2025‑08‑15
+ - [x] Test MIDI — externalisation de la pipeline `test-midi-send` vers utilitaires réutilisables: `src/test-utils/{openRawSender,runners,runMidiTest}.ts`. Le script `src/test-midi-send.ts` est réduit (< 100 lignes) et s’appuie sur `xtouch/api`. — 2025‑08‑16
+ - [x] Animation LCD rainbow + contrôle stepDelayMs: `src/animations/lcdRainbow.ts` + runner `runLcdRainbow()`, intégrée à la pipeline (modes `all`/`lcd`). Resets complets au début et à la fin des tests avec effacement LCD/7‑seg (`resetAll({ clearLcds: true })`). Séparation API: `src/xtouch/{api-midi,api-lcd}.ts`. — 2025‑08‑16
 
 ## Fait
 - [x] BUG: Latence/loop perceptible (≈1 s) sur feedback boutons et « recalage » des faders — métriques, anti‑echo par type, LWW, setpoints moteurs, échos locaux — 2025‑08‑15
@@ -62,3 +73,6 @@
 - [x] Ajout d’un squelette Node.js + TypeScript
 - [x] Initialisation du projet (structure, scripts pnpm, TypeScript) 
 - ~~ [ ] Bridge: reverse transform automatique du feedback (CC/Note → Pitch Bend)~~ — abandonné, remplacé par anti‑echo et setpoint moteurs via `midiBridge` + `Router`
+ - [x] Fix: chargement `LOG_LEVEL` via `.env` — import `dotenv/config` avant `logger`, suppression du chemin incorrect `../.env`, logs nettoyés — 2025‑08‑16
+ - [x] Fix: arrêt en dev (`pnpm dev`) — commandes CLI `exit|quit` appellent l’arrêt propre (`cleanup()`), Ctrl+C géré via signaux; aligné sur `pnpm start` — 2025‑08‑16
+ - [x] Nettoyage: suppression complète du flag de config `features.vm_sync` (schéma TS, UI editor, YAML, tests, README) — 2025‑08‑16

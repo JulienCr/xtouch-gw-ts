@@ -24,10 +24,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-100`}
-      >
-        {children}
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-100`}>
+        <header className="bg-white border-b border-gray-200">
+          <nav className="max-w-5xl mx-auto px-4 py-3 flex gap-4">
+            <a href="/" className="text-blue-600 hover:underline">Config Builder</a>
+            <a href="/state" className="text-blue-600 hover:underline">State</a>
+          </nav>
+        </header>
+        <div className="max-w-5xl mx-auto">
+          {children}
+        </div>
       </body>
     </html>
   );

@@ -15,12 +15,15 @@ export interface PagingConfig {
   next_note?: number;
 }
 
-/**
- * Drapeaux d'activation des fonctionnalités optionnelles.
- */
-export interface FeaturesConfig {
-  /** Active la synchronisation Voicemeeter (défaut: true) */
-  vm_sync?: boolean;
+ 
+
+/** Mode de l'X‑Touch: MCU (pitch bend pour faders) ou CTRL (CC pour faders). */
+export type XTouchMode = "mcu" | "ctrl";
+
+/** Configuration spécifique à l'X‑Touch. */
+export interface XTouchConfig {
+  /** Mode de fonctionnement. Défaut: "mcu" */
+  mode?: XTouchMode;
 }
 
 /**
@@ -128,8 +131,8 @@ export interface AppConfig {
     input_port: string;
     output_port: string;
   };
-  /** Fonctionnalités optionnelles */
-  features?: FeaturesConfig;
+  /** Configuration X‑Touch (mode, etc.) */
+  xtouch?: XTouchConfig;
   /** Navigation entre pages */
   paging?: PagingConfig;
   /** Liste des pages définies */

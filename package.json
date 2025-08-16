@@ -10,29 +10,48 @@
   "packageManager": "pnpm@9.12.3",
   "type": "commonjs",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --watch --import=tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "check:types": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "test:unit": "vitest run -c vitest.config.ts",
+    "test:integration": "vitest run --dir test/integration",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
     "clean": "rimraf dist",
     "sniff:web": "tsx src/sniffer-server.ts",
+    "test:midi": "tsx src/test-midi-send.ts",
     "docs": "typedoc",
     "docs:clean": "rimraf docs/api",
-    "docs:open": "pwsh -NoProfile -Command \"Start-Process docs/api/README.md\""
+    "docs:open": "pwsh -NoProfile -Command \"Start-Process docs/api/README.md\"",
+    "web": "node scripts/check-next-build.mjs && pnpm -C web/config-editor start",
+    "web:build": "pnpm -C web/config-editor build",
+    "web:dev": "pnpm -C web/config-editor dev"
   },
   "dependencies": {
     "@julusian/midi": "^3.6.1",
     "chalk": "^4.1.2",
     "chokidar": "^3.6.0",
+    "dotenv": "^17.2.1",
     "voicemeeter-connector": "^2.1.5",
     "yaml": "^2.8.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.20",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/coverage-v8": "^2.0.5",
+    "eslint": "^9.9.0",
+    "fast-check": "^3.19.0",
+    "prettier": "^3.3.3",
     "rimraf": "^5.0.5",
     "tsx": "^4.15.7",
     "typedoc": "^0.28.10",
     "typedoc-plugin-markdown": "^4.8.1",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
   }
 }
