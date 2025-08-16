@@ -22,4 +22,12 @@ export function updateFKeyLedsForActivePage(router: Router, x: XTouchDriver, pag
 	updateFunctionKeyLeds(x, pagingChannel, F_KEY_NOTES, Math.min(activeIdx, F_KEY_NOTES.length - 1));
 }
 
+/** Allume en permanence les boutons Prev/Next de pagination. */
+export function updatePrevNextLeds(x: XTouchDriver, channel1to16: number, prevNote: number, nextNote: number): void {
+	const ch = Math.max(1, Math.min(16, channel1to16)) | 0;
+	const status = 0x90 + (ch - 1);
+	x.sendRawMessage([status, Math.max(0, Math.min(127, prevNote | 0)), 0x7F]);
+	x.sendRawMessage([status, Math.max(0, Math.min(127, nextNote | 0)), 0x7F]);
+}
+
 
