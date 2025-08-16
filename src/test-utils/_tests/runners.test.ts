@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import * as xtapi from "../../xtouch/api";
-import { runCustomSequence, runButtonsWave, runFadersWaveOnly } from "../runners";
+import { runCustomSequence, runButtonsWave, runFadersWaveOnly, runLcdRainbow } from "../runners";
 
 function makeSink(): { sender: xtapi.RawSender; sent: number[][] } {
   const sent: number[][] = [];
@@ -61,6 +61,17 @@ describe("test-utils/runners", () => {
     expect(spyResetAll).toHaveBeenCalledTimes(2);
     spySet.mockRestore();
     spyResetAll.mockRestore();
+  });
+
+  it("runLcdRainbow animates colors and writes text once", async () => {
+    const { sender } = makeSink();
+    const spyColors = vi.spyOn(xtapi, "setLcdColors").mockImplementation(() => undefined as any);
+    const spyText = vi.spyOn(xtapi, "sendLcdStripText").mockImplementation(() => undefined as any);
+    await runLcdRainbow(sender, { durationMs: 10, fps: 60, stepDelayMs: 1 });
+    expect(spyText).toHaveBeenCalled();
+    expect(spyColors).toHaveBeenCalled();
+    spyColors.mockRestore();
+    spyText.mockRestore();
   });
 });
 

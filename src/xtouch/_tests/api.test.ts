@@ -50,6 +50,19 @@ describe("xtouch/api primitives", () => {
     ]);
   });
 
+  it("clearAllLcds clears text and colors, and resetAll can clear LCDs when option set", async () => {
+    const { sender, sent } = makeSink();
+    // clearAllLcds
+    await xtapi.clearAllLcds(sender);
+    // Should send at least colors SysEx (ends with F7) and several text frames
+    expect(sent.length).toBeGreaterThan(1);
+
+    // resetAll with clearLcds
+    sent.length = 0;
+    await xtapi.resetAll(sender, { clearLcds: true });
+    expect(sent.length).toBeGreaterThan(1);
+  });
+
   it("sendLcdStripText emits two SysEx frames (upper/lower)", () => {
     const { sender, sent } = makeSink();
     xtapi.sendLcdStripText(sender, 0, "HELLO", "WORLD");

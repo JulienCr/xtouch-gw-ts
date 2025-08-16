@@ -1,6 +1,7 @@
 import { logger } from "../logger";
 import * as xtapi from "../xtouch/api";
 import { playFadersWave, type DeviceMode } from "../animations/wave";
+import { playLcdRainbow } from "../animations/lcdRainbow";
 import { parseSequence, type Parsed } from "../midi/testDsl";
 
 export interface ButtonsWaveOptions {
@@ -47,6 +48,7 @@ export async function runButtonsWave(sender: xtapi.RawSender, opts: ButtonsWaveO
     lastNote: opts.buttonsLastNote,
     interMessageDelayMs: opts.buttonsInterMsgDelayMs,
     faderChannels: opts.waveFaderChannels,
+    clearLcds: true,
   });
   await xtapi.setAllButtonsVelocity(sender, opts.buttonsChannel, opts.buttonsFirstNote, opts.buttonsLastNote, 127, opts.buttonsInterMsgDelayMs);
   if (opts.waveDurationMs > 0) {
@@ -70,6 +72,7 @@ export async function runButtonsWave(sender: xtapi.RawSender, opts: ButtonsWaveO
     lastNote: opts.buttonsLastNote,
     interMessageDelayMs: opts.buttonsInterMsgDelayMs,
     faderChannels: opts.waveFaderChannels,
+    clearLcds: true,
   });
   logger.info("LED+Wave intégré terminé.");
 }
@@ -90,6 +93,26 @@ export async function runFadersWaveOnly(sender: xtapi.RawSender, opts: Omit<Butt
   logger.info("Wave terminé. Remise à zéro des faders…");
   await xtapi.resetFadersToZero(sender, opts.waveFaderChannels);
   logger.info("Faders remis à 0.");
+}
+
+export interface LcdRainbowRunOptions {
+  durationMs: number;
+  fps: number;
+  stepDelayMs?: number;
+}
+
+export async function runLcdRainbow(sender: xtapi.RawSender, opts: LcdRainbowRunOptions): Promise<void> {
+  await playLcdRainbow({
+    setColors: (colors) => xtapi.setLcdColors(sender, colors),
+    setText: (strip, upper, lower) => xtapi.sendLcdStripText(sender, strip, upper, lower),
+  }, {
+    durationMs: opts.durationMs,
+    fps: opts.fps,
+    stepDelayMs: opts.stepDelayMs,
+    stripCount: 8,
+    textUpper: (i) => `LCD #${i+1}`,
+    textLower: () => "is ready",
+  });
 }
 
 

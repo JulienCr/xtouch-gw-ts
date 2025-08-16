@@ -2,7 +2,7 @@ import { logger } from "../logger";
 import * as xtapi from "../xtouch/api";
 import { type DeviceMode } from "../animations/wave";
 import { openRawSender } from "./openRawSender";
-import { runButtonsWave, runCustomSequence, runFadersWaveOnly } from "./runners";
+import { runButtonsWave, runCustomSequence, runFadersWaveOnly, runLcdRainbow } from "./runners";
 
 /** Options de test MIDI pour la séquence et le wave. */
 export interface MidiTestOptions {
@@ -25,7 +25,11 @@ export interface MidiTestOptions {
   // Séquence custom
   customSequence: string[];
   // Mode de test
-  testMode: "all" | "custom" | "buttons" | "faders";
+  testMode: "all" | "custom" | "buttons" | "faders" | "lcd";
+  // LCD rainbow
+  lcdDurationMs?: number;
+  lcdFps?: number;
+  lcdStepDelayMs?: number;
 }
 
 export const defaultMidiTestOptions: MidiTestOptions = {
@@ -33,7 +37,7 @@ export const defaultMidiTestOptions: MidiTestOptions = {
   defaultDelayMs: 150,
   logHex: true,
   deviceMode: "mcu",
-  waveDurationMs: 4000,
+  waveDurationMs: 1200,
   waveFps: 60,
   waveFaderChannels: [1,2,3,4,5,6,7,8,9],
   waveCtrlChannel: 1,
@@ -45,9 +49,25 @@ export const defaultMidiTestOptions: MidiTestOptions = {
   buttonsInterMsgDelayMs: 2,
   customSequence: [],
   testMode: ((process.env.MIDI_TEST_MODE || "all").toLowerCase()) as MidiTestOptions["testMode"],
+  lcdDurationMs: 1200,
+  lcdFps: 30,
+  lcdStepDelayMs: 150,
 };
 
-function delay(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
+function buildResetOptions(opts: MidiTestOptions) {
+  return {
+    buttonsChannel: opts.buttonsChannel,
+    firstNote: opts.buttonsFirstNote,
+    lastNote: opts.buttonsLastNote,
+    interMessageDelayMs: opts.buttonsInterMsgDelayMs,
+    faderChannels: opts.waveFaderChannels,
+    clearLcds: true,
+  } as const;
+}
+
+async function resetAllSafe(sender: xtapi.RawSender, opts: MidiTestOptions): Promise<void> {
+  try { await xtapi.resetAll(sender, buildResetOptions(opts)); } catch {}
+}
 
 /**
  * Exécute la pipeline de test MIDI. Utilise le driver X‑Touch si fourni, sinon ouvre un Output brut.
@@ -64,6 +84,9 @@ export async function runMidiTest(providedSender?: xtapi.RawSender, override?: P
     cleanup = opened.cleanup;
     opts.deviceMode = opened.deviceMode;
   }
+
+  // Reset initial complet (LED OFF, faders à 0, LCDs nettoyés)
+  await resetAllSafe(sender, opts);
 
   try {
     if (opts.testMode === "all" || opts.testMode === "custom") {
@@ -83,13 +106,13 @@ export async function runMidiTest(providedSender?: xtapi.RawSender, override?: P
         waveCtrlCcNumbers: opts.waveCtrlCcNumbers,
         deviceMode: opts.deviceMode,
       });
+      const lcdOpts = { durationMs: opts.lcdDurationMs ?? 3000, fps: opts.lcdFps ?? 30, stepDelayMs: opts.lcdStepDelayMs };
+      await runLcdRainbow(sender, lcdOpts);
     } else if (opts.testMode === "buttons") {
-      const duration = opts.waveDurationMs > 0 ? opts.waveDurationMs : 2000;
-      logger.info(`Boutons: OFF→ON ${duration}ms→OFF`);
+
+      logger.info(`Boutons: OFF→ON`);
       await xtapi.setAllButtonsVelocity(sender, opts.buttonsChannel, opts.buttonsFirstNote, opts.buttonsLastNote, 0, opts.buttonsInterMsgDelayMs);
-      await xtapi.setAllButtonsVelocity(sender, opts.buttonsChannel, opts.buttonsFirstNote, opts.buttonsLastNote, 127, opts.buttonsInterMsgDelayMs);
-      await delay(duration);
-      await xtapi.setAllButtonsVelocity(sender, opts.buttonsChannel, opts.buttonsFirstNote, opts.buttonsLastNote, 0, opts.buttonsInterMsgDelayMs);
+      await xtapi.setAllButtonsVelocity(sender, opts.buttonsChannel, opts.buttonsFirstNote, opts.buttonsLastNote, 127, opts.buttonsInterMsgDelayMs);;
       logger.info("Boutons test terminé.");
     } else if (opts.testMode === "faders" && opts.waveDurationMs > 0) {
       await runFadersWaveOnly(sender, {
@@ -100,10 +123,14 @@ export async function runMidiTest(providedSender?: xtapi.RawSender, override?: P
         waveCtrlCcNumbers: opts.waveCtrlCcNumbers,
         deviceMode: opts.deviceMode,
       });
+    } else if (opts.testMode === "lcd") {
+      const lcdOpts = { durationMs: opts.lcdDurationMs ?? 3000, fps: opts.lcdFps ?? 30, stepDelayMs: opts.lcdStepDelayMs };
+      await runLcdRainbow(sender, lcdOpts);
     }
   } catch (error) {
     logger.error("Erreur lors de l'envoi MIDI:", error as any);
   } finally {
+    if (sender) await resetAllSafe(sender, opts);
     try { cleanup?.(); } catch {}
   }
 }

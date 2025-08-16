@@ -54,6 +54,7 @@
  - [x] Router cleanup & modularisation: suppression listes exhaustives d’apps dans `router`, latence et ombres par app dynamiques, extraction logique pages/transformations dans `src/router/page.ts`, typage latence générique par clé string, suppression du champ inutilisé `refreshTempoMs`, mise à jour de `attachXTouch()` et appels associés.
  - [x] M1 — Extraction `src/router/emit.ts` et `src/router/antiEcho.ts`, délégation depuis `src/router.ts`, build/tsc OK — 2025‑08‑15
  - [x] Test MIDI — externalisation de la pipeline `test-midi-send` vers utilitaires réutilisables: `src/test-utils/{openRawSender,runners,runMidiTest}.ts`. Le script `src/test-midi-send.ts` est réduit (< 100 lignes) et s’appuie sur `xtouch/api`. — 2025‑08‑16
+ - [x] Animation LCD rainbow + contrôle stepDelayMs: `src/animations/lcdRainbow.ts` + runner `runLcdRainbow()`, intégrée à la pipeline (modes `all`/`lcd`). Resets complets au début et à la fin des tests avec effacement LCD/7‑seg (`resetAll({ clearLcds: true })`). Séparation API: `src/xtouch/{api-midi,api-lcd}.ts`. — 2025‑08‑16
 
 ## Fait
 - [x] BUG: Latence/loop perceptible (≈1 s) sur feedback boutons et « recalage » des faders — métriques, anti‑echo par type, LWW, setpoints moteurs, échos locaux — 2025‑08‑15
