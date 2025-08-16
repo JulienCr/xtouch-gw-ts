@@ -1,23 +1,37 @@
 # XTouch GW – Tâches (Kanban)
 
+> **🚀 MIGRATION VERS TRELLO COMPLÉTÉE** - Le suivi de projet a été migré vers [Trello](https://trello.com/b/2TIFUKPw/xtouch-gw) le 16/08/2025. Ce fichier local reste disponible pour référence mais n'est plus mis à jour activement.
+>
+> **📊 Tableau Trello :** [https://trello.com/b/2TIFUKPw/xtouch-gw](https://trello.com/b/2TIFUKPw/xtouch-gw)
+>
+> **🎯 Structure Kanban standard :**
+> - **📋 Backlog** - Toutes les tâches futures planifiées
+> - **🔄 En cours** - Tâches actuellement travaillées
+> - **✅ Fait** - Tâches complétées
+>
+> **🏷️ Système de priorités et labels :**
+> - **Priorités :** Haute | Moyenne | Basse
+> - **Labels :** Feature | Performance | Bug | Documentation | Infrastructure
+>
+> **📝 Chaque tâche Trello contient :**
+> - Description détaillée avec contexte et objectifs
+> - Priorité claire
+> - Labels de catégorisation
+> - Exemples concrets et bénéfices
+
 > Source de vérité de l’avancement. Mettez à jour ce fichier à chaque étape importante.
 
 ## Backlog
-- [ ] ConfigLoader: lecture YAML + hot reload (YAML + chokidar)
-- [ ] Logger: niveaux error/warn/info/debug/trace + couleurs
-- [ ] Router: mapping `control -> (app, action, params)` (résolution et callbacks)
-- [ ] LED feedback X‑Touch (Note/CC out) synchronisé avec états appli
-- [ ] LCD mapping: intégrer `sendLcdStripText()` dans le Router (labels dynamiques)
-- [ ] Drivers applicatifs: Voicemeeter (actions réelles), QLC+, OBS
+- [ ] Drivers applicatifs: actions réelles (Voicemeeter, QLC+, OBS)
 - [ ] Outil de capture: générer un mapping YAML à partir des logs sniffés
 - [ ] Learn page (assistant): enchaîner plusieurs learns pour produire un bloc `controls`
-- [ ] Tests de latence et perf (< 20 ms)
-- [ ] CI basique (lint, build)
+- [ ] Tests de perf/jitter (< 20 ms) et micro-bench sur hot paths
+- [ ] CI GitHub Actions: pnpm i --frozen-lockfile, lint, check:types, test
 
 ## En cours
 - [x] Indiquer le nom de la page sur le grand afficheur 7-segments
 - [x] Utilise les boutons F1 -> F8 pour naviguer entre les pages (notes channel 1 64..57) et LED active sur la page courante
-- [ ] Router (pages OK) → implémenter le mapping d’actions
+- [x] Router: pages OK + mapping d’actions implémenté
   - [x] StateStore MIDI-only refactor: `MidiAddr` inclut `portId`; `MidiStateEntry` {known, origin, stale?}; suppression des défauts; stockage feedback only
   - [x] Anti-boucle déplacé côté Router: `XTouchShadow` + fenêtres anti‑echo par type (`antiLoopWindowMsByStatus`)
   - [x] Intégration refresh de page (ordonnancement Notes→CC→LCD→Faders) + Reset→Replay: OFF/0 pour unknown; PB/LCD HOLD
@@ -25,12 +39,12 @@
   - [x] Navigation next/prev: forcer `refreshPage()` sur les deux (fix next)
   - [x] Page passthrough: les feedbacks des bridges alimentent `StateStore` avec l’app correcte (qlc/voicemeeter/obs)
   - [x] Reset page "Default": Note OFF limité à canal 1, notes 0..31 (au lieu de 0,8,16,24 sur 1..9)
-  - [ ] Config Editor Web (Next.js) séparé: CRUD `config.yaml`, UI élégante Tailwind
+  - [x] Config Editor Web (Next.js) séparé: CRUD `config.yaml`, UI élégante Tailwind
   - [x] Replay PB en une passe (plan PB par fader) pour éviter PB=0 après PB connu (bug retour Page 1 / Voicemeeter)
   - [x] Refactor `app.ts`: déduplication helpers (resolveAppKey, F1..F8 LEDs, construction bridges, accès `passthrough(s)`) – 2025‑08‑15
   - [x] Centralisation anti-echo fallback via `getAntiLoopMs()` (remplace `?? 60` en dur) – 2025‑08‑15
   - [x] `src/midi/transform.ts`: utiliser `pb14FromRaw`/`rawFromPb14`; suppression des reverse transforms (gérées par `router/page.ts`) – 2025‑08‑15
-  - [ ] Tests P0 (unitaires)
+  - [x] Tests P0 (unitaires)
     - [x] src/midi/utils.ts
     - [x] src/midi/transform.ts
     - [x] src/state/store.ts
