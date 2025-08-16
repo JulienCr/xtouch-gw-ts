@@ -11,6 +11,7 @@ import { setupStatePersistence } from "./state/persistence";
 import { createBackgroundManager, initDrivers, startXTouchAndNavigation } from "./app/bootstrap";
 import { applyLcdForActivePage } from "./ui/lcd";
 import { updateFKeyLedsForActivePage } from "./xtouch/fkeys";
+import * as xtapi from "./xtouch/api";
 
 /**
  * Point d'entrée de l'application.
@@ -109,6 +110,14 @@ export async function startApp(): Promise<() => void> {
       },
     });
     xtouch = x;
+
+    // Reset complet de la surface au démarrage (LED OFF, faders 0, LCD/7-seg clear)
+    try {
+      await xtapi.resetAll(x, { clearLcds: true });
+      logger.info("X‑Touch réinitialisé au démarrage.");
+    } catch (e) {
+      logger.warn("Reset X‑Touch au démarrage: ignoré (", (e as any)?.message ?? e, ")");
+    }
 
     // Si aucune page ne définit de passthrough, activer le bridge global vers Voicemeeter
     const hasPagePassthrough = (cfg.pages ?? []).some(

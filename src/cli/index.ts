@@ -213,10 +213,10 @@ export function attachCli(ctx: CliContext): () => void {
         }
         case "test-midi": {
           const which = (rest[0] || "all").toLowerCase();
-          process.env.MIDI_TEST_MODE = which; // lu par test-midi-send
+          // Forcer le mode via param pour éviter les interférences d'environnement
           logger.info(`Test MIDI → ${which}`);
           try {
-            await testMidiSend();
+            await testMidiSend(ctx.xtouch || undefined, { testMode: which as any });
           } catch (e) {
             logger.error("Erreur test-midi:", e as any);
           }

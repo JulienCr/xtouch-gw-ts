@@ -1,6 +1,7 @@
 import { logger } from "./logger";
 import type { RawSender } from "./xtouch/api";
 import { runMidiTest } from "./test-utils/runMidiTest";
+import type { MidiTestOptions } from "./test-utils/runMidiTest";
 
 // ============================
 // Constantes d'édition rapide
@@ -50,7 +51,10 @@ const TEST_SEQUENCE: string[] = [
  * Si un `sender` est fourni (ex: `XTouchDriver`), la pipeline de l'app est utilisée.
  * Sinon, ouverture temporaire d'un port Output brut.
  */
-async function testMidiSend(sender?: RawSender) {
+async function testMidiSend(sender?: RawSender, override?: Partial<MidiTestOptions>) {
+  const envMode = (process.env.MIDI_TEST_MODE || "").toLowerCase();
+  const allowed = new Set(["all","custom","buttons","faders","lcd"]);
+  const withMode = allowed.has(envMode as any) ? { testMode: envMode as MidiTestOptions["testMode"] } : {};
   await runMidiTest(sender, {
     portNameFragmentOverride: PORT_NAME_FRAGMENT_OVERRIDE,
     defaultDelayMs: DEFAULT_DELAY_MS,
@@ -67,6 +71,8 @@ async function testMidiSend(sender?: RawSender) {
     buttonsLastNote: BUTTONS_TEST_LAST_NOTE,
     buttonsInterMsgDelayMs: BUTTONS_TEST_INTER_MSG_DELAY_MS,
     customSequence: TEST_SEQUENCE,
+    ...withMode,
+    ...(override || {}),
   });
 }
 
