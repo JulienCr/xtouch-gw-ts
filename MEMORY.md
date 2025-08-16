@@ -11,6 +11,9 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
  - 2025-08-16 — Infra tests
    - Décision: utiliser Vitest avec couverture v8 et convention `_tests` (tests co-localisés dans des sous-dossiers `_tests` à côté du code, ex: `src/midi/_tests/utils.test.ts`).
    - Scripts: `pnpm test`, `pnpm test:watch`, `pnpm lint`, `pnpm format`.
+ - 2025-08-16 — Reload state au démarrage
+   - Décision: hydrater le `StateStore` depuis `.state/snapshot.json` si présent, sans notifier les abonnés.
+   - Implémentation: méthode `hydrateFromSnapshot()` dans `StateStore`, chargée au bootstrap de la persistance. Les entrées sont marquées `stale: true` pour signaler qu’elles peuvent être obsolètes et déclencher un refresh de page sans boucles.
 - 2025-08-08 — Init
   - Décision: TypeScript + tsx (dev) + tsc (build).
   - Décision: `chalk@4` pour compat CJS simple; évite ESM-only de chalk@5 au démarrage.
