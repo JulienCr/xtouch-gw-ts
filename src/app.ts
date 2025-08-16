@@ -119,6 +119,12 @@ export async function startApp(): Promise<() => void> {
       logger.warn("Reset X‑Touch au démarrage: ignoré (", (e as any)?.message ?? e, ")");
     }
 
+    // Ré-appliquer LCD/LEDs après reset (le reset efface les LCD)
+    try {
+      applyLcdForActivePage(router, x);
+      try { updateFKeyLedsForActivePage(router, x, paging.channel); } catch {}
+    } catch {}
+
     // Si aucune page ne définit de passthrough, activer le bridge global vers Voicemeeter
     const hasPagePassthrough = (cfg.pages ?? []).some(
       (p) => !!p.passthrough || (Array.isArray((p as any).passthroughs) && (p as any).passthroughs.length > 0)
