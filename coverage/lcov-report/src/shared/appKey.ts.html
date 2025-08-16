@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">43.75% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>7/16</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">20% </span>
+                <span class="strong">85% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>1/5</span>
+                <span class='fraction'>17/20</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">43.75% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/16</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -96,25 +96,25 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-yes">22x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
@@ -126,22 +126,22 @@ export function resolveAppKey(toPort: string, fromPort: string): "voicemeeter" |
 	const to = (<span class="branch-0 cbranch-no" title="branch not covered" >toPort || "").t</span>oLowerCase();
 	const from = (<span class="branch-0 cbranch-no" title="branch not covered" >fromPort || "").t</span>oLowerCase();
 	const txt = `${to} ${from}`;
-	if (txt.includes("qlc")) return <span class="branch-0 cbranch-no" title="branch not covered" >"qlc";</span>
-	if (txt.includes("xtouch-gw") || txt.includes("voicemeeter")) <span class="branch-0 cbranch-no" title="branch not covered" >return "voicemeeter";</span>
-<span class="cstat-no" title="statement not covered" >	if (txt.includes("obs")) return "obs";</span>
-<span class="cstat-no" title="statement not covered" >	return "midi-bridge";</span>
-<span class="cstat-no" title="statement not covered" >}</span>
+	if (txt.includes("qlc")) return "qlc";
+	if (txt.includes("xtouch-gw") || txt.includes("voicemeeter")) return "voicemeeter";
+	if (txt.includes("obs")) return "obs";
+	return "midi-bridge";
+}
 &nbsp;
 /**
  * Variante simplifiée lorsqu'on n'a qu'un seul nom de port (IN/OUT unique).
  */
-export <span class="fstat-no" title="function not covered" >function resolveAppKeyFromPort(port: string): "voicemeeter" | "qlc" | "obs" | "midi-bridge" {</span>
-<span class="cstat-no" title="statement not covered" >	const p = (port || "").toLowerCase();</span>
-<span class="cstat-no" title="statement not covered" >	if (p.includes("qlc")) return "qlc";</span>
-<span class="cstat-no" title="statement not covered" >	if (p.includes("xtouch-gw") || p.includes("voicemeeter")) return "voicemeeter";</span>
-<span class="cstat-no" title="statement not covered" >	if (p.includes("obs")) return "obs";</span>
-<span class="cstat-no" title="statement not covered" >	return "midi-bridge";</span>
-<span class="cstat-no" title="statement not covered" >}</span>
+export function resolveAppKeyFromPort(port: string): "voicemeeter" | "qlc" | "obs" | "midi-bridge" {
+	const p = (<span class="branch-0 cbranch-no" title="branch not covered" >port || "").t</span>oLowerCase();
+	if (p.includes("qlc")) return "qlc";
+	if (p.includes("xtouch-gw") || p.includes("voicemeeter")) return "voicemeeter";
+	if (p.includes("obs")) return "obs";
+	return "midi-bridge";
+}
 &nbsp;
 &nbsp;
 &nbsp;</pre></td></tr></table></pre>
@@ -151,7 +151,7 @@ export <span class="fstat-no" title="function not covered" >function resolveAppK
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-16T00:08:44.990Z
+                at 2025-08-16T00:21:29.970Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

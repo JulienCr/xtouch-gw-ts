@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/19</span>
+                <span class='fraction'>19/19</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>5/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/19</span>
+                <span class='fraction'>19/19</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -94,66 +94,66 @@
 <a name='L29'></a><a href='#L29'>29</a>
 <a name='L30'></a><a href='#L30'>30</a>
 <a name='L31'></a><a href='#L31'>31</a>
-<a name='L32'></a><a href='#L32'>32</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L32'></a><a href='#L32'>32</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import type { MidiStateEntry, MidiValue } from "../state";<span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" ></span></span></span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { MidiStateEntry, MidiValue } from "../state";
 import { addrKeyWithoutPort } from "../shared/addrKey";
 &nbsp;
 /**
  * Gestion des ombres par application et clés d'adresses X‑Touch/App (sans port).
  */
-<span class="cstat-no" title="statement not covered" >export function makeAppShadows() {</span>
-<span class="cstat-no" title="statement not covered" >  const appShadows = new Map&lt;string, Map&lt;string, { value: MidiValue; ts: number }&gt;&gt;();</span>
+export function makeAppShadows() {
+  const appShadows = new Map&lt;string, Map&lt;string, { value: MidiValue; ts: number }&gt;&gt;();
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  function getAppShadow(appKey: string): Map&lt;string, { value: MidiValue; ts: number }&gt; {</span>
-<span class="cstat-no" title="statement not covered" >    let m = appShadows.get(appKey);</span>
-<span class="cstat-no" title="statement not covered" >    if (!m) {</span>
-<span class="cstat-no" title="statement not covered" >      m = new Map();</span>
-<span class="cstat-no" title="statement not covered" >      appShadows.set(appKey, m);</span>
-<span class="cstat-no" title="statement not covered" >    }</span>
-<span class="cstat-no" title="statement not covered" >    return m;</span>
-<span class="cstat-no" title="statement not covered" >  }</span>
+  function getAppShadow(appKey: string): Map&lt;string, { value: MidiValue; ts: number }&gt; {
+    let m = appShadows.get(appKey);
+    if (!m) {
+      m = new Map();
+      appShadows.set(appKey, m);
+    }
+    return m;
+  }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  function addrKeyForXTouch(addr: MidiStateEntry["addr"]): string {</span>
-<span class="cstat-no" title="statement not covered" >    return addrKeyWithoutPort(addr as any);</span>
-<span class="cstat-no" title="statement not covered" >  }</span>
+  function addrKeyForXTouch(addr: MidiStateEntry["addr"]): string {
+    return addrKeyWithoutPort(addr as any);
+  }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  function addrKeyForApp(addr: MidiStateEntry["addr"]): string {</span>
+  function addrKeyForApp(addr: MidiStateEntry["addr"]): string {
     // Anti-echo/latence côté app: ignorer le portId pour associer l'aller (to_port) et le retour (from_port)
-<span class="cstat-no" title="statement not covered" >    return addrKeyWithoutPort(addr as any);</span>
-<span class="cstat-no" title="statement not covered" >  }</span>
+    return addrKeyWithoutPort(addr as any);
+  }
 &nbsp;
-<span class="cstat-no" title="statement not covered" >  return { getAppShadow, addrKeyForXTouch, addrKeyForApp } as const;</span>
-<span class="cstat-no" title="statement not covered" >}</span>
+  return { getAppShadow, addrKeyForXTouch, addrKeyForApp } as const;
+}
 &nbsp;
 &nbsp;
 &nbsp;</pre></td></tr></table></pre>
@@ -163,7 +163,7 @@ import { addrKeyWithoutPort } from "../shared/addrKey";
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-16T00:08:44.957Z
+                at 2025-08-16T00:21:29.935Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

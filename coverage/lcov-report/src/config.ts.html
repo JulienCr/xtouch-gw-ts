@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">43.58% </span>
+                <span class="strong">82.05% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>17/39</span>
+                <span class='fraction'>32/39</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">28.57% </span>
+                <span class="strong">45.45% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>2/7</span>
+                <span class='fraction'>5/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">66.66% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/3</span>
+                <span class='fraction'>4/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">43.58% </span>
+                <span class="strong">82.05% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>17/39</span>
+                <span class='fraction'>32/39</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -439,23 +439,23 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { promises as fs } from "fs";
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span></td><td class="text"><pre class="prettyprint lang-js">import { promises as fs } from "fs";
 import path from "path";
 import YAML from "yaml";
 import chokidar from "chokidar";
@@ -634,31 +634,31 @@ export async function loadConfig(filePath?: string): Promise&lt;AppConfig&gt; {
  * @param onError Callback d'erreur facultative
  * @returns Fonction pour arrêter l'observation
  */
-export <span class="fstat-no" title="function not covered" >function watchConfig(</span>
-<span class="cstat-no" title="statement not covered" >  filePath: string,</span>
-<span class="cstat-no" title="statement not covered" >  onChange: (cfg: AppConfig) =&gt; void,</span>
-<span class="cstat-no" title="statement not covered" >  onError?: (err: unknown) =&gt; void</span>
-<span class="cstat-no" title="statement not covered" >): () =&gt; void {</span>
-<span class="cstat-no" title="statement not covered" >  const watcher = chokidar.watch(filePath, { ignoreInitial: true });</span>
-<span class="cstat-no" title="statement not covered" >  const handler = async () =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >    try {</span>
-<span class="cstat-no" title="statement not covered" >      const raw = await fs.readFile(filePath, "utf8");</span>
-<span class="cstat-no" title="statement not covered" >      const cfg = YAML.parse(raw) as AppConfig;</span>
-<span class="cstat-no" title="statement not covered" >      onChange(cfg);</span>
-<span class="cstat-no" title="statement not covered" >    } catch (err) {</span>
+export function watchConfig(
+  filePath: string,
+  onChange: (cfg: AppConfig) =&gt; void,
+  onError?: (err: unknown) =&gt; void
+): () =&gt; void {
+  const watcher = chokidar.watch(filePath, { ignoreInitial: true });
+  const handler = async () =&gt; {
+    try {
+      const raw = await fs.readFile(filePath, "utf8");
+      const cfg = YAML.parse(raw) as AppConfig;
+      onChange(cfg);
+<span class="branch-0 cbranch-no" title="branch not covered" >    } catch (err) {</span>
 <span class="cstat-no" title="statement not covered" >      onError?.(err);</span>
 <span class="cstat-no" title="statement not covered" >    }</span>
-<span class="cstat-no" title="statement not covered" >  };</span>
-<span class="cstat-no" title="statement not covered" >  watcher.on("change", handler);</span>
-<span class="cstat-no" title="statement not covered" >  return () =&gt; void watcher.close();</span>
-<span class="cstat-no" title="statement not covered" >} </span></pre></td></tr></table></pre>
+  };
+  watcher.on("change", handler);
+  return () =&gt; void watcher.close();
+} </pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
             </div><!-- /wrapper -->
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-16T00:08:44.990Z
+                at 2025-08-16T00:21:29.970Z
             </div>
         <script src="../prettify.js"></script>
         <script>

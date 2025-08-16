@@ -44,10 +44,15 @@ Carte du dépôt (Repository Map)
   - FS: persistance .state (journal.log, snapshot.json)
 - CI/CD: non détecté (.github non listé)
 
-État actuel des tests
-- Aucune suite de test détectée (pas de *.test.ts/*.spec.ts, pas de config Vitest/Jest)
-- Aucune intégration CI pour tests/coverage
-- Aucune métrique de couverture
+État actuel des tests (2025-08-16)
+- Vitest configuré avec couverture v8, convention `_tests` active
+- Suites présentes: 11 fichiers, 25 tests passés (100%)
+  - midi: utils (incl. fast-check), transform
+  - state: store
+  - router: antiEcho, emit, forward, page, planner
+  - shared: appKey
+  - config: load/findConfig
+- Couverture globale: ~24% lignes (modules P0 ciblés largement couverts)
 
 Barre de qualité cible
 - Couverture
@@ -74,7 +79,7 @@ Conventions
 
 Lots (batches), portée, tâches et critères de sortie
 
-Lot 0 (P0): Infrastructure de test
+Lot 0 (P0): Infrastructure de test — STATUS: DONE (2025-08-16)
 - Portée
   - Ajouter Vitest + config minimale; scripts pnpm test/test:watch/test:unit/test:integration
   - Activer couverture c8; ESLint + Prettier; typecheck (tsc --noEmit)
@@ -86,32 +91,32 @@ Lot 0 (P0): Infrastructure de test
   - Config ESLint/Prettier (si non présents) et règles de base TS strict
   - CI: workflow .github/workflows/test.yml (pnpm, pas de build/dev)
 - Exit
-  - pnpm test OK en local/CI; rapport coverage généré
+  - pnpm test OK en local; rapport coverage généré (dossier ignoré par git)
 
 Lot 1 (P0): Unit tests cœur
 - Modules et cas concrets
-  - src/midi/utils.ts
+  - src/midi/utils.ts ✅ (tests + propriété fast-check)
     - pb14FromRaw/rawFromPb14: inverses, bornes (0, 16383), monotonicité (fast-check), robustesse entrées invalides
     - getTypeNibble/isPB/isCC/isNoteOn: détection statuts; tables de vérité
     - human/hex: rendu stable; longueurs attendues
-  - src/midi/transform.ts (applyTransform)
+  - src/midi/transform.ts (applyTransform) ✅
     - pb_to_note: status PB → NoteOn attendu (canal, note, vélocité mappée), non-PB inchangé
     - pb_to_cc: mapping base_cc, cc_by_channel, canal cible, bornes 0..127
     - Idempotence: données non concernées renvoyées inchangées
-  - src/state/store.ts (StateStore)
+  - src/state/store.ts (StateStore) ✅
     - updateFromFeedback: known=true, origin=app, écrase par clé addr, publication aux subscribers
     - getKnownLatestForApp: filtres par status/channel/data1, sélection la plus récente
     - listStatesForApp/Apps: contenus attendus
-  - src/router/planner.ts (planRefresh)
+  - src/router/planner.ts (planRefresh) ✅
     - Priorités: PB connu (3) > CC mappé (2) > ZERO (1); Notes/CC: connu (2) > reset (1)
     - Canaux par app depuis page; zeros générés si absence d’état
     - Transformations transformAppToXTouch appliquées
-  - src/router/forward.ts (forwardFromApp)
+  - src/router/forward.ts (forwardFromApp) ✅
     - LWW/anti‑echo: messages proches d’actions locales ignorés selon fenêtre; appel emitter conditionnel
     - Latency meters: mise à jour lors de round-trip
-  - src/router/emit.ts (makeXTouchEmitter)
+  - src/router/emit.ts (makeXTouchEmitter) ✅
     - emitIfNotDuplicate: déduplication par clé, respect fenêtres anti‑echo; ordonnancement Notes→CC→PB
-  - src/config.ts (+ watchConfig si isolable)
+  - src/config.ts (+ watchConfig si isolable) ✅ (load/find)
     - loadConfig: parsing YAML valide/invalide; défauts; messages d’erreur clairs
 - Exit
   - Couverture ≥ 95% sur modules listés; tests déterministes
@@ -179,7 +184,7 @@ Scripts pnpm (à ajouter dans package.json, Lot 0)
 - "test:unit": "vitest run -c vitest.config.ts"
 - "test:integration": "vitest run --dir test/integration"
 - "lint": "eslint ."
-- "typecheck": "tsc --noEmit"
+- "typecheck": "tsc --NoEmit"
 - "format": "prettier --check ."
 
 Notes d’implémentation
@@ -199,4 +204,13 @@ Prochaines étapes
 - Valider ce plan (lots et priorités)
 - Exécuter Lot 0, puis Lot 1
 - Créer issues par module (P0 d’abord), ajouter checklists et critères de sortie
+
+## Journal d’avancement (MàJ continue)
+
+2025-08-16 — Lot 0 terminé + Lot 1 (P0) en bonne voie
+- Infra: Vitest + couverture v8, ESLint/Prettier, convention `_tests`.
+- Suites: 11 fichiers, 25 tests verts (100%).
+- Modules P0 couverts: midi/utils (incl. fast-check), midi/transform, state/store, router/antiEcho, router/emit, router/forward, router/page, router/planner, shared/appKey, config/load.
+- Couverture globale: ~24% lignes.
+- À faire (P0): cas edge router/planner (PB=0 sans mapping), watchConfig (stub watcher), midi/decoder (table de vérité).
 
