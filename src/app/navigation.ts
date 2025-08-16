@@ -1,6 +1,7 @@
 import type { Router } from "../router";
 import type { XTouchDriver } from "../xtouch/driver";
 import type { PagingConfig, PageConfig } from "../config";
+import { updatePrevNextLeds } from "../xtouch/fkeys";
 
 export interface NavigationDeps {
   /** Router applicatif contrôlant les pages */
@@ -53,6 +54,7 @@ export function attachNavigation(deps: NavigationDeps): () => void {
     if (!changed) return;
     cooldownUntil = now + 250;
     onAfterPageChange?.(router.getActivePage());
+    try { updatePrevNextLeds(xtouch, paging.channel, paging.prev_note, paging.next_note); } catch {}
   });
 
   return () => {

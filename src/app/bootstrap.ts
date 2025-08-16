@@ -5,7 +5,7 @@ import { ObsDriver } from "../drivers/obs";
 import type { AppConfig, PagingConfig, PageConfig } from "../config";
 import { XTouchDriver } from "../xtouch/driver";
 import { applyLcdForActivePage } from "../ui/lcd";
-import { updateFKeyLedsForActivePage } from "../xtouch/fkeys";
+import { updateFKeyLedsForActivePage, updatePrevNextLeds } from "../xtouch/fkeys";
 import { BackgroundListenerManager } from "../midi/backgroundListeners";
 import { attachNavigation } from "./navigation";
 import * as xtapi from "../xtouch/api";
@@ -73,6 +73,7 @@ export async function startXTouchAndNavigation(router: Router, options: StartXTo
   applyLcdForActivePage(router, xtouch);
   const paging = toRequiredPaging(config);
   try { updateFKeyLedsForActivePage(router, xtouch, paging.channel); } catch {}
+  try { updatePrevNextLeds(xtouch, paging.channel, paging.prev_note, paging.next_note); } catch {}
 
   const unsubscribeNavigation = attachNavigation({
     router,
