@@ -1,6 +1,7 @@
-import http from "http";
-import path from "path";
-import fs from "fs";
+import http from "node:http";
+import path from "node:path";
+import fs from "node:fs";
+import { pathToFileURL } from "node:url";
 import { logger } from "./logger";
 
 const PUBLIC_DIR = path.join(process.cwd(), "public");
@@ -47,12 +48,19 @@ export function startSnifferServer(): http.Server {
   if (!fs.existsSync(PUBLIC_DIR)) {
     fs.mkdirSync(PUBLIC_DIR, { recursive: true });
   }
+
   server.listen(PORT, () => {
     logger.info(`Sniffer Web MIDI: http://localhost:${PORT}/`);
   });
   return server;
 }
 
-if (require.main === module) {
+const isMain = (() => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try { return pathToFileURL(entry).href === import.meta.url; } catch { return false; }
+})();
+
+if (isMain) {
   startSnifferServer();
 }

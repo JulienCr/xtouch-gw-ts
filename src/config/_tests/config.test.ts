@@ -29,8 +29,6 @@ pages: []
 midi:
   input_port: "XTouch-IN"
   output_port: "XTouch-OUT"
-features:
-  vm_sync: true
 paging:
   channel: 1
   prev_note: 46

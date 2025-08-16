@@ -2,8 +2,8 @@ midi:
   input_port: "UM-One"
   output_port: "UM-One"
 
-features:
-  vm_sync: false
+xtouch:
+  mode: "mcu"  # "mcu" (par défaut) ou "ctrl"
 
 paging:
   channel: 1

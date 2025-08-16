@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">96.15% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>52/52</span>
+                <span class='fraction'>50/52</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.75% </span>
+                <span class="strong">75% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>15/16</span>
+                <span class='fraction'>12/16</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">96.15% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>52/52</span>
+                <span class='fraction'>50/52</span>
             </div>
         
             
@@ -145,27 +145,27 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">53x</span>
-<span class="cline-any cline-yes">53x</span>
-<span class="cline-any cline-yes">53x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">63x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-yes">52x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">52x</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-yes">8x</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-yes">28x</span>
-<span class="cline-any cline-yes">52x</span>
-<span class="cline-any cline-yes">52x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -175,8 +175,8 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">24x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">9x</span>
 <span class="cline-any cline-yes">9x</span>
@@ -195,7 +195,7 @@ const levelRank: Record&lt;LogLevel, number&gt; = {
   trace: 4,
 };
 &nbsp;
-let currentLevel: LogLevel = (process.env.<span class="branch-0 cbranch-no" title="branch not covered" >LOG_LEVEL as LogLevel) || "info";</span>
+let currentLevel: LogLevel = (process.env.LOG_LEVEL as LogLevel) || "info";
 &nbsp;
 export function setLogLevel(level: LogLevel): void {
   currentLevel = level;
@@ -220,10 +220,10 @@ function format(level: LogLevel, message: unknown, ...args: unknown[]): string {
       return chalk.yellow(`${base} ${text}`);
     case "info":
       return chalk.cyan(`${base} ${text}`);
-    case "debug":
-      return chalk.gray(`${base} ${text}`);
-    case "trace":
-      return chalk.magenta(`${base} ${text}`);
+<span class="branch-0 cbranch-no" title="branch not covered" >    case "debug":</span>
+<span class="cstat-no" title="statement not covered" >      return chalk.gray(`${base} ${text}`);</span>
+<span class="branch-0 cbranch-no" title="branch not covered" >    case "trace":</span>
+<span class="cstat-no" title="statement not covered" >      return chalk.magenta(`${base} ${text}`);</span>
   }
 }
 &nbsp;
@@ -238,10 +238,10 @@ export const logger = {
     if (shouldLog("info")) console.log(format("info", message, ...args));
   },
   debug: (message: unknown, ...args: unknown[]): void =&gt; {
-    if (shouldLog("debug")) console.log(format("debug", message, ...args));
+    if (shouldLog("debug")) <span class="branch-0 cbranch-no" title="branch not covered" >console.log(format("debug", message, ...args));</span>
   },
   trace: (message: unknown, ...args: unknown[]): void =&gt; {
-    if (shouldLog("trace")) console.log(format("trace", message, ...args));
+    if (shouldLog("trace")) <span class="branch-0 cbranch-no" title="branch not covered" >console.log(format("trace", message, ...args));</span>
   },
 }; </pre></td></tr></table></pre>
 
@@ -250,7 +250,7 @@ export const logger = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-16T00:35:00.153Z
+                at 2025-08-16T16:24:10.852Z
             </div>
         <script src="../prettify.js"></script>
         <script>

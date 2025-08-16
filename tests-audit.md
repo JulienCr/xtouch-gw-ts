@@ -215,3 +215,6 @@ Prochaines étapes
 - Nouveaux: midi/ports, midi/sniffer, router (orchestration), router-more (handleControl/updateConfig), drivers (voicemeeter), state/persistence (timers asynchrones).
 - Router central rehaussé à ~74.9% lignes; objectif: ≥ 85% via cas supplémentaires (replay forward dans onMidiFromApp, branches warnings).
 
+2025-08-16 — Refactor test MIDI
+- Extraction de la pipeline `src/test-midi-send.ts` vers `src/test-utils/{openRawSender,runners,runMidiTest}.ts`. Le script devient un fin wrapper et facilite la réutilisation côté E2E/HIL.
+

@@ -140,16 +140,7 @@ export default function ConfigBuilder() {
         />
       </Section>
 
-      <Section title="Fonctionnalités">
-        <label className="inline-flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={!!config.features?.vm_sync}
-            onChange={(e) => setConfig({ ...config, features: { ...(config.features || {}), vm_sync: e.target.checked } })}
-          />
-          <span>Voicemeeter Sync</span>
-        </label>
-      </Section>
+      
 
       <Section title="Paging">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

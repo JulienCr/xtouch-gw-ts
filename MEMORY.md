@@ -19,10 +19,12 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Problème: `pnpm add midi` échoue (node-gyp, MSBuild) sous Windows + Node 24.1.
   - Solution: `@julusian/midi` fonctionne immédiatement (précompilé/N-API). Sniffer natif intégré (CLI: midi-ports, midi-open, midi-close).
   - Fallback: sniffer Web MIDI dispo via `pnpm sniff:web` → `http://localhost:8123/`.
-- 2025-08-09 — loopMIDI en sécurité (boucle)
-  - Symptôme: plus aucune sortie MIDI, ports “gelés”.
-  - Cause: boucle de routage (X‑Touch ↔ bridge ↔ retour vers le même flux) détectée par loopMIDI → mise en sécurité.
-  - Actions: couper VM Sync si besoin, désactiver un des ponts, vérifier filtres/ports (pas de renvoi du feedback vers l’entrée source), redémarrer loopMIDI. 
+ - 2025-08-09 — loopMIDI en sécurité (boucle)
+   - Symptôme: plus aucune sortie MIDI, ports “gelés”.
+   - Cause: boucle de routage (X‑Touch ↔ bridge ↔ retour vers le même flux) détectée par loopMIDI → mise en sécurité.
+   - Actions: couper VM Sync si besoin, désactiver un des ponts, vérifier filtres/ports (pas de renvoi du feedback vers l’entrée source), redémarrer loopMIDI. 
+ - 2025-08-16 — Flag vm_sync retiré
+   - Décision: retirer `features.vm_sync` (non utilisé runtime). Nettoyage types, UI editor, README, YAML, tests.
  - 2025-08-09 — QLC+ ne gère pas Pitch Bend
    - Décision: ajout d’un transformer `pb_to_note` côté `MidiBridgeDriver` pour convertir Pitch Bend → Note On (même canal) avec vélocité mappée (0..127).
    - Usage: dans `config.yaml`, sous `passthroughs[].transform.pb_to_note.note` définir la note (ex: 0). Évite d’envoyer des PB à QLC+.
@@ -31,24 +33,24 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
     - Exemple: ch4 PB → ch1 CC 49 val[0..127]; ch1→CC46, ch2→CC47.
   - 2025-08-10 — Feedback inverse auto
     - Décision: toute transformation sortante (PB→Note, PB→CC) a son miroir automatique pour le feedback entrant (`Note/CC` → `PitchBend` vers X‑Touch) sans configuration supplémentaire.
- - 2025-08-10 — Refactor utilitaires
-   - Décision: extraire le rendu LCD et les fonctions MIDI communes pour réduire la duplication et faciliter les tests.
-   - Fichiers: `src/ui/lcd.ts`, `src/midi/utils.ts`, `src/midi/filter.ts`, `src/midi/transform.ts`. Mise à jour de `app.ts` et `drivers/midiBridge.ts` pour utiliser ces utilitaires.
- - 2025-08-10 — Oubli de rebuild → ancien comportement
-   - Symptôme: après modification du code, le LCD affiche encore le nom de page (ancien fallback) et ignore la nouvelle logique.
-   - Cause: process non redémarré / pas de rebuild → ancienne version en cours.
-   - Rappel: après des changements de logique, redémarrer le process (`pnpm dev`) ou lancer un type-check (`pnpm run check:types`) et relancer. Le hot reload YAML ne recharge pas le code.
- - 2025-08-10 — App web séparée pour l’édition de config
-   - Décision: isoler un éditeur Next.js dans `web/config-editor` pour éviter toute interaction avec la GW.
-   - Implémentation: API GET/PUT `/api/config` qui lit/écrit le `config.yaml` racine; UI YAML avec validation et preview JSON.
- - 2025-08-10 — State virtuel MIDI & multipage
-   - Décision: adopter une source de vérité MIDI-only par app (Note/CC/PB/SysEx) via `StateStore` avec anti-boucle (50ms) et `lastSentToXTouch`.
-   - Implémentation: capture des feedbacks depuis `VoicemeeterDriver` et `MidiBridgeDriver` vers le `Router.onMidiFromApp()`; mapping automatique de l’app (`qlc`/`voicemeeter`/`obs`) selon les ports bridge. Refresh de page ordonné (Notes→CC→LCD→Faders). Fix: `nextPage()` appelait pas `refreshPage()` → ajouté. Reset par défaut: canal 1, notes 0..31 uniquement (LED).
-   - À améliorer: filtrage par mapping de page → `MidiAddr` et persistance `.state/xtouch-gw.json`.
- - 2025-08-10 — Pages 3/4 ne se refreshent pas
-   - Symptôme: en naviguant vers P3/P4, pas de mise à jour des faders/LED.
-   - Cause: mauvaise hypothèse sur le canal cible; QLC attend les CC sur le canal 1.
-   - Fix: conserver `target_channel: 1` et clarifier `base_cc` en hex (P3: 0x45, P4: 0x50). Le feedback CC (CH1) est correctement inversé vers PB pour le refresh de page.
+  - 2025-08-10 — Refactor utilitaires
+    - Décision: extraire le rendu LCD et les fonctions MIDI communes pour réduire la duplication et faciliter les tests.
+    - Fichiers: `src/ui/lcd.ts`, `src/midi/utils.ts`, `src/midi/filter.ts`, `src/midi/transform.ts`. Mise à jour de `app.ts` et `drivers/midiBridge.ts` pour utiliser ces utilitaires.
+  - 2025-08-10 — Oubli de rebuild → ancien comportement
+    - Symptôme: après modification du code, le LCD affiche encore le nom de page (ancien fallback) et ignore la nouvelle logique.
+    - Cause: process non redémarré / pas de rebuild → ancienne version en cours.
+    - Rappel: après des changements de logique, redémarrer le process (`pnpm dev`) ou lancer un type-check (`pnpm run check:types`) et relancer. Le hot reload YAML ne recharge pas le code.
+  - 2025-08-10 — App web séparée pour l’édition de config
+    - Décision: isoler un éditeur Next.js dans `web/config-editor` pour éviter toute interaction avec la GW.
+    - Implémentation: API GET/PUT `/api/config` qui lit/écrit le `config.yaml` racine; UI YAML avec validation et preview JSON.
+  - 2025-08-10 — State virtuel MIDI & multipage
+    - Décision: adopter une source de vérité MIDI-only par app (Note/CC/PB/SysEx) via `StateStore` avec anti-boucle (50ms) et `lastSentToXTouch`.
+    - Implémentation: capture des feedbacks depuis `VoicemeeterDriver` et `MidiBridgeDriver` vers le `Router.onMidiFromApp()`; mapping automatique de l’app (`qlc`/`voicemeeter`/`obs`) selon les ports bridge. Refresh de page ordonné (Notes→CC→LCD→Faders). Fix: `nextPage()` appelait pas `refreshPage()` → ajouté. Reset par défaut: canal 1, notes 0..31 uniquement (LED).
+    - À améliorer: filtrage par mapping de page → `MidiAddr` et persistance `.state/xtouch-gw.json`.
+  - 2025-08-10 — Pages 3/4 ne se refreshent pas
+    - Symptôme: en naviguant vers P3/P4, pas de mise à jour des faders/LED.
+    - Cause: mauvaise hypothèse sur le canal cible; QLC attend les CC sur le canal 1.
+    - Fix: conserver `target_channel: 1` et clarifier `base_cc` en hex (P3: 0x45, P4: 0x50). Le feedback CC (CH1) est correctement inversé vers PB pour le refresh de page.
 - 2025-08-15 — Refactor State MIDI-only + Reset→Replay (nouvelle spec)
   - Changements majeurs: `MidiAddr` {portId,status,channel,data1}, `MidiStateEntry` {known,origin,stale?}; suppression des defaults dans le state; transforms “in/out” centralisées dans le Router; anti-boucle via `XTouchShadow` (valeur+ts) et `AppShadow`.
   - Persistance légère: `.state/journal.log` (append-only) + `.state/snapshot.json` (RAM périodique) pour debug.
@@ -67,3 +69,6 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
    - Symptôme: `LOG_LEVEL` depuis `.env` ignoré; le logger lisait la valeur par défaut `info`.
    - Cause: `dotenv.config()` appelé après import du `logger`, avec un chemin relatif erroné (`../.env`).
    - Fix: utiliser `import "dotenv/config"` au tout début de `src/index.ts` (avant tout import), laisser le chemin par défaut (racine du process), et retirer le `console.trace(process.env)` bruyant.
+- 2025-08-16 — Refactor test MIDI
+  - Décision: déplacer la logique générique du script `src/test-midi-send.ts` vers des utilitaires réutilisables et testables.
+  - Implémentation: nouveaux fichiers `src/test-utils/openRawSender.ts`, `src/test-utils/runners.ts`, `src/test-utils/runMidiTest.ts`. Le script `src/test-midi-send.ts` est réduit et s’appuie sur `xtouch/api`.

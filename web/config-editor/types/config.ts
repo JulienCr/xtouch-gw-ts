@@ -50,14 +50,12 @@ export interface AppConfig {
     input_port: string;
     output_port: string;
   };
-  features?: { vm_sync?: boolean };
   paging?: { channel?: number; prev_note?: number; next_note?: number };
   pages: PageConfig[];
 }
 
 export const defaultConfig = (): AppConfig => ({
   midi: { input_port: "UM-One", output_port: "UM-One" },
-  features: { vm_sync: false },
   paging: { channel: 1, prev_note: 46, next_note: 47 },
   pages: [
     { name: "Default", controls: {}, lcd: { labels: [] }, passthroughs: [] },

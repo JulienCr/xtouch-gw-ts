@@ -53,6 +53,7 @@
 - [x] Suppression: Voicemeeter Sync app‑based (obsolète) — code et références retirés
  - [x] Router cleanup & modularisation: suppression listes exhaustives d’apps dans `router`, latence et ombres par app dynamiques, extraction logique pages/transformations dans `src/router/page.ts`, typage latence générique par clé string, suppression du champ inutilisé `refreshTempoMs`, mise à jour de `attachXTouch()` et appels associés.
  - [x] M1 — Extraction `src/router/emit.ts` et `src/router/antiEcho.ts`, délégation depuis `src/router.ts`, build/tsc OK — 2025‑08‑15
+ - [x] Test MIDI — externalisation de la pipeline `test-midi-send` vers utilitaires réutilisables: `src/test-utils/{openRawSender,runners,runMidiTest}.ts`. Le script `src/test-midi-send.ts` est réduit (< 100 lignes) et s’appuie sur `xtouch/api`. — 2025‑08‑16
 
 ## Fait
 - [x] BUG: Latence/loop perceptible (≈1 s) sur feedback boutons et « recalage » des faders — métriques, anti‑echo par type, LWW, setpoints moteurs, échos locaux — 2025‑08‑15
@@ -73,3 +74,4 @@
 - ~~ [ ] Bridge: reverse transform automatique du feedback (CC/Note → Pitch Bend)~~ — abandonné, remplacé par anti‑echo et setpoint moteurs via `midiBridge` + `Router`
  - [x] Fix: chargement `LOG_LEVEL` via `.env` — import `dotenv/config` avant `logger`, suppression du chemin incorrect `../.env`, logs nettoyés — 2025‑08‑16
  - [x] Fix: arrêt en dev (`pnpm dev`) — commandes CLI `exit|quit` appellent l’arrêt propre (`cleanup()`), Ctrl+C géré via signaux; aligné sur `pnpm start` — 2025‑08‑16
+ - [x] Nettoyage: suppression complète du flag de config `features.vm_sync` (schéma TS, UI editor, YAML, tests, README) — 2025‑08‑16

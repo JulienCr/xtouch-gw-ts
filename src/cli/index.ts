@@ -3,6 +3,7 @@ import { logger } from "../logger";
 import type { Router } from "../router";
 import type { XTouchDriver } from "../xtouch/driver";
 import { MidiInputSniffer, listInputPorts } from "../midi/sniffer";
+import { testMidiSend } from "../test-midi-send";
 import { formatDecoded } from "../midi/decoder";
 
 export interface CliContext {
@@ -61,7 +62,7 @@ export function attachCli(ctx: CliContext): () => void {
   };
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'lcd <strip0-7> <upper> [lower]', 'latency:report', 'latency:reset', 'help', 'exit|quit'");
+  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'lcd <strip0-7> <upper> [lower]', 'latency:report', 'latency:reset', 'test-midi [all|custom|buttons|faders]', 'help', 'exit|quit'");
   rl.setPrompt("app> ");
   rl.prompt();
 
@@ -208,6 +209,17 @@ export function attachCli(ctx: CliContext): () => void {
         case "latency:reset": {
           if (typeof (ctx.router as any).resetLatency === "function") (ctx.router as any).resetLatency();
           logger.info("Latence: compteurs réinitialisés.");
+          break;
+        }
+        case "test-midi": {
+          const which = (rest[0] || "all").toLowerCase();
+          process.env.MIDI_TEST_MODE = which; // lu par test-midi-send
+          logger.info(`Test MIDI → ${which}`);
+          try {
+            await testMidiSend();
+          } catch (e) {
+            logger.error("Erreur test-midi:", e as any);
+          }
           break;
         }
         case "exit":

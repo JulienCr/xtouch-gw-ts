@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for src/xtouch/fkeys.ts</title>
+    <title>Code coverage report for src/xtouch/seg7.ts</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../../prettify.css" />
     <link rel="stylesheet" href="../../base.css" />
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../../index.html">All files</a> / <a href="index.html">src/xtouch</a> fkeys.ts</h1>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">src/xtouch</a> seg7.ts</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/15</span>
+                <span class='fraction'>0/20</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/1</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/15</span>
+                <span class='fraction'>0/20</span>
             </div>
         
             
@@ -88,13 +88,12 @@
 <a name='L23'></a><a href='#L23'>23</a>
 <a name='L24'></a><a href='#L24'>24</a>
 <a name='L25'></a><a href='#L25'>25</a>
-<a name='L26'></a><a href='#L26'>26</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -103,38 +102,45 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import type { Router } from "../router";<span class="fstat-no" title="function not covered" ><span class="branch-0 cbranch-no" title="branch not covered" ></span></span></span>
-import type { XTouchDriver } from "./driver";
-import { F_KEY_NOTES } from "./constants";
-&nbsp;
-/**
- * Allume/éteint les LEDs F1..F8 selon l'index actif.
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">/**
+ * Encode un caractère vers son masque 7-segments (bit0=a … bit6=g).
+ * Les lettres sont mappées en majuscules lorsque pertinent.
  */
-<span class="cstat-no" title="statement not covered" >export function updateFunctionKeyLeds(x: XTouchDriver, channel1to16: number, notes: number[], activeIndex: number): void {</span>
-<span class="cstat-no" title="statement not covered" >	const ch = Math.max(1, Math.min(16, channel1to16)) | 0;</span>
-<span class="cstat-no" title="statement not covered" >	for (let i = 0; i &lt; notes.length; i += 1) {</span>
-<span class="cstat-no" title="statement not covered" >		const note = notes[i] | 0;</span>
-<span class="cstat-no" title="statement not covered" >		const on = i === activeIndex ? 1 : 0;</span>
-<span class="cstat-no" title="statement not covered" >		const status = 0x90 + (ch - 1);</span>
-<span class="cstat-no" title="statement not covered" >		x.sendRawMessage([status, Math.max(0, Math.min(127, note)), on ? 0x7F : 0x00]);</span>
-<span class="cstat-no" title="statement not covered" >	}</span>
+<span class="cstat-no" title="statement not covered" >export function sevenSegForChar(ch: string): number {</span>
+<span class="cstat-no" title="statement not covered" >  const c = (ch || " ").toUpperCase();</span>
+<span class="cstat-no" title="statement not covered" >  switch (c) {</span>
+<span class="cstat-no" title="statement not covered" >    case "0": return 0x3F; case "1": return 0x06; case "2": return 0x5B; case "3": return 0x4F;</span>
+<span class="cstat-no" title="statement not covered" >    case "4": return 0x66; case "5": return 0x6D; case "6": return 0x7D; case "7": return 0x07;</span>
+<span class="cstat-no" title="statement not covered" >    case "8": return 0x7F; case "9": return 0x6F; case "A": return 0x77; case "B": return 0x7C;</span>
+<span class="cstat-no" title="statement not covered" >    case "C": return 0x39; case "D": return 0x5E; case "E": return 0x79; case "F": return 0x71;</span>
+<span class="cstat-no" title="statement not covered" >    case "G": return 0x3D; case "H": return 0x76; case "I": return 0x06; case "J": return 0x1E;</span>
+<span class="cstat-no" title="statement not covered" >    case "L": return 0x38; case "N": return 0x37; case "O": return 0x3F; case "P": return 0x73;</span>
+<span class="cstat-no" title="statement not covered" >    case "S": return 0x6D; case "T": return 0x78; case "U": return 0x3E; case "Y": return 0x6E;</span>
+<span class="cstat-no" title="statement not covered" >    case "-": return 0x40; case "_": return 0x08; case " ": default: return 0x00;</span>
+<span class="cstat-no" title="statement not covered" >  }</span>
 <span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
-/** Met à jour les LEDs F1..F8 pour refléter la page active. */
-<span class="cstat-no" title="statement not covered" >export function updateFKeyLedsForActivePage(router: Router, x: XTouchDriver, pagingChannel: number): void {</span>
-<span class="cstat-no" title="statement not covered" >	const pages = router.listPages();</span>
-<span class="cstat-no" title="statement not covered" >	const activeIdx = Math.max(0, pages.findIndex((n) =&gt; n === router.getActivePageName()));</span>
-<span class="cstat-no" title="statement not covered" >	updateFunctionKeyLeds(x, pagingChannel, F_KEY_NOTES, Math.min(activeIdx, F_KEY_NOTES.length - 1));</span>
+<span class="cstat-no" title="statement not covered" >export function centerToLength(s: string, targetLen: number): string {</span>
+<span class="cstat-no" title="statement not covered" >  const str = s ?? "";</span>
+<span class="cstat-no" title="statement not covered" >  if (str.length &gt;= targetLen) return str.slice(0, targetLen);</span>
+<span class="cstat-no" title="statement not covered" >  const totalPad = targetLen - str.length;</span>
+<span class="cstat-no" title="statement not covered" >  const left = Math.floor(totalPad / 2);</span>
+<span class="cstat-no" title="statement not covered" >  return " ".repeat(left) + str + " ".repeat(totalPad - left);</span>
 <span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
 &nbsp;
@@ -145,7 +151,7 @@ import { F_KEY_NOTES } from "./constants";
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-16T00:35:00.153Z
+                at 2025-08-16T16:24:10.852Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

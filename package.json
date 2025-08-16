@@ -23,9 +23,13 @@
     "format:write": "prettier --write .",
     "clean": "rimraf dist",
     "sniff:web": "tsx src/sniffer-server.ts",
+    "test:midi": "tsx src/test-midi-send.ts",
     "docs": "typedoc",
     "docs:clean": "rimraf docs/api",
-    "docs:open": "pwsh -NoProfile -Command \"Start-Process docs/api/README.md\""
+    "docs:open": "pwsh -NoProfile -Command \"Start-Process docs/api/README.md\"",
+    "web": "node scripts/check-next-build.mjs && pnpm -C web/config-editor start",
+    "web:build": "pnpm -C web/config-editor build",
+    "web:dev": "pnpm -C web/config-editor dev"
   },
   "dependencies": {
     "@julusian/midi": "^3.6.1",
