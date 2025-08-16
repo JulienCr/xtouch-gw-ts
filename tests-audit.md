@@ -218,3 +218,6 @@ Prochaines étapes
 2025-08-16 — Refactor test MIDI
 - Extraction de la pipeline `src/test-midi-send.ts` vers `src/test-utils/{openRawSender,runners,runMidiTest}.ts`. Le script devient un fin wrapper et facilite la réutilisation côté E2E/HIL.
 
+2025-08-16 — Hydration snapshot au démarrage
+- Ajout: `src/state/_tests/hydrate.test.ts` vérifie le chargement depuis `.state/snapshot.json` et le marquage `stale`.
+

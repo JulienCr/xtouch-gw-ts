@@ -100,6 +100,32 @@ export class StateStore {
     }
     return best;
   }
+
+  /**
+   * Hydrate le state à partir d'un snapshot persistant, sans notifier les abonnés.
+   * Les entrées sont marquées `stale: true` pour indiquer qu'elles peuvent être obsolètes.
+   * Les champs `known` et `origin` sont normalisés.
+   *
+   * @param app - Clé d'application à hydrater
+   * @param entries - Liste d'entrées issues du snapshot
+   */
+  hydrateFromSnapshot(app: AppKey, entries: MidiStateEntry[]): void {
+    const appState = this.appStates.get(app);
+    if (!appState) return;
+    for (const e of entries) {
+      const normalized: MidiStateEntry = {
+        addr: e.addr,
+        value: e.value,
+        ts: e.ts ?? Date.now(),
+        origin: "app",
+        known: true,
+        stale: true,
+        hash: e.hash,
+      };
+      const k = addrKey(normalized.addr);
+      appState.set(k, normalized);
+    }
+  }
 }
 
 

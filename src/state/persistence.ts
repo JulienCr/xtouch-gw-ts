@@ -16,6 +16,21 @@ export async function setupStatePersistence(router: Router): Promise<Persistence
 	const snapshotPath = path.join(stateDir, "snapshot.json");
 	try { await fs.mkdir(stateDir, { recursive: true }); } catch {}
 	const stateRef = (router as any).state as import("../state").StateStore | undefined;
+
+	// Hydrate initial state from snapshot if present (mark entries as stale)
+	try {
+		const raw = await fs.readFile(snapshotPath, { encoding: "utf8" });
+		const snap = JSON.parse(raw) as { ts?: number; apps?: Record<string, any[]> };
+		const apps = ["voicemeeter","qlc","obs","midi-bridge"] as const;
+		if (snap && snap.apps && stateRef && typeof (stateRef as any).hydrateFromSnapshot === "function") {
+			for (const app of apps) {
+				const entries = Array.isArray((snap.apps as any)[app]) ? (snap.apps as any)[app] : [];
+				if (entries.length > 0) {
+					(stateRef as any).hydrateFromSnapshot(app, entries);
+				}
+			}
+		}
+	} catch {}
 	const persistQueue: string[] = [];
 	let writing = false;
 	async function flushJournal() {
