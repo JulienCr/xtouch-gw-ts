@@ -17,3 +17,8 @@ Thumbs.db
  
 # Generated docs
 docs/api/coverage/
+
+# Generated artifacts
+coverage/
+docs/api/
+pr_body.txt
