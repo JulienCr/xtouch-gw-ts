@@ -8,6 +8,9 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
 - Tenir `TASKS.md` à jour après chaque lot de travail.
 
 ## Entrées
+ - 2025-08-16 — Infra tests
+   - Décision: utiliser Vitest avec couverture v8 et convention `_tests` (tests co-localisés dans des sous-dossiers `_tests` à côté du code, ex: `src/midi/_tests/utils.test.ts`).
+   - Scripts: `pnpm test`, `pnpm test:watch`, `pnpm lint`, `pnpm format`.
 - 2025-08-08 — Init
   - Décision: TypeScript + tsx (dev) + tsc (build).
   - Décision: `chalk@4` pour compat CJS simple; évite ESM-only de chalk@5 au démarrage.

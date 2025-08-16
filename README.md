@@ -57,6 +57,8 @@ pnpm install
 pnpm dev         # lancement en développement (tsx watch)
 pnpm build       # transpile TypeScript → dist/
 pnpm start       # exécute dist/index.js
+pnpm test        # tests unitaires (Vitest) + couverture
+pnpm test:watch  # tests en mode watch
 ```
 
 Pour activer des logs détaillés (PowerShell):
