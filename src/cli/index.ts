@@ -9,7 +9,7 @@ import { formatDecoded } from "../midi/decoder";
 export interface CliContext {
   router: Router;
   xtouch: XTouchDriver | null;
-  onExit?: () => void;
+  onExit?: () => Promise<void> | void;
 }
 
 export function attachCli(ctx: CliContext): () => void {
@@ -224,7 +224,7 @@ export function attachCli(ctx: CliContext): () => void {
         }
         case "exit":
         case "quit":
-          try { ctx.onExit?.(); } catch {}
+          try { await ctx.onExit?.(); } catch {}
           if (!ctx.onExit) {
             try { rl.close(); } catch {}
             try { process.exit(0); } catch {}
@@ -248,7 +248,7 @@ export function attachCli(ctx: CliContext): () => void {
 
   rl.on("close", () => {
     try { midiSniffer?.close(); } catch {}
-    try { ctx.onExit?.(); } catch {}
+    try { const p = ctx.onExit?.(); if (p && typeof (p as any).then === "function") { (p as Promise<void>).catch(() => {}); } } catch {}
   });
 
   return () => {

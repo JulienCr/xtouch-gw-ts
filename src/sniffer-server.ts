@@ -58,7 +58,10 @@ export function startSnifferServer(): http.Server {
 const isMain = (() => {
   const entry = process.argv[1];
   if (!entry) return false;
-  try { return pathToFileURL(entry).href === import.meta.url; } catch { return false; }
+  try { 
+    // Alternative à import.meta.url pour la compatibilité
+    return entry.endsWith("sniffer-server.ts") || entry.endsWith("sniffer-server.js");
+  } catch { return false; }
 })();
 
 if (isMain) {

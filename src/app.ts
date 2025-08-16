@@ -22,7 +22,7 @@ import * as xtapi from "./xtouch/api";
  *
  * @returns Fonction de nettoyage (arrêt propre des composants)
  */
-export async function startApp(): Promise<() => void> {
+export async function startApp(): Promise<() => Promise<void>> {
   const envLevel = (process.env.LOG_LEVEL as any) || "info";
   setLogLevel(envLevel);
 
@@ -145,10 +145,22 @@ export async function startApp(): Promise<() => void> {
   // CLI & arrêt propre
   let detachCli: () => void = () => {};
   let isCleaningUp = false;
-  const cleanup = () => {
+  const cleanup = async (): Promise<void> => {
     if (isCleaningUp) return;
     isCleaningUp = true;
     logger.info("Arrêt XTouch GW");
+    
+    // Reset complet de la surface X-Touch avant de quitter
+    try {
+      if (xtouch) {
+        logger.info("Reset complet de la surface X-Touch...");
+        await xtapi.resetAll(xtouch, { clearLcds: true });
+        logger.info("Surface X-Touch réinitialisée.");
+      }
+    } catch (e) {
+      logger.warn("Erreur lors du reset X-Touch:", (e as any)?.message ?? e);
+    }
+    
     try { persistence.stopSnapshot(); } catch {}
     try { persistence.unsubState(); } catch {}
     try { stopWatch(); } catch {}
@@ -165,17 +177,17 @@ export async function startApp(): Promise<() => void> {
 
   const onSig = () => {
     try { detachCli(); } catch {}
-    cleanup();
+    cleanup().catch(() => {});
   };
   process.on("SIGINT", onSig);
   process.on("SIGTERM", onSig);
   process.on("uncaughtException", (err) => {
     logger.error("Uncaught exception:", err as any);
-    cleanup();
+    cleanup().catch(() => {});
   });
   process.on("unhandledRejection", (reason) => {
     logger.error("Unhandled rejection:", reason as any);
-    cleanup();
+    cleanup().catch(() => {});
   });
 
   return cleanup;
