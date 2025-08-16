@@ -8,6 +8,8 @@ import { applyLcdForActivePage } from "../ui/lcd";
 import { updateFKeyLedsForActivePage } from "../xtouch/fkeys";
 import { BackgroundListenerManager } from "../midi/backgroundListeners";
 import { attachNavigation } from "./navigation";
+import * as xtapi from "../xtouch/api";
+import { logger } from "../logger";
 
 /**
  * Initialise et enregistre les drivers applicatifs standards.
@@ -50,7 +52,7 @@ export interface StartXTouchOptions {
  * Démarre le driver X‑Touch, attache le Router, applique LCD/LEDs et connecte la navigation.
  * Retourne le driver et une fonction pour détacher la navigation.
  */
-export function startXTouchAndNavigation(router: Router, options: StartXTouchOptions): { xtouch: XTouchDriver; unsubscribeNavigation: () => void; paging: Required<PagingConfig> } {
+export async function startXTouchAndNavigation(router: Router, options: StartXTouchOptions): Promise<{ xtouch: XTouchDriver; unsubscribeNavigation: () => void; paging: Required<PagingConfig> }> {
   const { config, onAfterPageChange } = options;
 
   const xtouch = new XTouchDriver({
@@ -58,6 +60,14 @@ export function startXTouchAndNavigation(router: Router, options: StartXTouchOpt
     outputName: config.midi.output_port,
   }, { echoPitchBend: false, echoButtonsAndEncoders: false });
   xtouch.start();
+
+  // Reset complet juste après connexion, avant toute application de LCD/LEDs
+  try {
+    await xtapi.resetAll(xtouch, { clearLcds: true });
+    logger.info("X‑Touch réinitialisé au démarrage.");
+  } catch (e) {
+    logger.warn("Reset X‑Touch au démarrage: ignoré (", (e as any)?.message ?? e, ")");
+  }
 
   router.attachXTouch(xtouch);
   applyLcdForActivePage(router, xtouch);

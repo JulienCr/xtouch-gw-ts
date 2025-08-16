@@ -87,7 +87,7 @@ export async function startApp(): Promise<() => void> {
 
   const rebuildBackgroundListeners = (activePage: PageConfig | undefined) => rebuild(activePage, cfg.pages);
   try {
-    const { xtouch: x, unsubscribeNavigation, paging } = startXTouchAndNavigation(router, {
+    const { xtouch: x, unsubscribeNavigation, paging } = await startXTouchAndNavigation(router, {
       config: cfg,
       onAfterPageChange: (x, page, paging) => {
         try { updateFKeyLedsForActivePage(router, x, paging.channel); } catch {}
@@ -111,19 +111,7 @@ export async function startApp(): Promise<() => void> {
     });
     xtouch = x;
 
-    // Reset complet de la surface au démarrage (LED OFF, faders 0, LCD/7-seg clear)
-    try {
-      await xtapi.resetAll(x, { clearLcds: true });
-      logger.info("X‑Touch réinitialisé au démarrage.");
-    } catch (e) {
-      logger.warn("Reset X‑Touch au démarrage: ignoré (", (e as any)?.message ?? e, ")");
-    }
-
-    // Ré-appliquer LCD/LEDs après reset (le reset efface les LCD)
-    try {
-      applyLcdForActivePage(router, x);
-      try { updateFKeyLedsForActivePage(router, x, paging.channel); } catch {}
-    } catch {}
+    // Reset déplacé dans startXTouchAndNavigation pour s'exécuter plus tôt
 
     // Si aucune page ne définit de passthrough, activer le bridge global vers Voicemeeter
     const hasPagePassthrough = (cfg.pages ?? []).some(
