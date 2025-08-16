@@ -46,15 +46,19 @@ Carte du dépôt (Repository Map)
 
 État actuel des tests (2025-08-16)
 - Vitest configuré avec couverture v8, convention `_tests` active
-- Suites présentes: 24 fichiers, 48 tests passés (100%)
-  - midi: utils (incl. fast-check), transform, filter, decoder
+- Suites présentes: 28 fichiers, 57 tests passés (100%)
+  - midi: utils (incl. fast-check), transform, filter, decoder, ports, sniffer
   - state: store, builders, persistence
-  - router: antiEcho, emit, forward, page, planner, latency, shadows
+  - router: antiEcho, emit, forward, page, planner, latency, shadows, router (orchestration)
   - shared: addrKey, appKey
   - config: load/findConfig, watchConfig
   - drivers: midiBridge, voicemeeter (fakes)
-- Couverture globale: ~49% lignes
-  - router ≈ 93%, drivers/midiBridge ≈ 71%, drivers/voicemeeter ≈ 75%, state/persistence ≈ 100%, midi/decoder ≈ 76%, logger ≈ 90%
+- Couverture globale: ~59.7% lignes
+  - router.ts ≈ 74.9%, router/* ≈ 95.5%
+  - drivers/midiBridge ≈ 71.2%, drivers/voicemeeter ≈ 75.4%
+  - state/persistence ≈ 100%
+  - midi/sniffer ≈ 100%, midi/ports ≈ 100%, midi/decoder ≈ 76.1%
+  - logger ≈ 96.1%
 
 Barre de qualité cible
 - Couverture
@@ -126,14 +130,9 @@ Lot 1 (P0): Unit tests cœur
 Lot 2 (P1): Intégration
 - Cibles
   - src/drivers/midiBridge.ts ✅
-    - Simuler XTouchDriver (fake) et ports MIDI cibles (double objet Output/Input) → vérifier filtrage, transform, setpoints PB (debounce), markAppShadowForOutgoing() invoqué
-    - Flux feedback IN (on("message")) → appel router.onMidiFromApp
   - src/drivers/voicemeeter.ts ✅
-    - Bridge brut avec fakes (Input/Output), forward X‑Touch → VM, callback feedback appelé
   - src/state/persistence.ts ✅
-    - Journal append-only + snapshot périodique vers répertoire tmp
   - src/app/bootstrap.ts (si présent) / startApp wiring
-    - Démarrage partiel avec stubs (sans ouvrir ports réels) pour vérifier wiring et callbacks (LCD/Fkeys) via spies
 - Exit
   - Scénarios heureux + erreurs; pas de fuite de ressources (timers nettoyés)
 
@@ -211,9 +210,8 @@ Prochaines étapes
 
 ## Journal d’avancement (MàJ continue)
 
-2025-08-16 — Lot 0 terminé + Lot 1 (P0) en bonne voie
-- Infra: Vitest + couverture v8, ESLint/Prettier, convention `_tests`.
-- Suites: 24 fichiers, 48 tests verts (100%).
-- Modules couverts: midi/utils (incl. fast-check), midi/transform, midi/filter, midi/decoder, state/store, state/builders, state/persistence, router/antiEcho, router/emit, router/forward, router/page, router/planner, router/latency, router/shadows, shared/addrKey, shared/appKey, config/load+watch, drivers/midiBridge, drivers/voicemeeter.
-- Couverture globale: ~49% lignes. Objectif suivant: ≥ 60% en ajoutant `midi/backgroundListeners`, `router.ts` (orchestration via stubs), `sniffer.ts`, `ports.ts`.
+2025-08-16 — Progression Lot 2 + Orchestration Router
+- Suites: 28 fichiers, 57 tests verts. Couverture globale ~59.7%.
+- Nouveaux: midi/ports, midi/sniffer, router (orchestration), router-more (handleControl/updateConfig), drivers (voicemeeter), state/persistence (timers asynchrones).
+- Router central rehaussé à ~74.9% lignes; objectif: ≥ 85% via cas supplémentaires (replay forward dans onMidiFromApp, branches warnings).
 
