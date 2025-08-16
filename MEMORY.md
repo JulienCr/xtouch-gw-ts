@@ -63,3 +63,7 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
    - Nettoyage: suppression des reverse transforms dans `src/midi/transform.ts`; ces miroirs sont gérés par `router/page.ts` (mapping CC→PB lors du refresh/replay).
    - Robustesse: remplacement des littéraux `?? 60` par `getAntiLoopMs(status)` dans `router` pour cohérence des fenêtres anti-echo.
    - Archivage: déplacement de `config copy.yaml` vers `docs/ARCHIVES/` pour éviter les doubles sources de config.
+ - 2025-08-16 — Env non chargé assez tôt
+   - Symptôme: `LOG_LEVEL` depuis `.env` ignoré; le logger lisait la valeur par défaut `info`.
+   - Cause: `dotenv.config()` appelé après import du `logger`, avec un chemin relatif erroné (`../.env`).
+   - Fix: utiliser `import "dotenv/config"` au tout début de `src/index.ts` (avant tout import), laisser le chemin par défaut (racine du process), et retirer le `console.trace(process.env)` bruyant.

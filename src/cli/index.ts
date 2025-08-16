@@ -8,6 +8,7 @@ import { formatDecoded } from "../midi/decoder";
 export interface CliContext {
   router: Router;
   xtouch: XTouchDriver | null;
+  onExit?: () => void;
 }
 
 export function attachCli(ctx: CliContext): () => void {
@@ -60,7 +61,7 @@ export function attachCli(ctx: CliContext): () => void {
   };
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'lcd <strip0-7> <upper> [lower]', 'latency:report', 'latency:reset', 'help', 'exit'");
+  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'lcd <strip0-7> <upper> [lower]', 'latency:report', 'latency:reset', 'help', 'exit|quit'");
   rl.setPrompt("app> ");
   rl.prompt();
 
@@ -186,7 +187,7 @@ export function attachCli(ctx: CliContext): () => void {
           break;
         }
         case "help":
-          logger.info("help: page <idx|name> | pages | emit <controlId> [value] | midi-ports | midi-open <idx|name> | midi-close | learn <id> | fader <ch> <0..16383> | latency:report | latency:reset | exit");
+          logger.info("help: page <idx|name> | pages | emit <controlId> [value] | midi-ports | midi-open <idx|name> | midi-close | learn <id> | fader <ch> <0..16383> | latency:report | latency:reset | exit|quit");
           break;
         case "latency:report": {
           const rpt = (ctx.router as any).getLatencyReport?.();
@@ -210,7 +211,12 @@ export function attachCli(ctx: CliContext): () => void {
           break;
         }
         case "exit":
-          rl.close();
+        case "quit":
+          try { ctx.onExit?.(); } catch {}
+          if (!ctx.onExit) {
+            try { rl.close(); } catch {}
+            try { process.exit(0); } catch {}
+          }
           break;
         default:
           if (cmd.length > 0) logger.warn("Commande inconnue. Tapez 'help'.");
@@ -229,7 +235,8 @@ export function attachCli(ctx: CliContext): () => void {
   process.on("SIGTERM", onSig);
 
   rl.on("close", () => {
-    midiSniffer?.close();
+    try { midiSniffer?.close(); } catch {}
+    try { ctx.onExit?.(); } catch {}
   });
 
   return () => {

@@ -26,6 +26,7 @@ export async function startApp(): Promise<() => void> {
   setLogLevel(envLevel);
 
   logger.info("Démarrage XTouch GW…");
+  logger.info("LOG_LEVEL:", process.env.LOG_LEVEL);
   const configPath = await findConfigPath();
   if (!configPath) {
     throw new Error("config.yaml introuvable. Copiez config.example.yaml → config.yaml");
@@ -138,9 +139,8 @@ export async function startApp(): Promise<() => void> {
     logger.warn("X-Touch/Voicemeeter non connecté:", (err as any)?.message ?? err);
   }
 
-  // CLI de développement
-  const detachCli = attachCli({ router, xtouch });
-
+  // CLI & arrêt propre
+  let detachCli: () => void = () => {};
   let isCleaningUp = false;
   const cleanup = () => {
     if (isCleaningUp) return;
@@ -156,6 +156,9 @@ export async function startApp(): Promise<() => void> {
     try { bgManager.shutdown(); } catch {}
     process.exit(0);
   };
+
+  // CLI de développement (permet 'exit'/'quit' pour arrêter proprement)
+  detachCli = attachCli({ router, xtouch, onExit: cleanup });
 
   const onSig = () => {
     try { detachCli(); } catch {}

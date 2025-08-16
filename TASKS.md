@@ -71,3 +71,5 @@
 - [x] Ajout d’un squelette Node.js + TypeScript
 - [x] Initialisation du projet (structure, scripts pnpm, TypeScript) 
 - ~~ [ ] Bridge: reverse transform automatique du feedback (CC/Note → Pitch Bend)~~ — abandonné, remplacé par anti‑echo et setpoint moteurs via `midiBridge` + `Router`
+ - [x] Fix: chargement `LOG_LEVEL` via `.env` — import `dotenv/config` avant `logger`, suppression du chemin incorrect `../.env`, logs nettoyés — 2025‑08‑16
+ - [x] Fix: arrêt en dev (`pnpm dev`) — commandes CLI `exit|quit` appellent l’arrêt propre (`cleanup()`), Ctrl+C géré via signaux; aligné sur `pnpm start` — 2025‑08‑16
