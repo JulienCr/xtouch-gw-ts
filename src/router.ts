@@ -192,7 +192,7 @@ export class Router {
       const ch = entry.addr.channel ?? 0;
       const d1 = entry.addr.data1 ?? 0;
       const val = Array.isArray(entry.value) ? `${(entry.value as Uint8Array).length}b` : String(entry.value);
-      logger.debug(`State <- ${app}: ${human(raw)} [${hex(raw)}] → ${kind} ch=${ch} d1=${d1} val=${val}`);
+      logger.trace(`State <- ${app}: ${human(raw)} [${hex(raw)}] → ${kind} ch=${ch} d1=${d1} val=${val}`);
     } catch {}
 
     // Si la page active implique cette app, envisager un forward immédiat vers X‑Touch (replay live)

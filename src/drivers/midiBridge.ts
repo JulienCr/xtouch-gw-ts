@@ -9,9 +9,6 @@ import { applyTransform } from "../midi/transform";
 import { findPortIndexByNameFragment } from "../midi/ports";
 import { resolveAppKeyFromPort } from "../shared/appKey";
 
-// findPortIndexByNameFragment désormais importé depuis src/midi/ports.ts
-
-
 export class MidiBridgeDriver implements Driver {
   readonly name = "midi-bridge";
   private outToTarget: Output | null = null;
@@ -83,14 +80,14 @@ export class MidiBridgeDriver implements Driver {
             const status = data[0] ?? 0;
             const isPBMsg = isPB(status);
             if (isPBMsg && (this.xtouch as any).isPitchBendSquelched?.()) {
-              logger.debug(`Bridge DROP (PB squelched) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
+              logger.trace(`Bridge DROP (PB squelched) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
               return;
             }
             try { (global as any).__router__?.markUserActionFromRaw?.(data); } catch {}
             if (matchFilter(data, this.filter)) {
                const tx = applyTransform(data, this.transform);
               if (!tx) {
-                logger.debug(`Bridge DROP (transformed to null) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
+                logger.trace(`Bridge DROP (transformed to null) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
                 return;
               }
               logger.debug(`Bridge TX -> ${this.toPort}: ${human(tx)} [${hex(tx)}]`);
@@ -125,7 +122,7 @@ export class MidiBridgeDriver implements Driver {
               // Note: On ne met pas à jour le state avec les commandes sortantes
               // Le state ne doit être mis à jour QUE par les feedbacks entrants
             } else {
-              logger.debug(`Bridge DROP (filtered) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
+              logger.trace(`Bridge DROP (filtered) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
             }
           } catch (err) {
             logger.warn("Bridge send error:", err as any);
@@ -141,8 +138,6 @@ export class MidiBridgeDriver implements Driver {
   }
 
   async execute(action: string, params: unknown[], context?: ExecutionContext): Promise<void> {}
-
-  // Résolution appKey mutualisée dans src/shared/appKey.ts
 
   async shutdown(): Promise<void> {
     try { this.inFromTarget?.closePort(); } catch {}
