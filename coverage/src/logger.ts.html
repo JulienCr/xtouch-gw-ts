@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">86.53% </span>
+                <span class="strong">94.23% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>45/52</span>
+                <span class='fraction'>49/52</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">69.23% </span>
+                <span class="strong">86.66% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>9/13</span>
+                <span class='fraction'>13/15</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">77.77% </span>
+                <span class="strong">88.88% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>7/9</span>
+                <span class='fraction'>8/9</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">86.53% </span>
+                <span class="strong">94.23% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>45/52</span>
+                <span class='fraction'>49/52</span>
             </div>
         
             
@@ -145,27 +145,27 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -175,14 +175,14 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span></td><td class="text"><pre class="prettyprint lang-js">import chalk from "chalk";
 &nbsp;
 export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";
@@ -195,7 +195,7 @@ const levelRank: Record&lt;LogLevel, number&gt; = {
   trace: 4,
 };
 &nbsp;
-let currentLevel: LogLevel = (process.env.LOG_LEVEL as LogLevel) || "info";
+let currentLevel: LogLevel = (process.env.<span class="branch-0 cbranch-no" title="branch not covered" >LOG_LEVEL as LogLevel) || "info";</span>
 &nbsp;
 export function setLogLevel(level: LogLevel): void {
   currentLevel = level;
@@ -220,10 +220,10 @@ function format(level: LogLevel, message: unknown, ...args: unknown[]): string {
 <span class="cstat-no" title="statement not covered" >      return chalk.yellow(`${base} ${text}`);</span>
     case "info":
       return chalk.cyan(`${base} ${text}`);
-<span class="branch-0 cbranch-no" title="branch not covered" >    case "debug":</span>
-<span class="cstat-no" title="statement not covered" >      return chalk.gray(`${base} ${text}`);</span>
-<span class="branch-0 cbranch-no" title="branch not covered" >    case "trace":</span>
-<span class="cstat-no" title="statement not covered" >      return chalk.magenta(`${base} ${text}`);</span>
+    case "debug":
+      return chalk.gray(`${base} ${text}`);
+    case "trace":
+      return chalk.magenta(`${base} ${text}`);
   }
 }
 &nbsp;
@@ -238,11 +238,11 @@ export const logger = {
     if (shouldLog("info")) console.log(format("info", message, ...args));
   },
   debug: (message: unknown, ...args: unknown[]): void =&gt; {
-    if (shouldLog("debug")) <span class="branch-0 cbranch-no" title="branch not covered" >console.log(format("debug", message, ...args));</span>
+    if (shouldLog("debug")) console.log(format("debug", message, ...args));
   },
-  trace: <span class="fstat-no" title="function not covered" >(message: unknown, ...args: unknown[]): void =&gt; {</span>
-<span class="cstat-no" title="statement not covered" >    if (shouldLog("trace")) console.log(format("trace", message, ...args));</span>
-<span class="cstat-no" title="statement not covered" >  },</span>
+  trace: (message: unknown, ...args: unknown[]): void =&gt; {
+    if (shouldLog("trace")) console.log(format("trace", message, ...args));
+  },
 }; </pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->
@@ -250,7 +250,7 @@ export const logger = {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-16T00:23:54.790Z
+                at 2025-08-16T00:31:40.544Z
             </div>
         <script src="../prettify.js"></script>
         <script>

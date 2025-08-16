@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">62.5% </span>
+                <span class="strong">85.71% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>35/56</span>
+                <span class='fraction'>48/56</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">89.65% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>26/29</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
-                <span class="quiet">Branches</span>
-                <span class='fraction'>23/23</span>
-            </div>
-        
-            
-            <div class='fl pad1y space-right2'>
-                <span class="strong">90% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>9/10</span>
+                <span class='fraction'>10/10</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">62.5% </span>
+                <span class="strong">85.71% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>35/56</span>
+                <span class='fraction'>48/56</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -158,34 +158,34 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -208,8 +208,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">9x</span>
-<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
@@ -224,8 +224,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">106x</span>
-<span class="cline-any cline-yes">106x</span>
+<span class="cline-any cline-yes">107x</span>
+<span class="cline-any cline-yes">107x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -253,28 +253,28 @@ export function hex(bytes: number[]): string {
 /**
  * Retourne une description humaine (type, canal, contrôleur, etc.) d'une trame MIDI.
  */
-export <span class="fstat-no" title="function not covered" >function human(bytes: number[]): string {</span>
-<span class="cstat-no" title="statement not covered" >  try {</span>
-<span class="cstat-no" title="statement not covered" >    const evt = decodeMidi(bytes);</span>
-<span class="cstat-no" title="statement not covered" >    if (evt.type === "controlChange") {</span>
+export function human(bytes: number[]): string {
+  try {
+    const evt = decodeMidi(bytes);
+    if (evt.type === "controlChange") <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
 <span class="cstat-no" title="statement not covered" >      const ccHex = `0x${evt.controller.toString(16)}`;</span>
 <span class="cstat-no" title="statement not covered" >      const valHex = `0x${evt.value.toString(16)}`;</span>
 <span class="cstat-no" title="statement not covered" >      return `CC ch=${evt.channel} cc=${evt.controller} (${ccHex}) val=${evt.value} (${valHex})`;</span>
 <span class="cstat-no" title="statement not covered" >    }</span>
-<span class="cstat-no" title="statement not covered" >    if (evt.type === "noteOn" || evt.type === "noteOff") {</span>
-<span class="cstat-no" title="statement not covered" >      const nHex = `0x${evt.note.toString(16)}`;</span>
-<span class="cstat-no" title="statement not covered" >      const vHex = `0x${evt.velocity.toString(16)}`;</span>
-<span class="cstat-no" title="statement not covered" >      const t = evt.type === "noteOn" ? "NoteOn" : "NoteOff";</span>
-<span class="cstat-no" title="statement not covered" >      return `${t} ch=${evt.channel} note=${evt.note} (${nHex}) vel=${evt.velocity} (${vHex})`;</span>
-<span class="cstat-no" title="statement not covered" >    }</span>
-<span class="cstat-no" title="statement not covered" >    if (evt.type === "pitchBend") {</span>
-<span class="cstat-no" title="statement not covered" >      return `PitchBend ch=${evt.channel} val14=${evt.value14} norm=${evt.normalized.toFixed(3)}`;</span>
-<span class="cstat-no" title="statement not covered" >    }</span>
+    if (evt.type === "noteOn" || evt.type === "noteOff") {
+      const nHex = `0x${evt.note.toString(16)}`;
+      const vHex = `0x${evt.velocity.toString(16)}`;
+      const t = evt.type === "noteOn" ? <span class="branch-0 cbranch-no" title="branch not covered" >"NoteOn" : "NoteOff";</span>
+      return `${t} ch=${evt.channel} note=${evt.note} (${nHex}) vel=${evt.velocity} (${vHex})`;
+    }
+    if (evt.type === "pitchBend") {
+      return `PitchBend ch=${evt.channel} val14=${evt.value14} norm=${evt.normalized.toFixed(3)}`;
+<span class="branch-0 cbranch-no" title="branch not covered" >    }</span>
 <span class="cstat-no" title="statement not covered" >    return formatDecoded(evt);</span>
 <span class="cstat-no" title="statement not covered" >  } catch {</span>
 <span class="cstat-no" title="statement not covered" >    return "Unknown";</span>
 <span class="cstat-no" title="statement not covered" >  }</span>
-<span class="cstat-no" title="statement not covered" >}</span>
+}
 &nbsp;
 /**
  * Parse un nombre qui peut être décimal ou hex (ex: "0x45", "45h", "45").
@@ -337,7 +337,7 @@ export function rawFromPb14(channel: number, value14: number): [number, number, 
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-08-16T00:23:54.832Z
+                at 2025-08-16T00:31:40.579Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
