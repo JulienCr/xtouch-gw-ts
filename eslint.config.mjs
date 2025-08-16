@@ -2,7 +2,7 @@
 import tseslint from "@typescript-eslint/eslint-plugin";
 import tsparser from "@typescript-eslint/parser";
 
-/** @type {import("eslint").Linter.Config[]} */
+/** @type {import("@typescript-eslint/utils/ts-eslint").FlatConfig.ConfigArray} */
 export default [
   {
     files: ["**/*.ts"],
