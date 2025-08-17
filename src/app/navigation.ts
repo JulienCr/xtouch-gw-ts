@@ -31,30 +31,44 @@ export function attachNavigation(deps: NavigationDeps): () => void {
     const status = data[0] ?? 0;
     const type = (status & 0xf0) >> 4;
     const ch = (status & 0x0f) + 1;
-    if (type !== 0x9 || ch !== paging.channel) return;
 
-    const note = data[1] ?? 0;
-    const vel = data[2] ?? 0;
-    if (vel <= 0) return;
-
+    const d1 = data[1] ?? 0;
+    const d2 = data[2] ?? 0;
     const now = Date.now();
     if (now < cooldownUntil) return;
 
-    let changed = false;
-    // Prev / Next
-    if (note === paging.prev_note || note === paging.next_note) {
-      if (note === paging.prev_note) { router.prevPage(); changed = true; }
-      if (note === paging.next_note) { router.nextPage(); changed = true; }
-    } else {
-      // F1..F8 → pages[0..7]
-      const idx = [54,55,56,57,58,59,60,61].indexOf(note);
-      if (idx >= 0) { router.setActivePage(idx); changed = true; }
+    // Notes: navigation
+    if (type === 0x9 && ch === paging.channel) {
+      const note = d1;
+      const vel = d2;
+      if (vel <= 0) return;
+      let changed = false;
+      if (note === paging.prev_note || note === paging.next_note) {
+        if (note === paging.prev_note) { router.prevPage(); changed = true; }
+        if (note === paging.next_note) { router.nextPage(); changed = true; }
+      } else {
+        const idx = [54,55,56,57,58,59,60,61].indexOf(note);
+        if (idx >= 0) { router.setActivePage(idx); changed = true; }
+      }
+      if (!changed) return;
+      cooldownUntil = now + 250;
+      onAfterPageChange?.(router.getActivePage());
+      try { updatePrevNextLeds(xtouch, paging.channel, paging.prev_note, paging.next_note); } catch {}
+      return;
     }
 
-    if (!changed) return;
-    cooldownUntil = now + 250;
-    onAfterPageChange?.(router.getActivePage());
-    try { updatePrevNextLeds(xtouch, paging.channel, paging.prev_note, paging.next_note); } catch {}
+    // CC: propager vers drivers via Router.handleControl
+    if (type === 0xB) {
+      const cc = d1;
+      const value = d2;
+      // Map CC 16..23 → enc1..enc8
+      if (cc >= 16 && cc <= 23) {
+        const idx = cc - 16 + 1; // 1..8
+        const controlId = `enc${idx}`;
+        router.handleControl(controlId, value).catch(() => {});
+      }
+    }
+
   });
 
   return () => {

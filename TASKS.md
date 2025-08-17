@@ -53,6 +53,8 @@
     - [x] src/router/forward.ts
     - [x] src/config.ts (load/find)
 
+- [ ] Driver OBS (WIP): connexion obs-websocket v5, actions `nudgeX`/`nudgeY`/`scaleUniform`, cache `sceneItemId` et transforms, reconnexion/backoff. Mapping encoders `enc6..enc8` via CC 21–23. Docs: `docs/driver-obs.md`.
+
 ## Nouveau
 - [x] Infra de tests (Lot 0): Vitest + couverture v8, scripts pnpm (`test`, `test:watch`, `test:unit`, `test:integration`, `lint`, `format`), convention de placement des tests sous `_tests` (ex: `src/**/_tests/*.test.ts`) – 2025-08-16
 - [x] Stack docs JSDoc/TypeDoc: config `typedoc.json`, scripts pnpm (`docs`, `docs:clean`), sortie Markdown `docs/api` – 2025-08-15

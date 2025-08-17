@@ -221,3 +221,21 @@ Prochaines étapes
 2025-08-16 — Hydration snapshot au démarrage
 - Ajout: `src/state/_tests/hydrate.test.ts` vérifie le chargement depuis `.state/snapshot.json` et le marquage `stale`.
 
+2025-08-17 — Driver OBS (WIP)
+- Ajout dépendance `obs-websocket-js` et squelette `src/drivers/obs.ts` (connexion, résolution item, deltas X/Y/Scale, backoff reconnexion).
+- Routage CC 16..23 → `enc1..enc8` via `attachNavigation()` pour permettre mappings page (ex: enc6..enc8 = X/Y/Scale).
+- À tester prochainement: coalescing des ticks, cache `sceneItemId`, lecture/écriture `Get/SetSceneItemTransform` (fakes), reconnection logic (timers factices).
+
+2025-08-17 — OBS: premiers tests unitaires
+- Ajout: `src/drivers/obs/_tests/transforms.test.ts`
+  - Anchors (CENTER/LEFT-TOP/RIGHT-BOTTOM)
+  - Scale relatif sans bounds (position corrigée selon ancre)
+  - Bounds actifs: boundsWidth/Height + correction position centrée
+- Backlog tests OBS (à ajouter):
+  - `ObsDriver.resolveStepDelta`: 1 → +step, 65 → −step, 0/64 → 0
+  - `applyDelta` avec mock `obs-websocket-js`: écritures partielles (scale seul, bounds seul, X/Y seuls)
+  - Reconnexion/backoff: timers factices, reprise automatique, reset cache ID si erreur SetSceneItemTransform
+  - Cache `sceneItemId`: hit/miss, invalidation après erreur, re-resolve OK
+  - Lecture fraîche: si `readCurrent` ≠ cache, ne “recolle” pas à l’ancienne position
+  - Non-écriture `width/height`: vérifier qu’aucun champ interdit n’est envoyé
+
