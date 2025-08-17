@@ -36,6 +36,7 @@
     "chalk": "^4.1.2",
     "chokidar": "^3.6.0",
     "dotenv": "^17.2.1",
+    "obs-websocket-js": "^5.0.6",
     "voicemeeter-connector": "^2.1.5",
     "yaml": "^2.8.1"
   },

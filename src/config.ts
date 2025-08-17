@@ -131,6 +131,12 @@ export interface AppConfig {
     input_port: string;
     output_port: string;
   };
+  /** Paramètres de connexion à OBS WebSocket. */
+  obs?: {
+    host?: string;
+    port?: number;
+    password?: string;
+  };
   /** Configuration X‑Touch (mode, etc.) */
   xtouch?: XTouchConfig;
   /** Navigation entre pages */
