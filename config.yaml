@@ -18,8 +18,8 @@ paging:
 pages:
   - name: "Voicemeeter+QLC"
     controls:
-        enc6: { app: "obs", action: "nudgeX", params: ["--- CAM Main 2", "--- CAM Main", 3] }
-        enc7: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 3] }
+        enc6: { app: "obs", action: "nudgeX", params: ["--- CAM Main 2", "--- CAM Main", 1] }
+        enc7: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 1] }
         enc8: { app: "obs", action: "scaleUniform", params: ["--- CAM Main 2", "--- CAM Main", 0.02] }
     lcd:
       labels:
