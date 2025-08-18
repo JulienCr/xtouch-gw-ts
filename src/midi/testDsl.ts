@@ -6,7 +6,16 @@ export type Parsed = ParsedWait | ParsedRaw;
 
 const toInt = (v: string | undefined, fb: number): number => {
   if (v == null) return fb;
-  const n = Number.parseInt(v, 10);
+  // Support hexadécimal (0x76, 0x1n) et décimal (118)
+  let value = v.toLowerCase();
+  const isHex = value.startsWith('0x');
+  
+  // Supprimer le suffixe 'n' s'il existe (ex: 0x1n → 0x1)
+  if (value.endsWith('n')) {
+    value = value.slice(0, -1);
+  }
+  
+  const n = Number.parseInt(value, isHex ? 16 : 10);
   return Number.isFinite(n) && n >= 0 ? n : fb;
 };
 
@@ -31,6 +40,12 @@ export function parseCommand(line: string, opts: { defaultDelayMs: number; noteO
     const status = 0xb0 + (ch - 1);
     const bytes: [number, number, number] = [status, cc, val];
     return { kind: "Raw", bytes, label: `CC ch=${ch} cc=${cc} val=${val}` };
+  }
+  if (cmd === "pb" || cmd === "pitchbend") {
+    const val14 = Math.max(0, Math.min(16383, toInt(params.value ?? params.val ?? params.value14, 8192)));
+    const [status, lsb, msb] = rawFromPb14(ch, val14);
+    const bytes: [number, number, number] = [status, lsb, msb];
+    return { kind: "Raw", bytes, label: `PitchBend ch=${ch} val14=${val14}` };
   }
   const note = toInt(params.note, 0) & 0x7f;
   const isOff = cmd === "noteoff";

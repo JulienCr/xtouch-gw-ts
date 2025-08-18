@@ -126,6 +126,25 @@ export class StateStore {
       appState.set(k, normalized);
     }
   }
+
+  /**
+   * Supprime tous les états d'une application spécifique.
+   */
+  clearStatesForApp(app: AppKey): void {
+    const appState = this.appStates.get(app);
+    if (appState) {
+      appState.clear();
+    }
+  }
+
+  /**
+   * Supprime tous les états de toutes les applications.
+   */
+  clearAllStates(): void {
+    for (const appState of this.appStates.values()) {
+      appState.clear();
+    }
+  }
 }
 
 

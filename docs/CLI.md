@@ -23,7 +23,18 @@ $env:LOG_LEVEL="debug"; pnpm start
   - Active une page par index (0..n-1) ou par nom.
 
 - `emit <controlId> [value]`
-  - Simule l’émission d’un contrôle vers le Router (utile pour tester un mapping).
+  - Simule l'émission d'un contrôle vers le Router (utile pour tester un mapping).
+
+- `send <command>`
+  - Envoie un message MIDI brut vers la X-Touch.
+  - Utilise la syntaxe `parseCommand` avec paramètres nommés (support décimal, hex 0x, et hex avec suffixe n) :
+    - `send noteon ch=1 note=118 velocity=127` - Note On (décimal)
+    - `send noteon ch=1 note=0x76 velocity=0x7F` - Note On (hexadécimal)
+    - `send noteon ch=1 note=0x1n velocity=0x1n` - Note On (hex avec suffixe n)
+    - `send noteoff ch=1 note=0x76` - Note Off  
+    - `send cc ch=1 cc=0x10 value=0x40` - Control Change
+    - `send pb ch=1 value=8192` - Pitch Bend 14-bit
+    - `send raw 90 76 7F` - Message brut hexadécimal
 
 - `midi-ports`
   - Liste les entrées MIDI disponibles, avec index et nom.
@@ -48,6 +59,16 @@ $env:LOG_LEVEL="debug"; pnpm start
 
 - `xtouch-start`
   - Relance le driver X‑Touch en rouvrant les ports définis dans `config.yaml`.
+
+- `reset`
+  - Réinitialise complètement la surface X-Touch (éteint tous les boutons, remet les faders à 0, efface les LCD).
+
+- `state <load|rm>`
+  - `state load` - Recharge les états depuis le snapshot persistant (`.state/snapshot.json`), synchronise automatiquement la surface X-Touch et recharge la configuration (LCD, éléments statiques)
+  - `state rm` - Supprime tous les états en mémoire ET les fichiers de persistance (`.state/snapshot.json`), puis synchronise la surface X-Touch
+
+- `show <pages>`
+  - `show pages` - Affiche la liste des pages avec leur index (1,2,3...) et indique la page active
 
 - `help`
   - Rappelle les commandes.
