@@ -11,8 +11,9 @@ import { setupStatePersistence } from "./state/persistence";
 import { createBackgroundManager, initDrivers, startXTouchAndNavigation } from "./app/bootstrap";
 import { applyLcdForActivePage } from "./ui/lcd";
 import { updateFKeyLedsForActivePage } from "./xtouch/fkeys";
-import { attachAssignButtons, refreshAssignLeds } from "./xtouch/assignButtons";
 import * as xtapi from "./xtouch/api";
+import { attachInputMapper } from "./xtouch/inputMapper";
+import { attachIndicators, refreshIndicators } from "./xtouch/indicators";
 
 // Minimal Node globals typing to satisfy TS without @types/node
 declare const process: any;
@@ -65,17 +66,15 @@ export async function startApp(): Promise<() => Promise<void>> {
             const pagingCh = (cfg.paging?.channel ?? 1) | 0;
             updateFKeyLedsForActivePage(router, x, pagingCh);
           } catch {}
-          // Rebrancher l'association Assign→Scènes OBS si définie
-          try {
-            const obs = router.getDriver("obs") as any;
-            if (obs) {
-              try { detachAssign?.(); } catch {}
-              detachAssign = null;
-              if (cfg.assign_scenes) {
-                detachAssign = await (await import("./xtouch/assignButtons")).attachAssignButtons({ router, xtouch: x, obs, config: cfg });
-              }
-            }
-          } catch {}
+          // Rebrancher l'InputMapper générique (mode/canal peuvent changer)
+          try { detachInputMapper?.(); } catch {}
+          try { detachInputMapper = await attachInputMapper({ router, xtouch: x, mode: cfg.xtouch?.mode ?? "mcu", channel: cfg.paging?.channel ?? 1 }); } catch {}
+          // Rebrancher les indicateurs génériques
+          try { detachIndicators?.(); } catch {}
+          detachIndicators = null;
+          try { detachIndicators = await attachIndicators({ router, xtouch: x, config: cfg }); } catch {}
+          // Force drivers to re-emit indicator signals after (re)attach so LEDs sync immediately
+          try { await refreshIndicators({ router, xtouch: x, config: cfg }); } catch {}
         }
       } catch (e) {
         logger.debug("Hot reload LCD refresh skipped:", e as any);
@@ -102,7 +101,8 @@ export async function startApp(): Promise<() => Promise<void>> {
   
 
   const rebuildBackgroundListeners = (activePage: PageConfig | undefined) => rebuild(activePage, cfg.pages);
-  let detachAssign: (() => void) | null = null;
+  let detachInputMapper: (() => void) | null = null;
+  let detachIndicators: (() => void) | null = null;
   try {
     const { xtouch: x, unsubscribeNavigation, paging } = await startXTouchAndNavigation(router, {
       config: cfg,
@@ -124,22 +124,25 @@ export async function startApp(): Promise<() => Promise<void>> {
           pageBridges = [];
         }
         try { router.refreshPage(); } catch {}
-        // Refresh Assign LEDs (page-level mapping may change)
-        try {
-          const obs = router.getDriver("obs") as any;
-          if (obs) { refreshAssignLeds({ router, xtouch: x, obs, config: cfg }).catch(() => {}); }
-        } catch {}
+        // Refresh LEDs (génériques)
+        try { refreshIndicators({ router, xtouch: x, config: cfg }).catch(() => {}); } catch {}
       },
     });
     xtouch = x;
+    // Input layer générique: attacher l'InputMapper (CSV → controlId → router)
     try {
-      const obs = router.getDriver("obs") as any;
-      if (obs) {
-        detachAssign = await attachAssignButtons({ router, xtouch: x, obs, config: cfg });
-      }
+      detachInputMapper = await attachInputMapper({ router, xtouch: x, mode: cfg.xtouch?.mode ?? "mcu", channel: paging.channel });
     } catch (e) {
-      logger.warn("Assign buttons wiring failed:", e as any);
+      logger.warn("InputMapper attach failed:", (e as any)?.message ?? e);
     }
+    // Indicateurs génériques (LEDs par CSV)
+    try {
+      detachIndicators = await attachIndicators({ router, xtouch: x, config: cfg });
+    } catch (e) {
+      logger.warn("Indicators attach failed:", (e as any)?.message ?? e);
+    }
+    // Force an initial indicator sync so current scene/studio LEDs light at startup
+    try { await refreshIndicators({ router, xtouch: x, config: cfg }); } catch {}
 
     // Reset déplacé dans startXTouchAndNavigation pour s'exécuter plus tôt
 
@@ -199,6 +202,8 @@ export async function startApp(): Promise<() => Promise<void>> {
     
     try { xtouch?.stop(); } catch {}
     try { bgManager.shutdown(); } catch {}
+    try { detachIndicators?.(); } catch {}
+    try { detachInputMapper?.(); } catch {}
     process.exit(0);
   };
 

@@ -164,15 +164,6 @@ Objectif: associer les boutons `TRACK`, `SEND`, `PAN`, `PLUGIN`, `EQ`, `INSTRUME
 
 ### Configuration YAML
 
-```yaml
-assign_scenes:
-  track: "SCÈNE CAM"
-  send: "SCÈNE PRÉSENTATION"
-  pan: "SCÈNE JEUX"
-  plugin: "SCÈNE OVERLAY"
-  eq: "SCÈNE INVITÉ"
-  instrument: "SCÈNE INTERLUDE"
-```
 
 ### Ingestion mapping MIDI
 

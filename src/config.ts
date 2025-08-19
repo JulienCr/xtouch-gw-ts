@@ -113,15 +113,6 @@ export interface PageConfig {
   passthroughs?: PassthroughConfig[];
   /** Définition des contrôles (spécifique aux apps) */
   controls: Record<string, unknown>;
-  /** Mapping Assign → scènes OBS pour cette page (prioritaire sur la racine). */
-  assign_scenes?: {
-    track?: string;
-    send?: string;
-    pan?: string;
-    plugin?: string;
-    eq?: string;
-    instrument?: string;
-  };
   /** Configuration des LCD de la X‑Touch pour cette page. */
   lcd?: {
     /** Libellés des 8 LCD (haut seulement ou {upper,lower}) */
@@ -150,15 +141,6 @@ export interface AppConfig {
   xtouch?: XTouchConfig;
   /** Navigation entre pages */
   paging?: PagingConfig;
-  /** Association de scènes OBS aux boutons Assign (TRACK, SEND, PAN, PLUGIN, EQ, INSTRUMENT). */
-  assign_scenes?: {
-    track?: string;
-    send?: string;
-    pan?: string;
-    plugin?: string;
-    eq?: string;
-    instrument?: string;
-  };
   /** Liste des pages définies */
   pages: Array<PageConfig>;
 }

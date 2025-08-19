@@ -54,6 +54,9 @@
     - [x] src/config.ts (load/find)
 
 - [ ] Driver OBS (WIP): connexion obs-websocket v5, actions `nudgeX`/`nudgeY`/`scaleUniform`, cache `sceneItemId` et transforms, reconnexion/backoff. Mapping encoders `enc6..enc8` via CC 21–23. Docs: `docs/driver-obs.md`.
+  - [x] Input layer générique: attacher `inputMapper` (CSV → controlId → router.handleControl)
+  - [x] Navigation: pagination uniquement (suppression du mapping CC 16..23 → enc1..8)
+  - [x] AssignButtons: LEDs seulement (retrait du routage des appuis)
 
 - [x] Feature: Boutons Assign → Scènes OBS
   - [x] Ajout `assign_scenes` (racine et page-level) dans `config.yaml`
