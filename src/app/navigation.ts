@@ -57,17 +57,7 @@ export function attachNavigation(deps: NavigationDeps): () => void {
       return;
     }
 
-    // CC: propager vers drivers via Router.handleControl
-    if (type === 0xB) {
-      const cc = d1;
-      const value = d2;
-      // Map CC 16..23 → enc1..enc8
-      if (cc >= 16 && cc <= 23) {
-        const idx = cc - 16 + 1; // 1..8
-        const controlId = `enc${idx}`;
-        router.handleControl(controlId, value).catch(() => {});
-      }
-    }
+    
 
   });
 

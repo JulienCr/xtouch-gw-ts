@@ -41,18 +41,18 @@
     "yaml": "^2.8.1"
   },
   "devDependencies": {
-    "@types/node": "^20.11.20",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
-    "@vitest/coverage-v8": "^2.0.5",
-    "eslint": "^9.9.0",
-    "fast-check": "^3.19.0",
-    "prettier": "^3.3.3",
-    "rimraf": "^5.0.5",
-    "tsx": "^4.15.7",
+    "@types/node": "^20.19.11",
+    "@typescript-eslint/eslint-plugin": "^8.40.0",
+    "@typescript-eslint/parser": "^8.40.0",
+    "@vitest/coverage-v8": "^2.1.9",
+    "eslint": "^9.33.0",
+    "fast-check": "^3.23.2",
+    "prettier": "^3.6.2",
+    "rimraf": "^5.0.10",
+    "tsx": "^4.20.4",
     "typedoc": "^0.28.10",
     "typedoc-plugin-markdown": "^4.8.1",
-    "typescript": "^5.5.4",
-    "vitest": "^2.0.5"
+    "typescript": "^5.9.2",
+    "vitest": "^2.1.9"
   }
 }

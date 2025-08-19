@@ -1,4 +1,5 @@
 import { logger } from "../../logger";
+declare function setTimeout(handler: (...args: any[]) => void, timeout?: number, ...args: any[]): any;
 import type { Driver, ExecutionContext } from "../../types";
 import { OBSWebSocket, EventSubscription, type OBSRequestTypes, type OBSResponseTypes } from "obs-websocket-js";
 import { findConfigPath, loadConfig } from "../../config";
@@ -12,11 +13,81 @@ export class ObsDriver implements Driver {
 	private cacheKeyToItemId: Map<string, number> = new Map();
 	private backoffMs = 1000;
 	private encoderSpeed = new EncoderSpeedTracker();
+	private sceneChangedListeners: Array<(sceneName: string) => void> = [];
+	private studioModeChangedListeners: Array<(enabled: boolean) => void> = [];
+	private indicatorEmitters: Array<(signal: string, value: unknown) => void> = [];
+	private curStudioMode = false;
+	private curProgramScene = "";
+	private curPreviewScene = "";
+	private selectedEmitTimer: any | null = null;
+	private lastSelectedSent: string | null = null;
 
 	async init(): Promise<void> { await this.connectFromConfig(); }
+	subscribeIndicators(emit: (signal: string, value: unknown) => void): () => void {
+		this.indicatorEmitters.push(emit);
+		// Emit initial values best-effort
+		(async () => {
+			try { const v = await this.isStudioModeEnabled(); this.curStudioMode = !!v; emit("obs.studioMode", v); } catch {}
+			try { const v = await this.getCurrentProgramScene(); this.curProgramScene = v; emit("obs.currentProgramScene", v); } catch {}
+			try { const v = await this.getCurrentPreviewScene(); this.curPreviewScene = v; emit("obs.currentPreviewScene", v); } catch {}
+			try { this.lastSelectedSent = null; this.emitSelectedScene(); } catch {}
+		})().catch(() => {});
+		return () => {
+			const i = this.indicatorEmitters.indexOf(emit);
+			if (i >= 0) this.indicatorEmitters.splice(i, 1);
+		};
+	}
+
+	private emitSelectedScene(): void {
+		const selected = this.curStudioMode ? this.curPreviewScene : this.curProgramScene;
+		if (this.lastSelectedSent !== null && selected === this.lastSelectedSent) return;
+		this.lastSelectedSent = selected;
+		for (const emit of this.indicatorEmitters) { try { emit("obs.selectedScene", selected); } catch {} }
+	}
+
+	private scheduleSelectedEmit(): void {
+		try { if (this.selectedEmitTimer) clearTimeout(this.selectedEmitTimer as any); } catch {}
+		this.selectedEmitTimer = setTimeout(() => {
+			this.selectedEmitTimer = null;
+			this.emitSelectedScene();
+		}, 80);
+	}
 
 	async execute(action: string, params: unknown[], context?: ExecutionContext): Promise<void> {
 		switch (action) {
+			case "setScene":
+			case "changeScene": {
+				const [sceneName] = params as [string]; 
+				if (!this.obs) return;
+
+				try {
+					const { studioModeEnabled } = await this.obs.call("GetStudioModeEnabled");
+					if (studioModeEnabled) {
+						await this.obs.call("SetCurrentPreviewScene" as keyof OBSRequestTypes, { sceneName } as any);
+						logger.info(`OBS (Studio Mode): preview scène → '${sceneName}'`);
+					} else {
+						await this.obs.call("SetCurrentProgramScene" as keyof OBSRequestTypes, { sceneName } as any);
+						logger.info(`OBS: programme scène → '${sceneName}'`);
+					}
+				} catch (err) {
+					logger.warn("OBS: changement de scène échoué:", err as any);
+				}
+				return;
+			}
+			case "toggleStudioMode": {
+				if (!this.obs) return;
+				const { studioModeEnabled } = await this.obs.call("GetStudioModeEnabled");
+				const next = !studioModeEnabled;
+				await this.obs.call("SetStudioModeEnabled" as keyof OBSRequestTypes, { studioModeEnabled: next } as any);
+				logger.info(`OBS: studio mode → ${next ? "ON" : "OFF"}`);
+				// Laisser les événements OBS propager l'état; on met juste à jour l'état local pour coalescer correctement
+				this.curStudioMode = !!next;
+				// ask for current scene and set it to the preview scene
+				const currentScene = await this.getCurrentProgramScene()
+				this.curPreviewScene = currentScene;
+				this.scheduleSelectedEmit();
+				return;
+			}
 			case "resolveItem": {
 				const [sceneName, sourceName] = params as [string, string];
 				await this.resolveItemId(sceneName, sourceName);
@@ -44,11 +115,13 @@ export class ObsDriver implements Driver {
 				return;
 			}
 			default:
-				logger.warn(`ObsDriver: action inconnue '${action}'.`);
+				// Is that case, consider the action as is and try to execute it
+				try { await this.obs?.call(action as keyof OBSRequestTypes, params as any); } catch (err) { logger.warn(`ObsDriver: action '${action}' inconnue:`, err as any); }
+				return;
 		}
 	}
 
-	async shutdown(): Promise<void> { try { await this.obs?.disconnect(); } catch {} this.obs = null; }
+	async shutdown(): Promise<void> { try { await this.obs?.disconnect(); } catch { } this.obs = null; }
 
 	private async connectFromConfig(): Promise<void> {
 		try {
@@ -59,7 +132,43 @@ export class ObsDriver implements Driver {
 
 			const obs = new OBSWebSocket(); this.obs = obs;
 			obs.on("ConnectionClosed", (err) => { logger.warn("OBS: connexion fermée", err as any); this.scheduleReconnect(); });
-			obs.on("Identified", ({ negotiatedRpcVersion }) => { logger.info(`OBS connecté (RPC v${negotiatedRpcVersion}).`); });
+			obs.on("Identified", async ({ negotiatedRpcVersion }) => { logger.info(`OBS connecté (RPC v${negotiatedRpcVersion}).`); try { await this.refreshIndicatorSignals(); } catch {} });
+			obs.on("CurrentProgramSceneChanged", (e: any) => {
+				try {
+					const sceneName = (e as any)?.sceneName ?? (e as any)?.sceneNameOld ?? "";
+					for (const cb of this.sceneChangedListeners) {
+						try { cb(sceneName); } catch { }
+					}
+					this.curProgramScene = sceneName;
+					for (const emit of this.indicatorEmitters) { try { emit("obs.currentProgramScene", sceneName); } catch {} }
+					this.scheduleSelectedEmit();
+					logger.debug(`OBS event: CurrentProgramSceneChanged → '${sceneName}'`);
+				} catch { }
+			});
+
+			// Studio mode state changes
+			obs.on("StudioModeStateChanged" as any, (e: any) => {
+				try {
+					const enabled = !!((e as any)?.studioModeEnabled);
+					for (const cb of this.studioModeChangedListeners) {
+						try { cb(enabled); } catch {}
+					}
+					this.curStudioMode = enabled;
+					for (const emit of this.indicatorEmitters) { try { emit("obs.studioMode", enabled); } catch {} }
+					this.scheduleSelectedEmit();
+					logger.debug(`OBS event: StudioModeStateChanged → ${enabled ? "ON" : "OFF"}`);
+				} catch {}
+			});
+
+			obs.on("CurrentPreviewSceneChanged" as any, (e: any) => {
+				try {
+					const sceneName = (e as any)?.sceneName ?? (e as any)?.sceneNameOld ?? "";
+					this.curPreviewScene = sceneName;
+					for (const emit of this.indicatorEmitters) { try { emit("obs.currentPreviewScene", sceneName); } catch {} }
+					this.scheduleSelectedEmit();
+					logger.debug(`OBS event: CurrentPreviewSceneChanged → '${sceneName}'`);
+				} catch { }
+			});
 
 			await obs.connect(url, password, { rpcVersion: 1, eventSubscriptions: EventSubscription.All & ~EventSubscription.InputVolumeMeters });
 		} catch (err) { logger.warn("OBS: connexion échouée:", err as any); this.scheduleReconnect(); }
@@ -67,7 +176,7 @@ export class ObsDriver implements Driver {
 
 	private scheduleReconnect(): void {
 		if (this.reconnecting) return; this.reconnecting = true; const delay = this.backoffMs; this.backoffMs = Math.min(30000, this.backoffMs * 2);
-		setTimeout(() => { this.reconnecting = false; this.connectFromConfig().catch(() => {}); }, delay);
+		setTimeout(() => { this.reconnecting = false; this.connectFromConfig().catch(() => { }); }, delay);
 	}
 
 	private key(sceneName: string, sourceName: string): string { return `${sceneName}::${sourceName}`; }
@@ -104,7 +213,7 @@ export class ObsDriver implements Driver {
 			await this.obs.call("SetSceneItemTransform" as keyof OBSRequestTypes, { sceneName, sceneItemId: id, sceneItemTransform } as any);
 			logger.trace(`OBS write OK for id=${id}`);
 			this.lastKnownTransforms.set(id, next);
-		} catch (err) { logger.warn("OBS: écriture transform échouée:", err as any); try { this.cacheKeyToItemId.delete(this.key(sceneName, sourceName)); } catch {} }
+		} catch (err) { logger.warn("OBS: écriture transform échouée:", err as any); try { this.cacheKeyToItemId.delete(this.key(sceneName, sourceName)); } catch { } }
 	}
 
 	private resolveStepDelta(deltaParam: number | undefined, ctxValue: unknown, baseStep: number): number {
@@ -113,6 +222,90 @@ export class ObsDriver implements Driver {
 		if (!Number.isFinite(v)) return step; if (v === 0 || v === 64) return 0;
 		if (v >= 1 && v <= 63) return step; if (v >= 65 && v <= 127) return -step; return 0;
 	}
+
+	/**
+	 * Enregistre un callback appelé à chaque changement de scène programme.
+	 */
+	onSceneChanged(cb: (sceneName: string) => void): () => void {
+		this.sceneChangedListeners.push(cb);
+		return () => {
+			const i = this.sceneChangedListeners.indexOf(cb);
+			if (i >= 0) this.sceneChangedListeners.splice(i, 1);
+		};
+	}
+
+	/**
+	 * Retourne l'état courant du Studio Mode (true/false). Vide si erreur (false par défaut).
+	 */
+	async isStudioModeEnabled(): Promise<boolean> {
+		try {
+			if (!this.obs) return false;
+			const { studioModeEnabled } = await this.obs.call("GetStudioModeEnabled");
+			return !!studioModeEnabled;
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * S'abonne aux changements d'état du Studio Mode.
+	 */
+	onStudioModeChanged(cb: (enabled: boolean) => void): () => void {
+		this.studioModeChangedListeners.push(cb);
+		return () => {
+			const i = this.studioModeChangedListeners.indexOf(cb);
+			if (i >= 0) this.studioModeChangedListeners.splice(i, 1);
+		};
+	}
+
+	/**
+	 * Retourne le nom de la scène programme courante (ou chaîne vide en cas d'erreur).
+	 */
+	async getCurrentProgramScene(): Promise<string> {
+		try {
+			if (!this.obs) return "";
+			const res = await this.obs.call("GetCurrentProgramScene" as keyof OBSRequestTypes, {} as any);
+			return (res as any)?.currentProgramSceneName ?? "";
+		} catch {
+			return "";
+		}
+	}
+
+	/**
+	 * Retourne le nom de la scène preview courante (ou chaîne vide en cas d'erreur).
+	 */
+	async getCurrentPreviewScene(): Promise<string> {
+		try {
+			if (!this.obs) return "";
+			const res = await this.obs.call("GetCurrentPreviewScene" as keyof OBSRequestTypes, {} as any);
+			return (res as any)?.currentPreviewSceneName ?? "";
+		} catch {
+			return "";
+		}
+	}
+
+	private async refreshIndicatorSignals(): Promise<void> {
+		try {
+		  const studio = await this.isStudioModeEnabled();
+		  this.curStudioMode = !!studio;
+		  for (const emit of this.indicatorEmitters) { try { emit("obs.studioMode", studio); } catch {} }
+		} catch {}
+	  
+		try {
+		  const prog = await this.getCurrentProgramScene();
+		  this.curProgramScene = prog;
+		  for (const emit of this.indicatorEmitters) { try { emit("obs.currentProgramScene", prog); } catch {} }
+		} catch {}
+	  
+		try {
+		  const prev = await this.getCurrentPreviewScene();
+		  this.curPreviewScene = prev;
+		  for (const emit of this.indicatorEmitters) { try { emit("obs.currentPreviewScene", prev); } catch {} }
+		} catch {}
+	  
+		this.lastSelectedSent = null; // force initial selected emit
+		this.emitSelectedScene();
+	  }
 }
 
 

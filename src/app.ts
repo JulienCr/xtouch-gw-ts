@@ -12,6 +12,12 @@ import { createBackgroundManager, initDrivers, startXTouchAndNavigation } from "
 import { applyLcdForActivePage } from "./ui/lcd";
 import { updateFKeyLedsForActivePage } from "./xtouch/fkeys";
 import * as xtapi from "./xtouch/api";
+import { attachInputMapper } from "./xtouch/inputMapper";
+import { attachIndicators, refreshIndicators } from "./xtouch/indicators";
+
+// Minimal Node globals typing to satisfy TS without @types/node
+declare const process: any;
+declare const global: any;
 
 /**
  * Point d'entrée de l'application.
@@ -60,6 +66,15 @@ export async function startApp(): Promise<() => Promise<void>> {
             const pagingCh = (cfg.paging?.channel ?? 1) | 0;
             updateFKeyLedsForActivePage(router, x, pagingCh);
           } catch {}
+          // Rebrancher l'InputMapper générique (mode/canal peuvent changer)
+          try { detachInputMapper?.(); } catch {}
+          try { detachInputMapper = await attachInputMapper({ router, xtouch: x, mode: cfg.xtouch?.mode ?? "mcu", channel: cfg.paging?.channel ?? 1 }); } catch {}
+          // Rebrancher les indicateurs génériques
+          try { detachIndicators?.(); } catch {}
+          detachIndicators = null;
+          try { detachIndicators = await attachIndicators({ router, xtouch: x, config: cfg }); } catch {}
+          // Force drivers to re-emit indicator signals after (re)attach so LEDs sync immediately
+          try { await refreshIndicators({ router, xtouch: x, config: cfg }); } catch {}
         }
       } catch (e) {
         logger.debug("Hot reload LCD refresh skipped:", e as any);
@@ -86,6 +101,8 @@ export async function startApp(): Promise<() => Promise<void>> {
   
 
   const rebuildBackgroundListeners = (activePage: PageConfig | undefined) => rebuild(activePage, cfg.pages);
+  let detachInputMapper: (() => void) | null = null;
+  let detachIndicators: (() => void) | null = null;
   try {
     const { xtouch: x, unsubscribeNavigation, paging } = await startXTouchAndNavigation(router, {
       config: cfg,
@@ -107,9 +124,25 @@ export async function startApp(): Promise<() => Promise<void>> {
           pageBridges = [];
         }
         try { router.refreshPage(); } catch {}
+        // Refresh LEDs (génériques)
+        try { refreshIndicators({ router, xtouch: x, config: cfg }).catch(() => {}); } catch {}
       },
     });
     xtouch = x;
+    // Input layer générique: attacher l'InputMapper (CSV → controlId → router)
+    try {
+      detachInputMapper = await attachInputMapper({ router, xtouch: x, mode: cfg.xtouch?.mode ?? "mcu", channel: paging.channel });
+    } catch (e) {
+      logger.warn("InputMapper attach failed:", (e as any)?.message ?? e);
+    }
+    // Indicateurs génériques (LEDs par CSV)
+    try {
+      detachIndicators = await attachIndicators({ router, xtouch: x, config: cfg });
+    } catch (e) {
+      logger.warn("Indicators attach failed:", (e as any)?.message ?? e);
+    }
+    // Force an initial indicator sync so current scene/studio LEDs light at startup
+    try { await refreshIndicators({ router, xtouch: x, config: cfg }); } catch {}
 
     // Reset déplacé dans startXTouchAndNavigation pour s'exécuter plus tôt
 
@@ -169,6 +202,8 @@ export async function startApp(): Promise<() => Promise<void>> {
     
     try { xtouch?.stop(); } catch {}
     try { bgManager.shutdown(); } catch {}
+    try { detachIndicators?.(); } catch {}
+    try { detachInputMapper?.(); } catch {}
     process.exit(0);
   };
 
@@ -181,11 +216,11 @@ export async function startApp(): Promise<() => Promise<void>> {
   };
   process.on("SIGINT", onSig);
   process.on("SIGTERM", onSig);
-  process.on("uncaughtException", (err) => {
+  process.on("uncaughtException", (err: unknown) => {
     logger.error("Uncaught exception:", err as any);
     cleanup().catch(() => {});
   });
-  process.on("unhandledRejection", (reason) => {
+  process.on("unhandledRejection", (reason: unknown) => {
     logger.error("Unhandled rejection:", reason as any);
     cleanup().catch(() => {});
   });

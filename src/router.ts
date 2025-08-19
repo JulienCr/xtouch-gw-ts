@@ -68,6 +68,11 @@ export class Router {
     this.drivers.set(key, driver);
   }
 
+  /** Récupère un driver par sa clé (ex: "obs"). */
+  getDriver<T extends Driver = Driver>(key: string): T | undefined {
+    return this.drivers.get(key) as T | undefined;
+  }
+
   /** Retourne la configuration de la page active. */
   getActivePage(): PageConfig | undefined {
     return this.config.pages[this.activePageIndex];
