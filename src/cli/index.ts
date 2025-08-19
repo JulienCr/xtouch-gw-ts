@@ -5,6 +5,8 @@ import type { XTouchDriver } from "../xtouch/driver";
 import { MidiInputSniffer, listInputPorts } from "../midi/sniffer";
 import { testMidiSend } from "../test-midi-send";
 import { formatDecoded } from "../midi/decoder";
+import { parseCommand } from "../midi/testDsl";
+import * as xtapi from "../xtouch/api";
 
 export interface CliContext {
   router: Router;
@@ -62,7 +64,7 @@ export function attachCli(ctx: CliContext): () => void {
   };
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'lcd <strip0-7> <upper> [lower]', 'latency:report', 'latency:reset', 'test-midi [all|custom|buttons|faders]', 'help', 'exit|quit'");
+  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'send <type> <params>', 'reset', 'state <load|rm>', 'show <pages>', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'lcd <strip0-7> <upper> [lower]', 'latency:report', 'latency:reset', 'test-midi [all|custom|buttons|faders]', 'help', 'exit|quit'");
   rl.setPrompt("app> ");
   rl.prompt();
 
@@ -187,8 +189,264 @@ export function attachCli(ctx: CliContext): () => void {
           logger.info(`7-seg ← '${text}'`);
           break;
         }
+        case "send": {
+          if (!ctx.xtouch) {
+            logger.warn("X-Touch non connecté");
+            break;
+          }
+          const cmdLine = rest.join(" ");
+          if (!cmdLine) {
+            logger.warn("Usage: send <command>");
+            logger.info("Exemples (support décimal, hex 0x, et hex avec suffixe n):");
+            logger.info("  send noteon ch=1 note=118 velocity=127");
+            logger.info("  send noteon ch=1 note=0x76 velocity=0x7F");
+            logger.info("  send noteon ch=1 note=0x1n velocity=0x1n");
+            logger.info("  send noteoff ch=1 note=0x76");
+            logger.info("  send cc ch=1 cc=0x10 value=0x40");
+            logger.info("  send pb ch=1 value=8192");
+            logger.info("  send raw 90 76 7F");
+            break;
+          }
+          
+          // Mode raw pour les messages hex bruts
+          if (cmdLine.startsWith("raw ")) {
+            const hexBytes = cmdLine.substring(4).split(/\s+/);
+            const bytes: number[] = [];
+            let valid = true;
+            for (const hex of hexBytes) {
+              const byte = parseInt(hex, 16);
+              if (!Number.isFinite(byte) || byte < 0 || byte > 255) {
+                logger.warn(`Octet invalide: ${hex} (attendu: 00..FF)`);
+                valid = false;
+                break;
+              }
+              bytes.push(byte);
+            }
+            if (valid && bytes.length > 0) {
+              ctx.xtouch.sendRawMessage(bytes);
+              logger.info(`MIDI → Raw (${bytes.map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')})`);
+            }
+            break;
+          }
+
+          // Utiliser parseCommand pour les autres commandes
+          const parsed = parseCommand(cmdLine, { defaultDelayMs: 0, noteOffAsNoteOn0: false });
+          if (!parsed) {
+            logger.warn("Commande non reconnue");
+            logger.info("Formats supportés: noteon, noteoff, cc, raw");
+            break;
+          }
+          
+          if (parsed.kind === "Wait") {
+            logger.warn("Wait non supporté dans send (utilisez test-midi)");
+            break;
+          }
+          
+          if (parsed.kind === "Raw") {
+            ctx.xtouch.sendRawMessage(parsed.bytes);
+            logger.info(`MIDI → ${parsed.label} (${parsed.bytes.map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')})`);
+          }
+          break;
+        }
+        case "reset": {
+          if (!ctx.xtouch) {
+            logger.warn("X-Touch non connecté");
+            break;
+          }
+          logger.info("Reset de la surface X-Touch...");
+          try {
+            await xtapi.resetAll(ctx.xtouch, { clearLcds: true });
+            logger.info("Reset terminé");
+          } catch (err) {
+            logger.error("Erreur lors du reset:", err as any);
+          }
+          break;
+        }
+        case "state": {
+          const subcmd = rest[0];
+          if (subcmd === "load") {
+            logger.info("Rechargement des états depuis le snapshot...");
+            try {
+              // Accéder au StateStore via le router
+              const stateRef = (ctx.router as any).state;
+              if (stateRef && typeof stateRef.hydrateFromSnapshot === "function") {
+                // Recharger depuis le snapshot
+                const fs = await import("fs/promises");
+                const path = await import("path");
+                const snapshotPath = path.resolve(process.cwd(), ".state", "snapshot.json");
+                try {
+                  const raw = await fs.readFile(snapshotPath, { encoding: "utf8" });
+                  const snap = JSON.parse(raw) as { ts?: number; apps?: Record<string, any[]> };
+                  const apps = ["voicemeeter", "qlc", "obs", "midi-bridge"] as const;
+                  if (snap && snap.apps) {
+                                         for (const app of apps) {
+                       const entries = Array.isArray((snap.apps as any)[app]) ? (snap.apps as any)[app] : [];
+                       if (entries.length > 0) {
+                         stateRef.hydrateFromSnapshot(app, entries);
+                         logger.info(`État rechargé pour ${app}: ${entries.length} entrées`);
+                       }
+                     }
+                     logger.info("Rechargement terminé");
+                     
+                     // Synchroniser la X-Touch avec les états rechargés
+                     logger.info("Synchronisation de la surface X-Touch...");
+                     try {
+                       if (ctx.xtouch) {
+                         // Déclencher un refresh de la page active pour synchroniser la surface
+                         ctx.router.refreshPage();
+                         logger.info("Surface synchronisée");
+                       } else {
+                         logger.warn("X-Touch non connectée, synchronisation impossible");
+                       }
+                     } catch (err) {
+                       logger.error("Erreur lors de la synchronisation:", err as any);
+                     }
+                     
+                     // Recharger la configuration pour remettre les LCD et éléments statiques
+                     logger.info("Rechargement de la configuration...");
+                     try {
+                       // Recharger le fichier config.yaml et mettre à jour le router
+                       const fs = await import("fs/promises");
+                       const path = await import("path");
+                       const configPath = path.resolve(process.cwd(), "config.yaml");
+                       try {
+                         const raw = await fs.readFile(configPath, { encoding: "utf8" });
+                         const YAML = await import("yaml");
+                         const newConfig = YAML.parse(raw);
+                         
+                         if (ctx.router && typeof (ctx.router as any).updateConfig === "function") {
+                           await (ctx.router as any).updateConfig(newConfig);
+                           logger.info("Configuration rechargée");
+                           
+                           // Appliquer les LCD de la nouvelle config
+                           if (ctx.xtouch) {
+                             try {
+                               const { applyLcdForActivePage } = await import("../ui/lcd");
+                               applyLcdForActivePage(ctx.router, ctx.xtouch);
+                               logger.info("LCD mis à jour");
+                             } catch (err) {
+                               logger.debug("Mise à jour LCD échouée:", err as any);
+                             }
+                           }
+                         } else {
+                           logger.warn("Méthode updateConfig non disponible");
+                         }
+                       } catch (err) {
+                         logger.error("Erreur lors de la lecture de config.yaml:", err as any);
+                       }
+                     } catch (err) {
+                       logger.error("Erreur lors du rechargement de la config:", err as any);
+                     }
+                  } else {
+                    logger.warn("Aucun snapshot trouvé");
+                  }
+                } catch (err) {
+                  logger.error("Erreur lors du rechargement:", err as any);
+                }
+              } else {
+                logger.warn("StateStore non accessible");
+              }
+            } catch (err) {
+              logger.error("Erreur lors du rechargement:", err as any);
+            }
+                     } else if (subcmd === "rm") {
+             logger.info("Suppression des états...");
+             try {
+               const stateRef = (ctx.router as any).state;
+               if (stateRef && typeof stateRef.clearAllStates === "function") {
+                 stateRef.clearAllStates();
+                 logger.info("États en mémoire supprimés");
+               } else {
+                 // Fallback: vider manuellement chaque app
+                 const apps = ["voicemeeter", "qlc", "obs", "midi-bridge"] as const;
+                 for (const app of apps) {
+                   if (stateRef && typeof stateRef.clearStatesForApp === "function") {
+                     stateRef.clearStatesForApp(app);
+                   }
+                 }
+                 logger.info("États en mémoire supprimés (fallback)");
+               }
+               
+               // Supprimer aussi les fichiers de persistance
+               logger.info("Suppression des fichiers de persistance...");
+               try {
+                 const fs = await import("fs/promises");
+                 const path = await import("path");
+                 const stateDir = path.resolve(process.cwd(), ".state");
+                 
+                 // Supprimer le snapshot principal
+                 const snapshotPath = path.join(stateDir, "snapshot.json");
+                 try {
+                   await fs.unlink(snapshotPath);
+                   logger.info("Snapshot supprimé");
+                 } catch (err) {
+                   if ((err as any)?.code === 'ENOENT') {
+                     logger.info("Snapshot déjà supprimé");
+                   } else {
+                     logger.warn("Erreur lors de la suppression du snapshot:", err as any);
+                   }
+                 }
+                 
+                 // Supprimer le répertoire .state s'il est vide
+                 try {
+                   const files = await fs.readdir(stateDir);
+                   if (files.length === 0) {
+                     await fs.rmdir(stateDir);
+                     logger.info("Répertoire .state supprimé");
+                   }
+                 } catch (err) {
+                   logger.debug("Impossible de supprimer le répertoire .state:", err as any);
+                 }
+                 
+                 logger.info("Fichiers de persistance supprimés");
+               } catch (err) {
+                 logger.error("Erreur lors de la suppression des fichiers:", err as any);
+               }
+               
+               // Synchroniser la surface X-Touch (remettre tout à zéro)
+               if (ctx.xtouch) {
+                 logger.info("Synchronisation de la surface X-Touch...");
+                 try {
+                   ctx.router.refreshPage();
+                   logger.info("Surface synchronisée (états effacés)");
+                 } catch (err) {
+                   logger.error("Erreur lors de la synchronisation:", err as any);
+                 }
+               }
+               
+             } catch (err) {
+               logger.error("Erreur lors de la suppression:", err as any);
+             }
+           } else {
+            logger.warn("Usage: state <load|rm>");
+            logger.info("  state load - Recharge les états depuis le snapshot");
+            logger.info("  state rm  - Supprime tous les états");
+          }
+          break;
+        }
+        case "show": {
+          const subcmd = rest[0];
+          if (subcmd === "pages") {
+            const pages = ctx.router.listPages();
+            if (pages.length === 0) {
+              logger.info("Aucune page configurée");
+            } else {
+              logger.info("Pages disponibles:");
+              for (let i = 0; i < pages.length; i++) {
+                const page = ctx.router.getActivePage();
+                const isActive = page && page.name === pages[i];
+                const marker = isActive ? " → " : "   ";
+                logger.info(`${marker}[${i + 1}] ${pages[i]}`);
+              }
+            }
+          } else {
+            logger.warn("Usage: show <pages>");
+            logger.info("  show pages - Liste les pages avec index (1,2,3...)");
+          }
+          break;
+        }
         case "help":
-          logger.info("help: page <idx|name> | pages | emit <controlId> [value] | midi-ports | midi-open <idx|name> | midi-close | learn <id> | fader <ch> <0..16383> | latency:report | latency:reset | exit|quit");
+          logger.info("help: page <idx|name> | pages | emit <controlId> [value] | send <type> <params> | reset | state <load|rm> | show <pages> | midi-ports | midi-open <idx|name> | midi-close | learn <id> | fader <ch> <0..16383> | latency:report | latency:reset | exit|quit");
           break;
         case "latency:report": {
           const rpt = (ctx.router as any).getLatencyReport?.();
