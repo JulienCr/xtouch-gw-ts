@@ -11,7 +11,12 @@ import { setupStatePersistence } from "./state/persistence";
 import { createBackgroundManager, initDrivers, startXTouchAndNavigation } from "./app/bootstrap";
 import { applyLcdForActivePage } from "./ui/lcd";
 import { updateFKeyLedsForActivePage } from "./xtouch/fkeys";
+import { attachAssignButtons, refreshAssignLeds } from "./xtouch/assignButtons";
 import * as xtapi from "./xtouch/api";
+
+// Minimal Node globals typing to satisfy TS without @types/node
+declare const process: any;
+declare const global: any;
 
 /**
  * Point d'entrée de l'application.
@@ -60,6 +65,17 @@ export async function startApp(): Promise<() => Promise<void>> {
             const pagingCh = (cfg.paging?.channel ?? 1) | 0;
             updateFKeyLedsForActivePage(router, x, pagingCh);
           } catch {}
+          // Rebrancher l'association Assign→Scènes OBS si définie
+          try {
+            const obs = router.getDriver("obs") as any;
+            if (obs) {
+              try { detachAssign?.(); } catch {}
+              detachAssign = null;
+              if (cfg.assign_scenes) {
+                detachAssign = await (await import("./xtouch/assignButtons")).attachAssignButtons({ router, xtouch: x, obs, config: cfg });
+              }
+            }
+          } catch {}
         }
       } catch (e) {
         logger.debug("Hot reload LCD refresh skipped:", e as any);
@@ -86,6 +102,7 @@ export async function startApp(): Promise<() => Promise<void>> {
   
 
   const rebuildBackgroundListeners = (activePage: PageConfig | undefined) => rebuild(activePage, cfg.pages);
+  let detachAssign: (() => void) | null = null;
   try {
     const { xtouch: x, unsubscribeNavigation, paging } = await startXTouchAndNavigation(router, {
       config: cfg,
@@ -107,9 +124,22 @@ export async function startApp(): Promise<() => Promise<void>> {
           pageBridges = [];
         }
         try { router.refreshPage(); } catch {}
+        // Refresh Assign LEDs (page-level mapping may change)
+        try {
+          const obs = router.getDriver("obs") as any;
+          if (obs) { refreshAssignLeds({ router, xtouch: x, obs, config: cfg }).catch(() => {}); }
+        } catch {}
       },
     });
     xtouch = x;
+    try {
+      const obs = router.getDriver("obs") as any;
+      if (obs) {
+        detachAssign = await attachAssignButtons({ router, xtouch: x, obs, config: cfg });
+      }
+    } catch (e) {
+      logger.warn("Assign buttons wiring failed:", e as any);
+    }
 
     // Reset déplacé dans startXTouchAndNavigation pour s'exécuter plus tôt
 
@@ -181,11 +211,11 @@ export async function startApp(): Promise<() => Promise<void>> {
   };
   process.on("SIGINT", onSig);
   process.on("SIGTERM", onSig);
-  process.on("uncaughtException", (err) => {
+  process.on("uncaughtException", (err: unknown) => {
     logger.error("Uncaught exception:", err as any);
     cleanup().catch(() => {});
   });
-  process.on("unhandledRejection", (reason) => {
+  process.on("unhandledRejection", (reason: unknown) => {
     logger.error("Unhandled rejection:", reason as any);
     cleanup().catch(() => {});
   });

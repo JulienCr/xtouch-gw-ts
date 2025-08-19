@@ -1,5 +1,5 @@
 
-# Spéc OBSDriver – contrôle X/Y/Scale via rotatifs 21–23
+# Spéc OBSDriver – contrôle X/Y/Scale via rotatifs 21–23 + Assign → Scènes
 
 ## Objectif
 
@@ -157,6 +157,34 @@ obs:
 * **Groups & Nested Scenes** : `sceneItemId` reste la clé ; si on vise un item dans un group, toujours référencé par l’ID retourné sur la scène parente.
 * **Bounds vs Scale** : si l’overlay doit garder une taille « pixel » stable, préférer `boundsType = OBS_BOUNDS_SCALE_INNER` + `boundsWidth/Height`. Sinon, agir sur `scaleX/Y`. (les champs sont dans `sceneItemTransform` v5). 
 * **Studio Mode** : aucune contrainte : on peut écrire sur n’importe quelle scène non visible (comportement voulu).
+
+## Boutons Assign → Scènes OBS
+
+Objectif: associer les boutons `TRACK`, `SEND`, `PAN`, `PLUGIN`, `EQ`, `INSTRUMENT` à des scènes OBS. Quand la scène est active, la LED du bouton est allumée; un appui sélectionne la scène.
+
+### Configuration YAML
+
+```yaml
+assign_scenes:
+  track: "SCÈNE CAM"
+  send: "SCÈNE PRÉSENTATION"
+  pan: "SCÈNE JEUX"
+  plugin: "SCÈNE OVERLAY"
+  eq: "SCÈNE INVITÉ"
+  instrument: "SCÈNE INTERLUDE"
+```
+
+### Ingestion mapping MIDI
+
+Les numéros de notes ne sont pas codés en dur. Le fichier `docs/xtouch-matching.csv` est utilisé pour retrouver, selon le mode `xtouch.mode` (`mcu` ou `ctrl`), la note associée à chaque bouton Assign.
+
+### Fonctionnement
+
+1. Au démarrage, lecture de la scène programme actuelle via `GetCurrentProgramScene` → mise à jour des LEDs.
+2. Abonnement à l’évènement `CurrentProgramSceneChanged` → LEDs mises à jour en temps réel.
+3. Appui sur un bouton Assign → appel `SetCurrentProgramScene(sceneName)`.
+
+Aucune hypothèse n’est faite sur les notes: elles proviennent du CSV.
 
 ## Contrats d’interface (côté GW)
 

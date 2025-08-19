@@ -21,6 +21,13 @@ pages:
         enc6: { app: "obs", action: "nudgeX", params: ["--- CAM Main 2", "--- CAM Main", 1] }
         enc7: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 1] }
         enc8: { app: "obs", action: "scaleUniform", params: ["--- CAM Main 2", "--- CAM Main", 0.02] }
+    assign_scenes:
+      track: "--- CAM Main"
+      pan: "--- CAM Main 2"
+      eq: "--- CAM Jardin"
+      send: "--- CAM Cour"
+      plugin: "SCENE_EQ"
+      instrument: "SCENE_INSTR"
     lcd:
       labels:
         - "Mic\nBaba"

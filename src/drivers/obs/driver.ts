@@ -12,11 +12,23 @@ export class ObsDriver implements Driver {
 	private cacheKeyToItemId: Map<string, number> = new Map();
 	private backoffMs = 1000;
 	private encoderSpeed = new EncoderSpeedTracker();
+	private sceneChangedListeners: Array<(sceneName: string) => void> = [];
 
 	async init(): Promise<void> { await this.connectFromConfig(); }
 
 	async execute(action: string, params: unknown[], context?: ExecutionContext): Promise<void> {
 		switch (action) {
+			case "setScene": {
+				const [sceneName] = params as [string];
+				if (!this.obs) return;
+				try {
+					await this.obs.call("SetCurrentProgramScene" as keyof OBSRequestTypes, { sceneName } as any);
+					logger.info(`OBS: scène active → '${sceneName}'`);
+				} catch (err) {
+					logger.warn("OBS: SetCurrentProgramScene échoué:", err as any);
+				}
+				return;
+			}
 			case "resolveItem": {
 				const [sceneName, sourceName] = params as [string, string];
 				await this.resolveItemId(sceneName, sourceName);
@@ -60,6 +72,15 @@ export class ObsDriver implements Driver {
 			const obs = new OBSWebSocket(); this.obs = obs;
 			obs.on("ConnectionClosed", (err) => { logger.warn("OBS: connexion fermée", err as any); this.scheduleReconnect(); });
 			obs.on("Identified", ({ negotiatedRpcVersion }) => { logger.info(`OBS connecté (RPC v${negotiatedRpcVersion}).`); });
+			obs.on("CurrentProgramSceneChanged", (e: any) => {
+				try {
+					const sceneName = (e as any)?.sceneName ?? (e as any)?.sceneNameOld ?? "";
+					for (const cb of this.sceneChangedListeners) {
+						try { cb(sceneName); } catch {}
+					}
+					logger.debug(`OBS event: CurrentProgramSceneChanged → '${sceneName}'`);
+				} catch {}
+			});
 
 			await obs.connect(url, password, { rpcVersion: 1, eventSubscriptions: EventSubscription.All & ~EventSubscription.InputVolumeMeters });
 		} catch (err) { logger.warn("OBS: connexion échouée:", err as any); this.scheduleReconnect(); }
@@ -112,6 +133,30 @@ export class ObsDriver implements Driver {
 		const v = typeof ctxValue === "number" ? ctxValue : NaN;
 		if (!Number.isFinite(v)) return step; if (v === 0 || v === 64) return 0;
 		if (v >= 1 && v <= 63) return step; if (v >= 65 && v <= 127) return -step; return 0;
+	}
+
+	/**
+	 * Enregistre un callback appelé à chaque changement de scène programme.
+	 */
+	onSceneChanged(cb: (sceneName: string) => void): () => void {
+		this.sceneChangedListeners.push(cb);
+		return () => {
+			const i = this.sceneChangedListeners.indexOf(cb);
+			if (i >= 0) this.sceneChangedListeners.splice(i, 1);
+		};
+	}
+
+	/**
+	 * Retourne le nom de la scène programme courante (ou chaîne vide en cas d'erreur).
+	 */
+	async getCurrentProgramScene(): Promise<string> {
+		try {
+			if (!this.obs) return "";
+			const res = await this.obs.call("GetCurrentProgramScene" as keyof OBSRequestTypes, {} as any);
+			return (res as any)?.currentProgramSceneName ?? "";
+		} catch {
+			return "";
+		}
 	}
 }
 
