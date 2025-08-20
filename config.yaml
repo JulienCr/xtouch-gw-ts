@@ -45,6 +45,12 @@ pages_global:
       params: ["--- CAM Cour"]
       indicator: { signal: "obs.selectedScene", equals: "--- CAM Cour" }
 
+    assign_plugin:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- Blur"]
+      indicator: { signal: "obs.selectedScene", equals: "--- Blur" }
+
     global_view:
       app: "obs"
       action: "toggleStudioMode"
