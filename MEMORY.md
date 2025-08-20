@@ -12,6 +12,10 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Besoin: recaler rapidement surface/états/drivers après dérive (déconnexions OBS, reboot, etc.).
   - Solution: nouveau hook optionnel `Driver.sync()` appelé via `Router.syncDrivers()`, et commande CLI `sync` enchaînant reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD.
   - Leçon: centraliser la resynchro côté Router/CLI, laisser chaque driver gérer sa lecture d’état.
+- 2025-08-20 — Aide CLI illisible via logger
+  - Symptôme: liste de commandes sur une seule ligne via logger, dépendante du niveau de logs.
+  - Solution: `help.yaml` + rendu tableau 3 colonnes (stdout) au démarrage et via `help`; ajout commande `clear` (efface écran/scrollback) sans logger.
+  - Leçon: éviter le logger pour les aides interactives; privilégier stdout et une source éditable (YAML).
 - 2025-08-20 — LEDs navigation écrasées par indicateurs génériques
   - Symptôme: à l'arrivée sur une page, Prev/Next et F1..F8 s'allument puis s'éteignent immédiatement.
   - Cause: `attachIndicators()` ré-émettait des NoteOn à 0 pour tous les contrôles mappés par CSV, y compris ceux sans indicateur actif, écrasant les LEDs gérées par `fkeys`.

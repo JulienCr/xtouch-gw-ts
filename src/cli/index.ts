@@ -1,5 +1,6 @@
 import readline from "readline";
 import { logger } from "../logger";
+import { loadHelpSpec, printHelp } from "./help";
 import type { Router } from "../router";
 import type { XTouchDriver } from "../xtouch/driver";
 import { MidiInputSniffer, listInputPorts } from "../midi/sniffer";
@@ -19,6 +20,17 @@ export function attachCli(ctx: CliContext): () => void {
   let pendingLearnControlId: string | null = null;
 
   const toHex = (bytes: number[]) => bytes.map((b) => b.toString(16).padStart(2, "0")).join(" ");
+
+  /**
+   * Effacer l'écran et l'historique de scroll du terminal (sans logger).
+   * Utilise des séquences ANSI compatibles Windows Terminal/PowerShell 7+.
+   */
+  const clearConsole = () => {
+    try {
+      // Efface écran + scrollback et remet le curseur en haut à gauche
+      process.stdout.write("\x1B[2J\x1B[3J\x1B[H");
+    } catch {}
+  };
 
   const ensureSniffer = () => {
     if (!midiSniffer) {
@@ -64,7 +76,12 @@ export function attachCli(ctx: CliContext): () => void {
   };
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'send <type> <params>', 'reset', 'state <load|rm>', 'sync', 'show <pages>', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'lcd <strip0-7> <upper> [lower]', 'latency:report', 'latency:reset', 'test-midi [all|custom|buttons|faders]', 'help', 'exit|quit'");
+  try {
+    const spec = loadHelpSpec();
+    printHelp(spec);
+  } catch (err) {
+    process.stdout.write("Aide CLI indisponible (help.yaml introuvable ou invalide). Tapez 'help'.\n");
+  }
   rl.setPrompt("app> ");
   rl.prompt();
 
@@ -507,9 +524,19 @@ export function attachCli(ctx: CliContext): () => void {
           }
           break;
         }
-        case "help":
-          logger.info("help: page <idx|name> | pages | emit <controlId> [value] | send <type> <params> | reset | state <load|rm> | sync | show <pages> | midi-ports | midi-open <idx|name> | midi-close | learn <id> | fader <ch> <0..16383> | latency:report | latency:reset | exit|quit");
+        case "help": {
+          try {
+            const spec = loadHelpSpec();
+            printHelp(spec);
+          } catch (err) {
+            process.stdout.write("Aide CLI indisponible (help.yaml introuvable ou invalide).\n");
+          }
           break;
+        }
+        case "clear": {
+          clearConsole();
+          break;
+        }
         case "latency:report": {
           const rpt = (ctx.router as any).getLatencyReport?.();
           if (!rpt) {

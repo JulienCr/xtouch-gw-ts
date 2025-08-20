@@ -1,0 +1,92 @@
+# CLI help specification (YAML)
+# Columns: commande | options | description
+commands:
+  - command: page
+    options: "<idx|name>"
+    description: Activer une page par index (1..N) ou par nom exact.
+
+  - command: pages
+    options: ""
+    description: Lister les pages disponibles (noms).
+
+  - command: emit
+    options: "<controlId> [value]"
+    description: Émettre un événement de contrôle côté router (bypass mapping X‑Touch).
+
+  - command: send
+    options: "<type> <params>"
+    description: Envoyer une commande MIDI directe (noteon|noteoff|cc|pb|raw). Exemples via "send" sans arguments.
+
+  - command: reset
+    options: ""
+    description: Reset complet de la surface X‑Touch (LCD/LED/faders selon logique).
+
+  - command: state
+    options: "<load|rm>"
+    description: load → recharge les états depuis snapshot; rm → efface tous les états en mémoire.
+
+  - command: sync
+    options: ""
+    description: Resynchronisation globale (reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD).
+
+  - command: show
+    options: "<pages>"
+    description: Afficher des informations (actuellement supporte "pages" détaillées avec index et marqueur actif).
+
+  - command: midi-ports
+    options: ""
+    description: Lister les ports MIDI d'entrée détectés.
+
+  - command: midi-open
+    options: "<idx|name>"
+    description: Ouvrir un port MIDI d'entrée par index ou par nom.
+
+  - command: midi-close
+    options: ""
+    description: Fermer le port MIDI d'entrée ouvert.
+
+  - command: learn
+    options: "<id>"
+    description: Armer un learn pour un controlId (suggère un mapping YAML d'après l'événement reçu).
+
+  - command: fader
+    options: "<ch> <0..16383>"
+    description: Déplacer un fader (Pitch Bend 14 bits) du canal indiqué.
+
+  - command: xtouch-stop
+    options: ""
+    description: Arrêter le driver X‑Touch et libérer les ports (utilisez ensuite midi-open).
+
+  - command: xtouch-start
+    options: ""
+    description: (Info) Redémarrage X‑Touch non supporté ici; utilisez le redémarrage de l'app.
+
+  - command: lcd
+    options: "<strip0-7> <upper> [lower]"
+    description: Écrire du texte sur l'afficheur LCD d'un strip.
+
+  - command: latency:report
+    options: ""
+    description: Afficher un rapport synthétique de latence par app et type d'événement.
+
+  - command: latency:reset
+    options: ""
+    description: Réinitialiser les compteurs de latence.
+
+  - command: test-midi
+    options: "[all|custom|buttons|faders]"
+    description: Lancer les tests de sortie MIDI (inclut reset/replay et animations LCD selon mode).
+
+  - command: help
+    options: ""
+    description: Afficher cette aide.
+
+  - command: exit|quit
+    options: ""
+    description: Quitter l'application.
+
+  - command: clear
+    options: ""
+    description: Effacer l'écran/scrollback du terminal (ne passe pas par le logger).
+
+
