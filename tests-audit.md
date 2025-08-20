@@ -210,6 +210,9 @@ Prochaines étapes
 
 ## Journal d’avancement (MàJ continue)
 
+2025-08-20 — pages_global (defaults) ajouté
+- Typecheck OK, suite de tests complète verte après fusion globale des pages.
+
 2025-08-16 — Progression Lot 2 + Orchestration Router
 - Suites: 28 fichiers, 57 tests verts. Couverture globale ~59.7%.
 - Nouveaux: midi/ports, midi/sniffer, router (orchestration), router-more (handleControl/updateConfig), drivers (voicemeeter), state/persistence (timers asynchrones).

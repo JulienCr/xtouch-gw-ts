@@ -123,6 +123,24 @@ export interface PageConfig {
 }
 
 /**
+ * Valeurs par défaut globales appliquées à toutes les pages (surchargées par la page).
+ * Permet de définir des `controls`, `lcd` ou `passthrough(s)` communs.
+ */
+export interface GlobalPageDefaults {
+  /** Définition des contrôles communs à toutes les pages */
+  controls?: Record<string, unknown>;
+  /** LCD commun (labels/couleurs) — si non défini par la page */
+  lcd?: {
+    labels?: Array<string | { upper?: string; lower?: string }>;
+    colors?: Array<number | string>;
+  };
+  /** Pont unique par défaut (si la page n'en définit pas) */
+  passthrough?: PassthroughConfig;
+  /** Liste de ponts par défaut (si la page n'en définit pas) */
+  passthroughs?: PassthroughConfig[];
+}
+
+/**
  * Configuration racine de l'application.
  */
 export interface AppConfig {
@@ -141,6 +159,8 @@ export interface AppConfig {
   xtouch?: XTouchConfig;
   /** Navigation entre pages */
   paging?: PagingConfig;
+  /** Valeurs par défaut appliquées à toutes les pages (merge/surcharge) */
+  pages_global?: GlobalPageDefaults;
   /** Liste des pages définies */
   pages: Array<PageConfig>;
 }

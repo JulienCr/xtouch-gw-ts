@@ -100,7 +100,7 @@ export async function startApp(): Promise<() => Promise<void>> {
 
   
 
-  const rebuildBackgroundListeners = (activePage: PageConfig | undefined) => rebuild(activePage, cfg.pages);
+  const rebuildBackgroundListeners = (activePage: PageConfig | undefined) => rebuild(activePage, router.getPagesMerged());
   let detachInputMapper: (() => void) | null = null;
   let detachIndicators: (() => void) | null = null;
   try {
@@ -147,8 +147,8 @@ export async function startApp(): Promise<() => Promise<void>> {
     // Reset déplacé dans startXTouchAndNavigation pour s'exécuter plus tôt
 
     // Si aucune page ne définit de passthrough, activer le bridge global vers Voicemeeter
-    const hasPagePassthrough = (cfg.pages ?? []).some(
-      (p) => !!p.passthrough || (Array.isArray((p as any).passthroughs) && (p as any).passthroughs.length > 0)
+    const hasPagePassthrough = (router.getPagesMerged() ?? []).some(
+      (p) => !!(p as any).passthrough || (Array.isArray((p as any).passthroughs) && (p as any).passthroughs.length > 0)
     );
     if (!hasPagePassthrough) {
       vmBridge = new VoicemeeterDriver(x, {

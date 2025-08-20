@@ -15,46 +15,49 @@ paging:
   prev_note: 46
   next_note: 47
 
+pages_global:
+  controls:
+    vpot6_rotate: { app: "obs", action: "nudgeX", params: ["--- CAM Main 2", "--- CAM Main", 1] }
+    vpot7_rotate: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 1] }
+    vpot8_rotate: { app: "obs", action: "scaleUniform", params: ["--- CAM Main 2", "--- CAM Main", 0.02] }
+
+    assign_track:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Main"]
+      indicator: { signal: "obs.selectedScene", equals: "--- CAM Main" }
+
+    assign_pan:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Main 2"]
+      indicator: { signal: "obs.selectedScene", equals: "--- CAM Main 2" }
+
+    assign_eq:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Jardin"]
+      indicator: { signal: "obs.selectedScene", equals: "--- CAM Jardin" }
+
+    assign_send:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Cour"]
+      indicator: { signal: "obs.selectedScene", equals: "--- CAM Cour" }
+
+    scrub:
+      app: "obs"
+      action: "toggleStudioMode"
+      indicator: { signal: "obs.studioMode", truthy: true }
+
+    play:
+      app: "obs"
+      action: "TriggerStudioModeTransition"
+      indicator: { signal: "obs.studioMode", truthy: true }
+
 pages:
   - name: "Voicemeeter+QLC"
-    controls:
-        vpot6_rotate: { app: "obs", action: "nudgeX", params: ["--- CAM Main 2", "--- CAM Main", 1] }
-        vpot7_rotate: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 1] }
-        vpot8_rotate: { app: "obs", action: "scaleUniform", params: ["--- CAM Main 2", "--- CAM Main", 0.02] }
-
-        assign_track: 
-          app: "obs"
-          action: "changeScene" 
-          params: ["--- CAM Main"]
-          indicator: { signal: "obs.selectedScene", equals: "--- CAM Main" }
-
-        assign_pan: 
-          app: "obs"
-          action: "changeScene" 
-          params: ["--- CAM Main 2"]
-          indicator: { signal: "obs.selectedScene", equals: "--- CAM Main 2" }
-
-        assign_eq: 
-          app: "obs"
-          action: "changeScene" 
-          params: ["--- CAM Jardin"]
-          indicator: { signal: "obs.selectedScene", equals: "--- CAM Jardin" }
-
-        assign_send: 
-          app: "obs"
-          action: "changeScene" 
-          params: ["--- CAM Cour"]
-          indicator: { signal: "obs.selectedScene", equals: "--- CAM Cour" }
-
-        scrub:
-          app: "obs"
-          action: "toggleStudioMode"
-          indicator: { signal: "obs.studioMode", truthy: true }
-
-        play:
-          app: "obs"
-          action: "TriggerStudioModeTransition"
-          indicator: { signal: "obs.studioMode", truthy: true } 
+    controls: {}
 
     lcd:
       labels:

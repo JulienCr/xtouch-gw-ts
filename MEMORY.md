@@ -8,6 +8,9 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
 - Tenir `TASKS.md` à jour après chaque lot de travail.
 
 ## Entrées
+ - 2025-08-20 — Defaults globaux pages
+   - Décision: introduire `pages_global` dans `config.yaml` pour définir des contrôles/LCD/passthroughs communs.
+   - Implémentation: fusion au runtime dans `Router.mergeGlobalIntoPage()` sans muter la config; override par page.
  - 2025-08-16 — Infra tests
    - Décision: utiliser Vitest avec couverture v8 et convention `_tests` (tests co-localisés dans des sous-dossiers `_tests` à côté du code, ex: `src/midi/_tests/utils.test.ts`).
    - Scripts: `pnpm test`, `pnpm test:watch`, `pnpm lint`, `pnpm format`.

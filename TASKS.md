@@ -29,6 +29,7 @@
 - [ ] CI GitHub Actions: pnpm i --frozen-lockfile, lint, check:types, test
 
 ## En cours
+- [x] Pages: support d'un bloc `pages_global` (defaults fusionnés dans chaque page; override par page)
 - [x] Indiquer le nom de la page sur le grand afficheur 7-segments
 - [x] Utilise les boutons F1 -> F8 pour naviguer entre les pages (notes channel 1 64..57) et LED active sur la page courante
 - [x] Router: pages OK + mapping d’actions implémenté
