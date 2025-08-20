@@ -1,6 +1,6 @@
 import type { AppKey, MidiStateEntry, MidiStatus } from "../state";
 import type { PageConfig } from "../config";
-import { getPbChannelForControlId } from "../xtouch/matching";
+import { getPbChannelForControlId, getMessageTypeForControlId, getInputLookups } from "../xtouch/matching";
 import { getPagePassthroughItems } from "../config/passthrough";
 import { resolveAppKey } from "../shared/appKey";
 import type { ControlMapping } from "../types";
@@ -20,6 +20,8 @@ export function getAppsForPage(page: PageConfig): AppKey[] {
 		}
 	}
 	const out = Array.from(set.values());
+	// Fallback historique: si aucune app explicite, considérer 'voicemeeter' par défaut
+	if (out.length === 0) return ["voicemeeter" as AppKey];
 	return out;
 }
 
@@ -94,7 +96,37 @@ export function resolvePbToCcMappingForApp(page: PageConfig, app: AppKey): { map
 
 export function transformAppToXTouch(page: PageConfig, app: AppKey, entry: MidiStateEntry): MidiStateEntry | null {
 	const status = entry.addr.status as MidiStatus;
-	if (status === "note" || status === "pb" || status === "sysex") {
+	// Ne pas relayer les Notes sauf si explicitement autorisé par un passthrough (filters.types)
+	if (status === "note") {
+		const items = getPagePassthroughItems(page);
+		const relevant = (Array.isArray(items) ? items : [])
+			.filter((it: any) => (resolveAppKey(it?.to_port, it?.from_port) as AppKey) === app);
+		let allow = false;
+		for (const it of relevant) {
+			const types: string[] | undefined = it?.filter?.types;
+			if (Array.isArray(types) && (types.includes("noteOn") || types.includes("noteOff"))) { allow = true; break; }
+		}
+		// Symétrie stricte: autoriser Note uniquement si la page a un contrôle mappé correspondant à cette note pour cette app
+		if (!allow) {
+			try {
+				const note = entry.addr.data1 ?? -1;
+				if (typeof note === "number" && note >= 0) {
+					const lookup = getInputLookups("mcu");
+					const controlId = lookup.noteToControl.get(note) || null;
+					if (controlId) {
+						const m = (page.controls as Record<string, ControlMapping | undefined>)[controlId];
+						if (m && m.app === app && m.midi) {
+							const kind = getMessageTypeForControlId(controlId, "mcu");
+							if (kind === "note") allow = true;
+						}
+					}
+				}
+			} catch {}
+		}
+		if (!allow) return null;
+		return entry;
+	}
+	if (status === "pb" || status === "sysex") {
 		return entry;
 	}
 	if (status === "cc") {

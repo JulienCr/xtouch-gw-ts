@@ -26,19 +26,35 @@ class ControlMidiSenderImpl {
    * @param cfg Configuration applicative courante
    */
   async init(cfg: AppConfig): Promise<void> {
-    // Heuristiques par app pour choisir le port de sortie cible
-    // - voicemeeter: utiliser le port "xtouch-gw" (bridge VM) si présent
-    // - qlc: utiliser le port contenant "qlc-in"
-    // - obs: généralement pas d'entrée MIDI → pas d'ouverture par défaut
-    // Ces valeurs peuvent être raffinées plus tard (config globale optionnelle)
-    this.appToOutName.set("voicemeeter", "xtouch-gw");
-    this.appToOutName.set("qlc", "qlc-in");
-    this.appToOutName.set("obs", "obs"); // prob. non utilisé
+    // Reset soft des mappings (conserve l'instance)
+    this.appToOutName.clear();
+    this.appToInName.clear();
+    // D'abord, appliquer les ports fournis par la config si présents
+    try {
+      const list = cfg?.midi?.apps || [];
+      for (const it of list) {
+        const name = (it?.name || "").trim();
+        if (!name) continue;
+        if (it.output_port) this.appToOutName.set(name, it.output_port);
+        if (it.input_port) this.appToInName.set(name, it.input_port);
+      }
+    } catch {}
+    // Plus d'heuristiques: les ports par app doivent être fournis dans config.midi.apps
+  }
 
-    // Heuristiques pour port d'entrée (feedback) par app
-    this.appToInName.set("voicemeeter", "xtouch-gw-feedback");
-    this.appToInName.set("qlc", "qlc-out");
-    this.appToInName.set("obs", "obs"); // pas d'entrée MIDI standard
+  /**
+   * Réapplique la configuration et redémarre proprement les ports ouverts par ce service.
+   */
+  async reconfigure(cfg: AppConfig): Promise<void> {
+    // Fermer les ports ouverts (laisser les autres composants gérer leurs propres ports)
+    try {
+      for (const o of this.outPerApp.values()) { try { o.closePort(); } catch {} }
+      for (const i of this.inPerApp.values()) { try { i.closePort(); } catch {} }
+    } finally {
+      this.outPerApp.clear();
+      this.inPerApp.clear();
+    }
+    await this.init(cfg);
   }
 
   /**
@@ -147,6 +163,28 @@ class ControlMidiSenderImpl {
     if (!out) return;
 
     const channel = Math.max(1, Math.min(16, (spec.channel | 0) || 1));
+    // Mode passthrough: envoyer "value" si c'est déjà une trame brute
+    if (spec.type === "passthrough") {
+      const input = Array.isArray(value) ? (value as unknown[]) : null;
+      if (input && input.length >= 1) {
+        const status = ((Number(input[0]) | 0) & 0xff);
+        const dataBytes = input.slice(1).map((n) => {
+          const v = Number(n) | 0;
+          return Math.max(0, Math.min(127, v));
+        });
+        const tx: number[] = [status, ...dataBytes];
+        out.sendMessage(tx);
+        if (!hasPassthroughForApp(app)) {
+          try {
+            const g = (global as unknown as { __router__?: any });
+            g.__router__?.markAppShadowForOutgoing?.(app, tx, needle);
+            g.__router__?.onMidiFromApp?.(app, tx, needle);
+          } catch {}
+        }
+        this.ensureFeedbackOpen(app).catch(() => {});
+      }
+      return;
+    }
     const statusNibble = spec.type === "note" ? 0x9 : spec.type === "cc" ? 0xB : 0xE;
     const status = (statusNibble << 4) | (channel - 1);
 
@@ -304,6 +342,11 @@ export async function initControlMidiSender(cfg: AppConfig): Promise<void> {
   await ControlMidiSender.init(cfg);
   // MODIF: exposer pour orchestration (reconcile on page change)
   try { (global as any).__controlMidiSender__ = ControlMidiSender; } catch {}
+}
+
+/** Met à jour les ports par app à partir d’une nouvelle config (hot reload). */
+export async function updateControlMidiSenderConfig(cfg: AppConfig): Promise<void> {
+  await ControlMidiSender.reconfigure(cfg);
 }
 
 /**

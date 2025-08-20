@@ -146,6 +146,8 @@ export class Router {
     // 1) Mode MIDI direct si défini: envoi immédiat vers l'app cible
     if (mapping.midi) {
       try {
+        // En mode passthrough, si la valeur n'est pas une trame brute mais un scalaire (ex: PB 14b),
+        // laisser le sender décider; sinon transmettre tel quel.
         await sendControlMidi(mapping.app, mapping.midi, value);
       } catch (err) {
         logger.warn(`Envoi MIDI direct échoué pour '${controlId}':`, err as any);

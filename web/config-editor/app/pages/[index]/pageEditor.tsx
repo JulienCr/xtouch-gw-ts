@@ -147,7 +147,7 @@ function ControlsEditor({ controls, onChange }: { controls: Record<string, Contr
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
               <LabeledSelect label="App" value={controls[id]?.app || "qlc"} onChange={(v) => onChange({ ...controls, [id]: { ...(controls[id] || {}), app: v } as any })} options={["voicemeeter", "qlc", "obs", "console"]} />
-              <LabeledSelect label="Type" value={controls[id]?.midi?.type || "cc"} onChange={(v) => onChange({ ...controls, [id]: { ...(controls[id] || {}), midi: { ...(controls[id]?.midi || {}), type: v as any } } })} options={["cc", "note", "pb"]} />
+              <LabeledSelect label="Type" value={controls[id]?.midi?.type || "cc"} onChange={(v) => onChange({ ...controls, [id]: { ...(controls[id] || {}), midi: { ...(controls[id]?.midi || {}), type: v as any } } })} options={["cc", "note", "pb", "passthrough"]} />
               <LabeledInput label="Channel" value={String(controls[id]?.midi?.channel ?? 1)} onChange={(v) => onChange({ ...controls, [id]: { ...(controls[id] || {}), midi: { ...(controls[id]?.midi || {}), channel: Number(v) } } })} />
               {controls[id]?.midi?.type === "cc" && (
                 <LabeledInput label="CC" value={String(controls[id]?.midi?.cc ?? 0)} onChange={(v) => onChange({ ...controls, [id]: { ...(controls[id] || {}), midi: { ...(controls[id]?.midi || {}), cc: Number(v) } } })} />

@@ -4,6 +4,7 @@ declare const process: any;
 import { logger } from "../logger";
 
 import { getInputLookups } from "./matching";
+import type { ControlMapping } from "../types";
 
 export interface InputMapperOptions {
   router: Router;
@@ -33,9 +34,22 @@ export async function attachInputMapper(opts: InputMapperOptions): Promise<() =>
         // Note On (treat vel 0 as off; only handle press)
         const note = data[1] ?? 0;
         const vel = data[2] ?? 0;
-        if (vel <= 0) return;
         const id = noteToControl.get(note);
-        if (id) router.handleControl(id).catch(() => {});
+        if (id) {
+          try {
+            const page = (router as any).getActivePage?.();
+            const mapping = page?.controls?.[id] as ControlMapping | undefined;
+            if (mapping?.midi?.type === "passthrough") {
+              // En passthrough, relayer press ET release (vel=0)
+              router.handleControl(id, data).catch(() => {});
+            } else {
+              // Sinon, ne router que l'appui (vel>0)
+              if (vel > 0) router.handleControl(id).catch(() => {});
+            }
+          } catch {
+            if (vel > 0) router.handleControl(id).catch(() => {});
+          }
+        }
         return;
       }
       if (typeNibble === 0xB) {
@@ -45,7 +59,19 @@ export async function attachInputMapper(opts: InputMapperOptions): Promise<() =>
         const cc = data[1] ?? 0;
         const v = data[2] ?? 0;
         const id = ccToControl.get(cc);
-        if (id) router.handleControl(id, v).catch(() => {});
+        if (id) {
+          try {
+            const page = (router as any).getActivePage?.();
+            const mapping = page?.controls?.[id] as ControlMapping | undefined;
+            if (mapping?.midi?.type === "passthrough") {
+              router.handleControl(id, data).catch(() => {});
+            } else {
+              router.handleControl(id, v).catch(() => {});
+            }
+          } catch {
+            router.handleControl(id, v).catch(() => {});
+          }
+        }
         return;
       }
       if (typeNibble === 0xE) {
@@ -61,7 +87,12 @@ export async function attachInputMapper(opts: InputMapperOptions): Promise<() =>
           try {
             const page = (router as any).getActivePage?.();
             if (page && page.controls && Object.prototype.hasOwnProperty.call(page.controls, id)) {
-              router.handleControl(id, value14).catch(() => {});
+              const mapping = page.controls[id] as ControlMapping | undefined;
+              if (mapping?.midi?.type === "passthrough") {
+                router.handleControl(id, data).catch(() => {});
+              } else {
+                router.handleControl(id, value14).catch(() => {});
+              }
             }
           } catch {}
         }

@@ -53,6 +53,7 @@ export interface XTouchLookup {
 	ccToControl: Map<number, string>;
 	pbChannelToControl: Map<number, string>;
 	controlIdToPbChannel: Map<string, number>;
+	controlIdToKind: Map<string, "note" | "cc" | "pb">;
 }
 
 function buildLookup(rows: CsvRow[], mode: XTouchMode): XTouchLookup {
@@ -60,18 +61,20 @@ function buildLookup(rows: CsvRow[], mode: XTouchMode): XTouchLookup {
 	const ccToControl = new Map<number, string>();
 	const pbChannelToControl = new Map<number, string>();
 	const controlIdToPbChannel = new Map<string, number>();
+	const controlIdToKind = new Map<string, "note" | "cc" | "pb">();
 	for (const r of rows) {
 		const specTxt = mode === "ctrl" ? r.ctrl_message : r.mcu_message;
 		const m = parseMessageSpec(specTxt);
 		if (!m) continue;
-		if (m.type === "note" && typeof m.d1 === "number") noteToControl.set(m.d1, r.control_id);
-		if (m.type === "cc" && typeof m.d1 === "number") ccToControl.set(m.d1, r.control_id);
+		if (m.type === "note" && typeof m.d1 === "number") { noteToControl.set(m.d1, r.control_id); controlIdToKind.set(r.control_id, "note"); }
+		if (m.type === "cc" && typeof m.d1 === "number") { ccToControl.set(m.d1, r.control_id); controlIdToKind.set(r.control_id, "cc"); }
 		if (m.type === "pb" && typeof m.ch === "number") {
 			pbChannelToControl.set(m.ch, r.control_id);
 			controlIdToPbChannel.set(r.control_id, m.ch);
+			controlIdToKind.set(r.control_id, "pb");
 		}
 	}
-	return { noteToControl, ccToControl, pbChannelToControl, controlIdToPbChannel };
+	return { noteToControl, ccToControl, pbChannelToControl, controlIdToPbChannel, controlIdToKind };
 }
 
 let cachedByMode: Partial<Record<XTouchMode, XTouchLookup>> = {};
@@ -96,6 +99,13 @@ export function getPbChannelForControlId(controlId: string, mode: XTouchMode = "
 /** Returns input lookups (note/cc/pb) from CSV; used by the input mapper. */
 export function getInputLookups(mode: XTouchMode = "mcu", csvPath?: string): XTouchLookup {
 	return ensureLookup(mode, csvPath);
+}
+
+/** Returns the primary message kind (note/cc/pb) for a given control ID using the CSV. */
+export function getMessageTypeForControlId(controlId: string, mode: XTouchMode = "mcu", csvPath?: string): "note" | "cc" | "pb" | null {
+	if (!controlId) return null;
+	const l = ensureLookup(mode, csvPath);
+	return l.controlIdToKind.get(controlId) ?? null;
 }
 
 

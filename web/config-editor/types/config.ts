@@ -35,7 +35,7 @@ export interface PassthroughConfig {
 }
 
 export interface ControlMidiSpec {
-  type: "cc" | "note" | "pb";
+  type: "cc" | "note" | "pb" | "passthrough";
   channel: number;
   cc?: number;
   note?: number;
@@ -74,6 +74,7 @@ export interface AppConfig {
   midi: {
     input_port: string;
     output_port: string;
+    apps?: Array<{ name: string; output_port?: string; input_port?: string }>;
   };
   paging?: { channel?: number; prev_note?: number; next_note?: number };
   pages_global?: GlobalPageDefaults;

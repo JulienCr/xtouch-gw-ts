@@ -7,7 +7,7 @@
  */
 export interface ControlMidiSpec {
   /** Type d'événement MIDI à émettre */
-  type: "cc" | "note" | "pb";
+  type: "cc" | "note" | "pb" | "passthrough";
   /** Canal MIDI (1..16) */
   channel: number;
   /** Numéro de CC (si type=cc) */

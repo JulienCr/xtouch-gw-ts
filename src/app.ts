@@ -14,7 +14,7 @@ import { updateFKeyLedsForActivePage } from "./xtouch/fkeys";
 import * as xtapi from "./xtouch/api";
 import { attachInputMapper } from "./xtouch/inputMapper";
 import { attachIndicators, refreshIndicators } from "./xtouch/indicators";
-import { initControlMidiSender, shutdownControlMidiSender } from "./services/controlMidiSender";
+import { initControlMidiSender, shutdownControlMidiSender, updateControlMidiSenderConfig } from "./services/controlMidiSender";
 
 // Minimal Node globals typing to satisfy TS without @types/node
 declare const process: any;
@@ -59,6 +59,7 @@ export async function startApp(): Promise<() => Promise<void>> {
     async (next) => {
       cfg = next;
       await router.updateConfig(next);
+      try { await updateControlMidiSenderConfig(next); } catch {}
       // Réappliquer les LCD si X-Touch actif
       try {
         if (xtouch) {
