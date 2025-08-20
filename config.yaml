@@ -21,6 +21,10 @@ pages_global:
     vpot7_rotate: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 1] }
     vpot8_rotate: { app: "obs", action: "scaleUniform", params: ["--- CAM Main 2", "--- CAM Main", 0.02] }
 
+    fader9:
+      app: "qlc"
+      midi: { type: "cc", channel: 1, cc: 78 }
+
     assign_track:
       app: "obs"
       action: "changeScene"
@@ -62,6 +66,19 @@ pages_global:
       indicator: { signal: "obs.studioMode", truthy: true }
 
 pages:
+
+  - name: "Test QLC"
+    lcd:
+      labels:
+        - "Test"
+      colors: [1]
+    controls: 
+          fader1: 
+            app: "qlc" 
+            midi: { type: "cc", channel: 1, cc: 81 }
+
+
+
   - name: "Voicemeeter+QLC"
     controls: {}
 
@@ -96,14 +113,14 @@ pages:
   - name: "Lum Latéraux"
     lcd:
       labels:
-        - "Jardin\nDimmer"
-        - "Jardin\nRouge"
-        - "Jardin\nVert"
-        - "Jardin\nBleu"
-        - "Cours\nDimmer"
-        - "Cours\nRouge"
-        - "Cours\nVert"
-        - "Cours\nBleu"
+        - "Lat Jar\nDimmer"
+        - "Lat Jar\nRouge"
+        - "Lat Jar\nVert"
+        - "Lat Jar\nBleu"
+        - "Lat Cour\nDimmer"
+        - "Lat Cour\nRouge"
+        - "Lat Cour\nVert"
+        - "Lat Cour\nBleu"
       colors: [7,1,2,4,7,1,2,4]
     passthroughs:
       - driver: "midi"

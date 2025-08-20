@@ -116,4 +116,17 @@ Après `learn <id>`, le prochain message produit:
 fader1: { app: "console", action: "log", params: [] }
 ```
 
+Pour un envoi MIDI direct (global, toutes apps), utilisez:
+
+```yaml
+fader1:
+  app: "qlc"
+  midi:
+    type: "cc"
+    channel: 1
+    cc: 81
+```
+
+Le backend convertit automatiquement la valeur si le fader émet en PitchBend (14 bits), en normalisant vers 0..127 pour un CC.
+
 Adaptez ensuite `app`, `action` et `params` selon l’application cible (Voicemeeter/QLC+/OBS).

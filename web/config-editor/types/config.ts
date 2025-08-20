@@ -34,6 +34,21 @@ export interface PassthroughConfig {
   transform?: TransformConfig;
 }
 
+export interface ControlMidiSpec {
+  type: "cc" | "note" | "pb";
+  channel: number;
+  cc?: number;
+  note?: number;
+}
+
+export interface ControlMapping {
+  app: string;
+  action?: string;
+  params?: unknown[];
+  midi?: ControlMidiSpec;
+  indicator?: { signal: string; equals?: unknown; in?: unknown[]; truthy?: boolean };
+}
+
 export interface PageConfig {
   name: string;
   passthrough?: PassthroughConfig;

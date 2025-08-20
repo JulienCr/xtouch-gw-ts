@@ -110,6 +110,16 @@ pages:
       fader2: { app: "qlc", action: "setChannelValue", params: [5] }
       rotary1: { app: "obs", action: "setVolume", params: ["Mic/Aux"] }
 
+  - name: "QLC via MIDI direct"
+    controls:
+      fader1:
+        app: "qlc"
+        midi:
+          type: "cc"      # note|cc|pb
+          channel: 1
+          cc: 81          # numéro de CC si type=cc
+    # Remarque: si le fader émet en Pitch Bend (mode MCU), la valeur 14 bits est convertie vers 7 bits (0..127) automatiquement avant envoi du CC.
+
   - name: "QLC Scene Control"
     controls:
       button1: { app: "qlc", action: "triggerCue", params: ["Scene1"] }

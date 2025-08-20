@@ -54,6 +54,9 @@
     - [x] src/router/forward.ts
     - [x] src/config.ts (load/find)
 
+## Fait
+- [x] Controls MIDI directs (global): ajout de `controls.*.midi` pour adresser n'importe quelle app via CC/Note/PB, avec conversion automatique PB→CC si besoin. Service `controlMidiSender` (ports cache) + heuristiques ports (voicemeeter→`xtouch-gw`, qlc→`qlc-in`). UI éditeur mise à jour. Docs README/CLI/specs.
+
 - [ ] Driver OBS (WIP): connexion obs-websocket v5, actions `nudgeX`/`nudgeY`/`scaleUniform`, cache `sceneItemId` et transforms, reconnexion/backoff. Mapping encoders `enc6..enc8` via CC 21–23. Docs: `docs/driver-obs.md`.
   - [x] Input layer générique: attacher `inputMapper` (CSV → controlId → router.handleControl)
   - [x] Navigation: pagination uniquement (suppression du mapping CC 16..23 → enc1..8)

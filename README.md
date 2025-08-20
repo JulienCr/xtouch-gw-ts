@@ -112,6 +112,17 @@ pages:
             base_cc: "0x45"   # ch1→0x46, ch2→0x47, …
     controls: {}              # mappings (router) – optionnels à ce stade
 
+    # Exemple de mapping MIDI direct global (sans passer par un bridge):
+    # Convertit automatiquement PB→CC si le fader émet en PitchBend.
+    # Ici: fader1 → CC81 ch1 sur le port QLC (qlc-in)
+    controls:
+      fader1:
+        app: "qlc"
+        midi:
+          type: "cc"
+          channel: 1
+          cc: 81
+
   - name: "Default"
     controls: {}
 ```

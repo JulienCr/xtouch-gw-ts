@@ -4,19 +4,21 @@ import type { Driver, ExecutionContext } from "../types";
 import type { XTouchDriver } from "../xtouch/driver";
 import type { MidiFilterConfig, TransformConfig } from "../config";
 import { hex, human, isPB, pb14FromRaw } from "../midi/utils";
+import { scheduleFaderSetpoint } from "../xtouch/faderSetpoint";
 import { matchFilter } from "../midi/filter";
 import { applyTransform } from "../midi/transform";
 import { findPortIndexByNameFragment } from "../midi/ports";
 import { resolveAppKeyFromPort } from "../shared/appKey";
+
+// MODIF: typage sûr pour accès au squelch PB
+type PitchBendSquelchCapable = { isPitchBendSquelched?: () => boolean };
 
 export class MidiBridgeDriver implements Driver {
   readonly name = "midi-bridge";
   private outToTarget: Output | null = null;
   private inFromTarget: Input | null = null;
   private unsubXTouch?: () => void;
-  // Debounce pour setpoint moteurs: éviter de renvoyer PB pendant le mouvement → ne fixer qu'à l'arrêt
-  private faderSetpointTimers: Map<number, NodeJS.Timeout> = new Map();
-  private lastPbValue14: Map<number, number> = new Map();
+  // MODIF: timers/état de setpoint supprimés (mutualisés via scheduleFaderSetpoint)
 
   constructor(
     private readonly xtouch: XTouchDriver,
@@ -79,7 +81,8 @@ export class MidiBridgeDriver implements Driver {
             // Bloquer temporairement l'émission des PB du X‑Touch vers la cible pendant squelch
             const status = data[0] ?? 0;
             const isPBMsg = isPB(status);
-            if (isPBMsg && (this.xtouch as any).isPitchBendSquelched?.()) {
+            const squelched = (this.xtouch as unknown as PitchBendSquelchCapable).isPitchBendSquelched?.() === true;
+            if (isPBMsg && squelched) {
               logger.trace(`Bridge DROP (PB squelched) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
               return;
             }
@@ -99,26 +102,13 @@ export class MidiBridgeDriver implements Driver {
                   const lsb = data[1] ?? 0;
                   const msb = data[2] ?? 0;
                   const value14 = pb14FromRaw(lsb, msb);
-                  this.lastPbValue14.set(ch1, value14);
-                  const prev = this.faderSetpointTimers.get(ch1);
-                  if (prev) {
-                    try { clearTimeout(prev); } catch {}
-                  }
-                  const t = setTimeout(() => {
-                    const v = this.lastPbValue14.get(ch1);
-                    if (v != null) {
-                      try {
-                        logger.trace(`Setpoint PB -> X-Touch: ch=${ch1} val14=${v}`);
-                        this.xtouch.setFader14(ch1, v);
-                      } catch {}
-                    }
-                    this.faderSetpointTimers.delete(ch1);
-                  }, 90);
-                  this.faderSetpointTimers.set(ch1, t);
+                  scheduleFaderSetpoint(this.xtouch, ch1, value14);
                 }
               } catch {}
               // Marquer shadow app pour anti-echo côté router (exposé globalement par app.ts)
               try { (global as any).__router__?.markAppShadowForOutgoing?.(resolveAppKeyFromPort(this.toPort), tx, this.toPort); } catch {}
+              // MODIF: mise à jour optimiste du state pour assurer un refresh correct après changement de page
+              try { (global as any).__router__?.onMidiFromApp?.(resolveAppKeyFromPort(this.toPort), tx, this.toPort); } catch {}
               // Note: On ne met pas à jour le state avec les commandes sortantes
               // Le state ne doit être mis à jour QUE par les feedbacks entrants
             } else {

@@ -14,6 +14,7 @@ import { updateFKeyLedsForActivePage } from "./xtouch/fkeys";
 import * as xtapi from "./xtouch/api";
 import { attachInputMapper } from "./xtouch/inputMapper";
 import { attachIndicators, refreshIndicators } from "./xtouch/indicators";
+import { initControlMidiSender, shutdownControlMidiSender } from "./services/controlMidiSender";
 
 // Minimal Node globals typing to satisfy TS without @types/node
 declare const process: any;
@@ -49,6 +50,8 @@ export async function startApp(): Promise<() => Promise<void>> {
 
   // Enregistrer et initialiser les drivers
   await initDrivers(router);
+  // Service d'envoi MIDI par contrôle (ports cache)
+  await initControlMidiSender(cfg);
 
   // Hot reload config
   const stopWatch = watchConfig(
@@ -110,6 +113,8 @@ export async function startApp(): Promise<() => Promise<void>> {
         try { updateFKeyLedsForActivePage(router, x, paging.channel); } catch {}
         applyLcdForActivePage(router, x);
         rebuildBackgroundListeners(page);
+        // MODIF: synchroniser les entrées feedback de controls.midi avec la page (fermer celles couverts par passthroughs)
+        try { (global as any).__controlMidiSender__?.reconcileForPage?.(page); } catch {}
         if (page?.passthrough || page?.passthroughs) {
           for (const b of pageBridges) {
             try { b.shutdown().catch((err) => logger.warn("Bridge shutdown error:", err as any)); } catch {}
@@ -119,7 +124,7 @@ export async function startApp(): Promise<() => Promise<void>> {
           buildPageBridges(router, x, items, false).then((bridges) => { pageBridges = bridges; }).catch((err) => logger.warn("Bridge page build error:", err as any));
         } else {
           for (const b of pageBridges) {
-            b.shutdown().catch((err) => logger.warn("Bridge shutdown error:", err as any));
+            try { b.shutdown().catch((err) => logger.warn("Bridge shutdown error:", err as any)); } catch {}
           }
           pageBridges = [];
         }
@@ -129,6 +134,8 @@ export async function startApp(): Promise<() => Promise<void>> {
       },
     });
     xtouch = x;
+    // Exposer pour services globaux (setpoint moteur après envoi direct)
+    (global as any).__xtouch__ = x;
     // Input layer générique: attacher l'InputMapper (CSV → controlId → router)
     try {
       detachInputMapper = await attachInputMapper({ router, xtouch: x, mode: cfg.xtouch?.mode ?? "mcu", channel: paging.channel });
@@ -163,6 +170,7 @@ export async function startApp(): Promise<() => Promise<void>> {
 
     // Initialiser bridge pour page active si défini
     const initialPage = router.getActivePage();
+    try { (global as any).__controlMidiSender__?.reconcileForPage?.(initialPage); } catch {}
     if (initialPage?.passthrough || initialPage?.passthroughs) {
       const items = getPagePassthroughItems(initialPage);
       pageBridges = await buildPageBridges(router, x, items, true);
@@ -199,6 +207,7 @@ export async function startApp(): Promise<() => Promise<void>> {
     try { stopWatch(); } catch {}
     try { for (const b of pageBridges) b.shutdown().catch(() => {}); } catch {}
     try { vmBridge?.shutdown(); } catch {}
+    try { await shutdownControlMidiSender(); } catch {}
     
     try { xtouch?.stop(); } catch {}
     try { bgManager.shutdown(); } catch {}

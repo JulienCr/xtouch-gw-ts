@@ -55,16 +55,17 @@ export async function attachInputMapper(opts: InputMapperOptions): Promise<() =>
   const channel = opts.channel ?? 1;
   const csvPath = opts.matchingCsvPath ?? path.join(process.cwd(), "docs", "xtouch-matching.csv");
   const rows = await loadCsv(csvPath);
-  // Build reverse maps per type (note/cc) for fast lookup on CH1
+  // Build reverse maps per type (note/cc/pb) for fast lookup on CH1
   const noteToControl = new Map<number, string>();
   const ccToControl = new Map<number, string>();
+  const hasAnyPbControl = new Set<string>();
   for (const r of rows) {
     const spec = mode === "ctrl" ? r.ctrl_message : r.mcu_message;
     const m = parseMessageSpec(spec);
     if (!m) continue;
     if (m.type === "note" && typeof m.d1 === "number") noteToControl.set(m.d1, r.control_id);
     if (m.type === "cc" && typeof m.d1 === "number") ccToControl.set(m.d1, r.control_id);
-    // PB mapping to logical control can be added later if needed
+    if (m.type === "pb") hasAnyPbControl.add(r.control_id);
   }
 
   const unsub = xtouch.subscribe((_delta, data) => {
@@ -88,6 +89,29 @@ export async function attachInputMapper(opts: InputMapperOptions): Promise<() =>
         const v = data[2] ?? 0;
         const id = ccToControl.get(cc);
         if (id) router.handleControl(id, v).catch(() => {});
+        return;
+      }
+      if (typeNibble === 0xE) {
+        // Pitch Bend 14 bits (faders en mode MCU)
+        // Acheminer vers les contrôles PB si configurés (ex: fader1)
+        const lsb = data[1] ?? 0;
+        const msb = data[2] ?? 0;
+        const value14 = ((msb & 0x7f) << 7) | (lsb & 0x7f);
+        // Dans le CSV, les faders PB sont déclarés avec pb=chN → control_id par strip (ex: fader1..8)
+        // Ici, on ne connaît pas l'association channel→id sans logique dédiée.
+        // Stratégie: on émet des events vers des ids connus s'ils existent conventionnellement.
+        // Convention: "fader1".."fader9".
+        const ch1 = (status & 0x0f) + 1;
+        const id = ch1 >= 1 && ch1 <= 8 ? `fader${ch1}` : (ch1 === 9 ? "fader_master" : null);
+        if (id && hasAnyPbControl.has(id)) {
+          // MODIF: n'émettre PB→handleControl que si la page active a un mapping pour cet id
+          try {
+            const page = (router as any).getActivePage?.();
+            if (page && page.controls && Object.prototype.hasOwnProperty.call(page.controls, id)) {
+              router.handleControl(id, value14).catch(() => {});
+            }
+          } catch {}
+        }
         return;
       }
     } catch (err) {

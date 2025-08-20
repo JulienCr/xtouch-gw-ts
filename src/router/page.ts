@@ -2,13 +2,26 @@ import type { AppKey, MidiStateEntry, MidiStatus } from "../state";
 import type { PageConfig } from "../config";
 import { getPagePassthroughItems } from "../config/passthrough";
 import { resolveAppKey } from "../shared/appKey";
+import type { ControlMapping } from "../types";
 
 export function getAppsForPage(page: PageConfig): AppKey[] {
 	const items = getPagePassthroughItems(page);
-	const appKeys: AppKey[] = Array.isArray(items)
+	const viaPassthrough: AppKey[] = Array.isArray(items)
 		? Array.from(new Set(items.map((it: any) => resolveAppKey(it?.to_port, it?.from_port) as AppKey)))
 		: [];
-	return appKeys.length > 0 ? appKeys : ["voicemeeter"];
+	// MODIF: priorité aux apps déclarées par passthroughs pour éviter l'écoute double
+	if (viaPassthrough.length > 0) return viaPassthrough;
+	const set = new Set<AppKey>();
+	// MODIF: inclure aussi les apps référencées par controls.* (mapping/app), utile sans passthrough
+	const controls = (page.controls as Record<string, unknown>) || {};
+	for (const [, raw] of Object.entries(controls)) {
+		const m = raw as unknown as { app?: string };
+		if (m && typeof m.app === "string") {
+			set.add(m.app as AppKey);
+		}
+	}
+	const out = Array.from(set.values());
+	return out.length > 0 ? out : ["voicemeeter"];
 }
 
 export function getChannelsForApp(page: PageConfig, app: AppKey): number[] {
@@ -42,21 +55,47 @@ export function resolvePbToCcMappingForApp(page: PageConfig, app: AppKey): { map
 		.map((it: any) => ({ app: resolveAppKey(it?.to_port, it?.from_port) as AppKey, transform: it?.transform }))
 		.find((x: any) => x.app === app);
 	const pb2cc = cfg?.transform?.pb_to_cc;
-	if (!pb2cc) return null;
 	const out = new Map<number, number>();
 	const reverse = new Map<number, number>();
-	const baseRaw = pb2cc.base_cc;
-	const base = typeof baseRaw === "string" ? parseInt(baseRaw, 16) : (typeof baseRaw === "number" ? baseRaw : undefined);
-	for (let ch = 1; ch <= 9; ch++) {
-		let cc = pb2cc.cc_by_channel?.[ch];
-		if (cc == null && base != null) {
-			cc = base + (ch - 1);
+	if (pb2cc) {
+		const baseRaw = pb2cc.base_cc;
+		const base = typeof baseRaw === "string" ? parseInt(baseRaw, 16) : (typeof baseRaw === "number" ? baseRaw : undefined);
+		for (let ch = 1; ch <= 9; ch++) {
+			let cc = pb2cc.cc_by_channel?.[ch];
+			if (cc == null && base != null) {
+				cc = base + (ch - 1);
+			}
+			if (typeof cc === "string") {
+				cc = cc.startsWith("0x") ? parseInt(cc, 16) : parseInt(cc, 10);
+			}
+			if (typeof cc === "number") { out.set(ch, cc); reverse.set(cc, ch); }
 		}
-		if (typeof cc === "string") {
-			cc = cc.startsWith("0x") ? parseInt(cc, 16) : parseInt(cc, 10);
-		}
-		if (typeof cc === "number") { out.set(ch, cc); reverse.set(cc, ch); }
 	}
+
+	// MODIF: si aucune transform pb_to_cc n'est définie, construire une table depuis les controls.*.midi
+	if (out.size === 0 && page?.controls) {
+		const entries = Object.entries((page.controls as Record<string, unknown>) || {}) as Array<[string, ControlMapping]>;
+		for (const [controlId, mapping] of entries) {
+			if (!mapping || mapping.app !== app || !mapping.midi) continue;
+			const spec = mapping.midi;
+			if (spec.type !== "cc") continue;
+			// Déduction du canal fader à partir de l'id de contrôle (fader1..fader9)
+			let ch: number | null = null;
+			const m = /^fader(\d+)$/.exec(controlId);
+			if (m) {
+				const n = Number(m[1]);
+				if (Number.isFinite(n) && n >= 1 && n <= 9) ch = n;
+			}
+			if (controlId === "fader_master") ch = 9;
+			if (ch == null) continue;
+			const cc = Number(spec.cc);
+			if (Number.isFinite(cc)) {
+				out.set(ch, cc);
+				reverse.set(cc, ch);
+			}
+		}
+	}
+
 	return out.size > 0 ? { map: out, channelForCc: reverse } : null;
 }
 

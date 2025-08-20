@@ -8,7 +8,30 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
 - Tenir `TASKS.md` à jour après chaque lot de travail.
 
 ## Entrées
-- 2025-08-20 — Ajout d’un cycle de resynchronisation global (CLI `sync`)
+- 2025-08-20 — Fonctionnalité controls.midi et résolution des bugs de coexistence
+  - Décision: introduire `controls.*.midi { type, channel, cc|note }` pour un routage global générique (toutes apps) sans dupliquer de logique dans les drivers.
+  - Implémentation: service `src/services/controlMidiSender.ts` (cache de ports, conversion 14b→7b pour CC), `Router.handleControl()` priorise `midi` sur `action`, `inputMapper` émet valeur14 pour faders PB.
+  - Leçon: factoriser la logique d'envoi MIDI hors drivers spécifiques, conserver OBS/Voicemeeter/QLC pur API côté drivers.
+  - Besoin: recaler rapidement surface/états/drivers après dérive (déconnexions OBS, reboot, etc.).
+  - Solution: nouveau hook optionnel `Driver.sync()` appelé via `Router.syncDrivers()`, et commande CLI `sync` enchaînant reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD.
+  - Leçon: centraliser la resynchro côté Router/CLI, laisser chaque driver gérer sa lecture d'état.
+  - **Bugs rencontrés et solutions:**
+    - **Offset pb_to_cc (+1)**: Le calcul `base_cc + channel_source` était incorrect. Fix: `base_cc + (channel_source - 1)` pour que fader1→CC81, fader2→CC82, etc.
+    - **Passthrough cassé après controls.midi**: L'inputMapper appelait `handleControl` même sur les pages sans mapping controls. Fix: filtrer les appels PB→handleControl uniquement si le control_id existe dans la page active.
+    - **Passthrough et controls.midi en conflit**: Double écoute des ports MIDI causant des conflits. Fix: prioriser les passthroughs, fermer les ports controlMidiSender quand un passthrough est actif.
+    - **Feedback manquant pour controls.midi**: Pas de mise à jour de l'état après envoi. Fix: ouverture de ports d'entrée dédiés + optimistic update immédiat du state.
+    - **Désynchronisation entre pages**: Fader déplacé sur page passthrough non reflété sur page controls.midi. Fix: optimistic update dans midiBridge + controlMidiSender pour maintenir le state à jour.
+  - **Leçons apprises:**
+    - **Gestion des ports MIDI**: Un seul service doit "posséder" les ports IN/OUT pour une app donnée. Prioriser les passthroughs sur les controls.midi.
+    - **Optimistic updates**: Mettre à jour le state immédiatement après envoi MIDI pour éviter les désynchronisations lors des changements de page.
+    - **Filtrage des événements**: Ne traiter les événements controls.midi que quand ils sont explicitement mappés sur la page active.
+    - **Mutualisation du code**: Factoriser la logique de setpoint des faders dans un utilitaire partagé pour éviter la duplication.
+    - **Coexistence des systèmes**: Les passthroughs et controls.midi peuvent coexister mais nécessitent une gestion stricte des priorités et des ports.
+- 2025-08-20 — Ajout d'un cycle de resynchronisation global (CLI `sync`)
+- 2025-08-20 — Mapping MIDI direct par contrôle
+  - Décision: introduire `controls.*.midi { type, channel, cc|note }` pour un routage global générique (toutes apps) sans dupliquer de logique dans les drivers.
+  - Implémentation: service `src/services/controlMidiSender.ts` (cache de ports, conversion 14b→7b pour CC), `Router.handleControl()` priorise `midi` sur `action`, `inputMapper` émet valeur14 pour faders PB.
+  - Leçon: factoriser la logique d’envoi MIDI hors drivers spécifiques, conserver OBS/Voicemeeter/QLC pur API côté drivers.
   - Besoin: recaler rapidement surface/états/drivers après dérive (déconnexions OBS, reboot, etc.).
   - Solution: nouveau hook optionnel `Driver.sync()` appelé via `Router.syncDrivers()`, et commande CLI `sync` enchaînant reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD.
   - Leçon: centraliser la resynchro côté Router/CLI, laisser chaque driver gérer sa lecture d’état.

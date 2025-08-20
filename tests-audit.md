@@ -260,3 +260,8 @@ Prochaines étapes
   - Lecture fraîche: si `readCurrent` ≠ cache, ne “recolle” pas à l’ancienne position
   - Non-écriture `width/height`: vérifier qu’aucun champ interdit n’est envoyé
 
+2025-08-20 — Controls MIDI directs (nouvelle feature)
+- Ajout: `src/services/controlMidiSender.ts` (nouveau module, non couvert par tests pour l’instant)
+- Changements: `src/router.ts` (priorise `mapping.midi`), `src/xtouch/inputMapper.ts` (émission valeur14 pour PB)
+- Impact couverture: dossier `services` partiellement couvert; prévoir tests unitaires stubs Output pour valider conversion 14b→7b et ouverture de ports.
+

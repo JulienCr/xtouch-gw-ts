@@ -1,13 +1,40 @@
 /**
  * Mapping d'un contrôle logique vers une action d'application.
  */
+/**
+ * Spécifie une émission MIDI directe pour un contrôle.
+ * Permet d'adresser une application (par ses ports MIDI par défaut) sans passer par un bridge global.
+ */
+export interface ControlMidiSpec {
+  /** Type d'événement MIDI à émettre */
+  type: "cc" | "note" | "pb";
+  /** Canal MIDI (1..16) */
+  channel: number;
+  /** Numéro de CC (si type=cc) */
+  cc?: number;
+  /** Numéro de note (si type=note) */
+  note?: number;
+}
+
 export interface ControlMapping {
-  /** Clé d'application (ex: "obs") */
+  /** Clé d'application cible (ex: "obs", "qlc", "voicemeeter") */
   app: string;
-  /** Nom d'action (ex: "toggleStudioMode", "changeScene") */
-  action: string;
-  /** Paramètres passés à l'action */
+  /**
+   * Nom d'action (ex: "toggleStudioMode", "changeScene").
+   * Ignoré si `midi` est défini (le mapping MIDI est prioritaire).
+   */
+  action?: string;
+  /** Paramètres passés à l'action (si `action` défini) */
   params?: unknown[];
+  /**
+   * Spécification d'un envoi MIDI direct (prioritaire sur `action`).
+   * Exemple YAML:
+   *   controls:
+   *     fader1:
+   *       app: "qlc"
+   *       midi: { type: "cc", channel: 1, cc: 81 }
+   */
+  midi?: ControlMidiSpec;
   /**
    * Spécification optionnelle d'un indicateur (LED) à allumer/éteindre
    * en fonction d'un signal publié par le driver.
