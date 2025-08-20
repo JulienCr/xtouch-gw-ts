@@ -6,6 +6,7 @@ import { logger } from "../logger";
 import { scheduleFaderSetpoint } from "../xtouch/faderSetpoint";
 import type { XTouchDriver } from "../xtouch/driver";
 import { resolveAppKey } from "../shared/appKey";
+import { resolvePbToCcMappingForApp } from "../router/page";
 
 /**
  * Gestionnaire global d'émission MIDI pour les mappings de `controls.*.midi`.
@@ -177,7 +178,23 @@ class ControlMidiSenderImpl {
           v7 = Math.round(Math.max(0, Math.min(16383, v)) / 16383 * 127);
           // Programmer aussi un setpoint moteur pour éviter le « retour » après mouvement
           const xt = getGlobalXTouch();
-          if (xt) scheduleFaderSetpoint(xt, channel, Math.max(0, Math.min(16383, v | 0)));
+          if (xt) {
+            // En MCU, le canal CC cible (souvent CH1 pour QLC) n'est pas le canal du fader source.
+            // Déduire le canal fader depuis la page active via le mapping CC→PB s'il est disponible.
+            let faderChannel = channel;
+            try {
+              const g = (global as unknown as { __router__?: { getActivePage: () => PageConfig | undefined } }).__router__;
+              const page = g?.getActivePage?.();
+              if (page) {
+                const m = resolvePbToCcMappingForApp(page, app as any);
+                const ch = m?.channelForCc?.get(cc);
+                if (typeof ch === "number" && Number.isFinite(ch) && ch >= 1 && ch <= 16) {
+                  faderChannel = ch;
+                }
+              }
+            } catch {}
+            scheduleFaderSetpoint(xt, faderChannel, Math.max(0, Math.min(16383, v | 0)));
+          }
         } else {
           v7 = Math.max(0, Math.min(127, v | 0));
         }

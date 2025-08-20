@@ -66,19 +66,6 @@ pages_global:
       indicator: { signal: "obs.studioMode", truthy: true }
 
 pages:
-
-  - name: "Test QLC"
-    lcd:
-      labels:
-        - "Test"
-      colors: [1]
-    controls: 
-          fader1: 
-            app: "qlc" 
-            midi: { type: "cc", channel: 1, cc: 81 }
-
-
-
   - name: "Voicemeeter+QLC"
     controls: {}
 
@@ -122,16 +109,31 @@ pages:
         - "Lat Cour\nVert"
         - "Lat Cour\nBleu"
       colors: [7,1,2,4,7,1,2,4]
-    passthroughs:
-      - driver: "midi"
-        to_port: "qlc-in"
-        from_port: "qlc-out"
-        transform:
-          pb_to_cc:
-            target_channel: 1   # Envoyer vers canal 1 (QLC+)
-            base_cc: 81     # Mapping: ch1→0x46, ch2→0x47, ch3→0x48, ch4→0x49, etc.
-            cc_by_channel:
-              9: 78  # Master Dimmer
+    controls:
+      fader1:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 81 }
+      fader2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 82 }
+      fader3:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 83 }
+      fader4:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 84 }
+      fader5:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 85 }
+      fader6:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 86 }
+      fader7:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 87 }
+      fader8:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 88 }
   - name: "Néons Latéraux RGB"
     lcd:
       labels:
@@ -177,8 +179,4 @@ pages:
             base_cc: 96     # Base CC P2 (80) → P4 = 209–216 en QLC
             cc_by_channel:
               9: 78  # Master Dimmer (Fader 9)
-  - name: "Default"
-    lcd:
-      labels:
-        - "Default"
     controls: {} 

@@ -19,6 +19,13 @@ function parseMessageSpec(spec: string): { type: "note" | "cc" | "pb"; ch?: numb
     return Number.isFinite(n) ? { type: "cc", d1: n } : null;
   }
   if (s.startsWith("pb=")) {
+    // Expected format: pb=chN
+    const m = /pb=ch(\d+)/i.exec(s);
+    if (m) {
+      const ch = Number(m[1]);
+      if (Number.isFinite(ch) && ch >= 1 && ch <= 16) return { type: "pb", ch };
+      return { type: "pb" };
+    }
     return { type: "pb" };
   }
   return null;
@@ -58,14 +65,20 @@ export async function attachInputMapper(opts: InputMapperOptions): Promise<() =>
   // Build reverse maps per type (note/cc/pb) for fast lookup on CH1
   const noteToControl = new Map<number, string>();
   const ccToControl = new Map<number, string>();
-  const hasAnyPbControl = new Set<string>();
+  // For MCU PB, map the MIDI channel → control_id using CSV (e.g., pb=ch2 → fader2)
+  const pbChannelToControl = new Map<number, string>();
   for (const r of rows) {
     const spec = mode === "ctrl" ? r.ctrl_message : r.mcu_message;
     const m = parseMessageSpec(spec);
     if (!m) continue;
     if (m.type === "note" && typeof m.d1 === "number") noteToControl.set(m.d1, r.control_id);
     if (m.type === "cc" && typeof m.d1 === "number") ccToControl.set(m.d1, r.control_id);
-    if (m.type === "pb") hasAnyPbControl.add(r.control_id);
+    if (m.type === "pb") {
+      // In MCU, pb carries the fader on its own channel (1..9)
+      if (typeof m.ch === "number") {
+        pbChannelToControl.set(m.ch, r.control_id);
+      }
+    }
   }
 
   const unsub = xtouch.subscribe((_delta, data) => {
@@ -73,8 +86,9 @@ export async function attachInputMapper(opts: InputMapperOptions): Promise<() =>
       const status = data[0] ?? 0;
       const typeNibble = (status & 0xf0) >> 4;
       const ch1 = (status & 0x0f) + 1;
-      if (ch1 !== (channel | 0)) return;
       if (typeNibble === 0x9) {
+        // Only handle Note on the configured paging channel
+        if (ch1 !== (channel | 0)) return;
         // Note On (treat vel 0 as off; only handle press)
         const note = data[1] ?? 0;
         const vel = data[2] ?? 0;
@@ -84,6 +98,8 @@ export async function attachInputMapper(opts: InputMapperOptions): Promise<() =>
         return;
       }
       if (typeNibble === 0xB) {
+        // Only handle CC on the configured paging channel
+        if (ch1 !== (channel | 0)) return;
         // Control Change 0..127, value 0..127
         const cc = data[1] ?? 0;
         const v = data[2] ?? 0;
@@ -93,18 +109,14 @@ export async function attachInputMapper(opts: InputMapperOptions): Promise<() =>
       }
       if (typeNibble === 0xE) {
         // Pitch Bend 14 bits (faders en mode MCU)
-        // Acheminer vers les contrôles PB si configurés (ex: fader1)
+        // Acheminer vers les contrôles PB selon leur canal (défini dans le CSV: pb=chN)
         const lsb = data[1] ?? 0;
         const msb = data[2] ?? 0;
         const value14 = ((msb & 0x7f) << 7) | (lsb & 0x7f);
-        // Dans le CSV, les faders PB sont déclarés avec pb=chN → control_id par strip (ex: fader1..8)
-        // Ici, on ne connaît pas l'association channel→id sans logique dédiée.
-        // Stratégie: on émet des events vers des ids connus s'ils existent conventionnellement.
-        // Convention: "fader1".."fader9".
-        const ch1 = (status & 0x0f) + 1;
-        const id = ch1 >= 1 && ch1 <= 8 ? `fader${ch1}` : (ch1 === 9 ? "fader_master" : null);
-        if (id && hasAnyPbControl.has(id)) {
-          // MODIF: n'émettre PB→handleControl que si la page active a un mapping pour cet id
+        const chPb = (status & 0x0f) + 1;
+        const id = pbChannelToControl.get(chPb);
+        if (id) {
+          // N'émettre PB→handleControl que si la page active a un mapping pour cet id
           try {
             const page = (router as any).getActivePage?.();
             if (page && page.controls && Object.prototype.hasOwnProperty.call(page.controls, id)) {

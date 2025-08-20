@@ -215,6 +215,11 @@ Prochaines étapes
 - Changement: `updateLeds()` n'émet plus que pour les contrôles avec indicateur explicite.
 - Résultat: suite `pnpm test` entièrement verte après modification.
 
+2025-08-20 — InputMapper (MCU) — routage PB multi-canaux
+- Problème: seuls les PB canal 1 (fader1) passaient; faders 2..8 rejetés par un filtre de canal global.
+- Fix: parsing `pb=chN` depuis `docs/xtouch-matching.csv` et table `pbChannelToControl`; filtrage de canal maintenu pour Note/CC uniquement; PB accepté sur 1..9 puis résolu vers `control_id`.
+- Tests: suite unitaire complète verte (`pnpm test:unit`). Ajouter plus tard des tests ciblés sur `attachInputMapper` avec driver X‑Touch fake.
+
 2025-08-20 — pages_global (defaults) ajouté
 - Typecheck OK, suite de tests complète verte après fusion globale des pages.
 

@@ -48,6 +48,16 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Cause: `attachIndicators()` ré-émettait des NoteOn à 0 pour tous les contrôles mappés par CSV, y compris ceux sans indicateur actif, écrasant les LEDs gérées par `fkeys`.
   - Fix: dans `src/xtouch/indicators.ts`, ne toucher qu'aux LEDs présentes dans `litByControlId` (celles avec un indicateur explicite). Les LEDs navigation restent gérées par `updateFKeyLedsForActivePage`/`updatePrevNextLeds`.
   - Leçon: isoler les responsabilités LED — navigation vs indicateurs d'app — et éviter les write-all par défaut.
+ - 2025-08-20 — InputMapper (MCU) ne routait pas les faders 2..8
+   - Symptôme: seul `fader1` fonctionnait; logs « Aucun mapping pour 'faderX_touch' ».
+   - Cause: filtre global par `paging.channel` appliqué aussi aux Pitch Bend (faders MCU), rejetant les PB sur ch2..8.
+   - Fix: parser `pb=chN` depuis `docs/xtouch-matching.csv` et construire `pbChannelToControl`; n'appliquer le filtre de canal qu'aux Note/CC; accepter PB sur tous canaux et router selon la table.
+   - Leçon: en MCU, le canal MIDI d'un fader est sémantique (strip). Le filtrage de canal doit être spécifique au type de message.
+ - 2025-08-20 — Setpoint moteur incorrect sur faders 2..8 (controls.midi)
+  - Symptôme: après mouvement d'un fader 2..8, le moteur se recalait mal ou revenait à une position incorrecte.
+  - Cause: `scheduleFaderSetpoint()` était appelé avec le canal CC cible (souvent CH1 pour QLC) au lieu du canal du fader source (CH2..8).
+  - Fix: dans `controlMidiSender.ts`, déduire le canal fader depuis la page active via `resolvePbToCcMappingForApp()` et le mapping CC→PB, puis programmer le setpoint sur ce canal.
+  - Leçon: en MCU, le canal MIDI d'un fader (source) et le canal CC cible (destination) sont distincts. Le setpoint moteur doit toujours être sur le canal source.
  - 2025-08-20 — Defaults globaux pages
    - Décision: introduire `pages_global` dans `config.yaml` pour définir des contrôles/LCD/passthroughs communs.
    - Implémentation: fusion au runtime dans `Router.mergeGlobalIntoPage()` sans muter la config; override par page.
