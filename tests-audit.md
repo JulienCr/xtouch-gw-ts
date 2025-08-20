@@ -210,6 +210,11 @@ Prochaines étapes
 
 ## Journal d’avancement (MàJ continue)
 
+2025-08-20 — Correctif LEDs navigation
+- Les LEDs Prev/Next et F1..F8 étaient éteintes par la couche d'indicateurs génériques.
+- Changement: `updateLeds()` n'émet plus que pour les contrôles avec indicateur explicite.
+- Résultat: suite `pnpm test` entièrement verte après modification.
+
 2025-08-20 — pages_global (defaults) ajouté
 - Typecheck OK, suite de tests complète verte après fusion globale des pages.
 

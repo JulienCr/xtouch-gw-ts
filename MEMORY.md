@@ -8,6 +8,11 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
 - Tenir `TASKS.md` à jour après chaque lot de travail.
 
 ## Entrées
+- 2025-08-20 — LEDs navigation écrasées par indicateurs génériques
+  - Symptôme: à l'arrivée sur une page, Prev/Next et F1..F8 s'allument puis s'éteignent immédiatement.
+  - Cause: `attachIndicators()` ré-émettait des NoteOn à 0 pour tous les contrôles mappés par CSV, y compris ceux sans indicateur actif, écrasant les LEDs gérées par `fkeys`.
+  - Fix: dans `src/xtouch/indicators.ts`, ne toucher qu'aux LEDs présentes dans `litByControlId` (celles avec un indicateur explicite). Les LEDs navigation restent gérées par `updateFKeyLedsForActivePage`/`updatePrevNextLeds`.
+  - Leçon: isoler les responsabilités LED — navigation vs indicateurs d'app — et éviter les write-all par défaut.
  - 2025-08-20 — Defaults globaux pages
    - Décision: introduire `pages_global` dans `config.yaml` pour définir des contrôles/LCD/passthroughs communs.
    - Implémentation: fusion au runtime dans `Router.mergeGlobalIntoPage()` sans muter la config; override par page.
