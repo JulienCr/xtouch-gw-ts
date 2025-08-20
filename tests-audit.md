@@ -222,6 +222,10 @@ Prochaines étapes
 - Ajout d’un cycle de resynchronisation global (reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD).
 - Impact tests: pas de tests ajoutés immédiatement (fonctionnalité CLI). Prévoir des tests d’intégration simulant `Router.syncDrivers()` avec drivers fakes exposant `sync()`.
 
+2025-08-20 — CLI REPL: complétion Tab
+- Ajout d’un `readline.completer` pour la REPL (suggestions de commandes et complétions contextuelles: pages, ports MIDI, sous-commandes `state|show|completion`).
+- Impact tests: non couvert (interaction terminal). Option: tests unitaires sur une fonction pure d’extraction de candidats si extraite ultérieurement.
+
 2025-08-20 — CLI: aide YAML + commande clear
 - Aide CLI rendue via `src/cli/help.ts` à partir de `src/cli/help.yaml`; affichage sur stdout (pas de logger).
 - Nouvelle commande `clear` qui efface l’écran et le scrollback.

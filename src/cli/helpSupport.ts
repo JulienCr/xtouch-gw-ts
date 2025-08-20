@@ -1,5 +1,5 @@
 import path from "path";
-import type { CliContext } from "./index";
+import type { CliContext } from "./types";
 import type { HelpRuntimeContext, HelpSpecV2 } from "./help";
 import { levenshtein } from "./levenshtein";
 

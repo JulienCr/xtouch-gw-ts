@@ -138,6 +138,10 @@ categories:
         name: "help"
         usage: "help [<commande|catégorie>|all|examples|json|search <texte>]"
         description: "Aide générale, par catégorie ou détaillée"
+      - id: clear
+        name: "clear"
+        usage: "clear"
+        description: "Effacer l'écran et l'historique du terminal"
       - id: exit
         name: "exit"
         usage: "exit | quit"

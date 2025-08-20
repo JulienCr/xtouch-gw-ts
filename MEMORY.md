@@ -16,6 +16,10 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Symptôme: liste de commandes sur une seule ligne via logger, dépendante du niveau de logs.
   - Solution: refonte UX-first de l'aide: `help.yaml` v2 (meta/context/categories), rendu cheatsheet coloré avec catégories, usages et exemples; support `help <cmd|cat|all|examples|json>`, suggestions Levenshtein, alias `:` (ex: `midi:open`) + compat; ajout `completion <zsh|bash|powershell>`; header contextuel (config/page/ports/logs). `clear` conserve un effacement stdout.
   - Leçon: éviter le logger pour les aides interactives; privilégier stdout et une source éditable (YAML).
+ - 2025-08-20 — Complétion REPL manquante
+  - Symptôme: pas de Tab-complete dans la REPL, malgré un script `completion` rudimentaire côté shell.
+  - Solution: ajout d’un `readline.completer` avec suggestions contextuelles (commandes de base, `page` → pages/index, `midi-open` → noms/index de ports, `state`/`show`/`completion` → sous-commandes, `fader`/`lcd` → bornes).
+  - Leçon: pour une REPL, préférer la complétion intégrée (stateful) plutôt que des scripts shell statiques.
 - 2025-08-20 — LEDs navigation écrasées par indicateurs génériques
   - Symptôme: à l'arrivée sur une page, Prev/Next et F1..F8 s'allument puis s'éteignent immédiatement.
   - Cause: `attachIndicators()` ré-émettait des NoteOn à 0 pour tous les contrôles mappés par CSV, y compris ceux sans indicateur actif, écrasant les LEDs gérées par `fkeys`.
