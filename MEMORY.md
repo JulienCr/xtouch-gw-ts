@@ -8,6 +8,10 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
 - Tenir `TASKS.md` à jour après chaque lot de travail.
 
 ## Entrées
+- 2025-08-20 — Ajout d’un cycle de resynchronisation global (CLI `sync`)
+  - Besoin: recaler rapidement surface/états/drivers après dérive (déconnexions OBS, reboot, etc.).
+  - Solution: nouveau hook optionnel `Driver.sync()` appelé via `Router.syncDrivers()`, et commande CLI `sync` enchaînant reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD.
+  - Leçon: centraliser la resynchro côté Router/CLI, laisser chaque driver gérer sa lecture d’état.
 - 2025-08-20 — LEDs navigation écrasées par indicateurs génériques
   - Symptôme: à l'arrivée sur une page, Prev/Next et F1..F8 s'allument puis s'éteignent immédiatement.
   - Cause: `attachIndicators()` ré-émettait des NoteOn à 0 pour tous les contrôles mappés par CSV, y compris ceux sans indicateur actif, écrasant les LEDs gérées par `fkeys`.

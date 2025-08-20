@@ -218,6 +218,10 @@ Prochaines étapes
 2025-08-20 — pages_global (defaults) ajouté
 - Typecheck OK, suite de tests complète verte après fusion globale des pages.
 
+2025-08-20 — CLI: commande `sync` et hook `Driver.sync()`
+- Ajout d’un cycle de resynchronisation global (reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD).
+- Impact tests: pas de tests ajoutés immédiatement (fonctionnalité CLI). Prévoir des tests d’intégration simulant `Router.syncDrivers()` avec drivers fakes exposant `sync()`.
+
 2025-08-16 — Progression Lot 2 + Orchestration Router
 - Suites: 28 fichiers, 57 tests verts. Couverture globale ~59.7%.
 - Nouveaux: midi/ports, midi/sniffer, router (orchestration), router-more (handleControl/updateConfig), drivers (voicemeeter), state/persistence (timers asynchrones).

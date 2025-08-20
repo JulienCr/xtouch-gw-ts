@@ -67,6 +67,14 @@ $env:LOG_LEVEL="debug"; pnpm start
   - `state load` - Recharge les états depuis le snapshot persistant (`.state/snapshot.json`), synchronise automatiquement la surface X-Touch et recharge la configuration (LCD, éléments statiques)
   - `state rm` - Supprime tous les états en mémoire ET les fichiers de persistance (`.state/snapshot.json`), puis synchronise la surface X-Touch
 
+- `sync`
+  - Exécute une resynchronisation complète en 4 étapes:
+    1. Reset X‑Touch (effacement LCD/LED, faders à 0)
+    2. Rechargement des états depuis le snapshot
+    3. Synchronisation des drivers (ex: OBS: studio mode, scènes programme/preview)
+    4. Ré-application des LCD de la page active et refresh complet de la page
+  - Objectif: recaler rapidement l’application et la surface avec l’état réel des logiciels cibles.
+
 - `show <pages>`
   - `show pages` - Affiche la liste des pages avec leur index (1,2,3...) et indique la page active
 

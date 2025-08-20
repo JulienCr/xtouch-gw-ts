@@ -64,7 +64,7 @@ export function attachCli(ctx: CliContext): () => void {
   };
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'send <type> <params>', 'reset', 'state <load|rm>', 'show <pages>', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'lcd <strip0-7> <upper> [lower]', 'latency:report', 'latency:reset', 'test-midi [all|custom|buttons|faders]', 'help', 'exit|quit'");
+  logger.info("CLI: commandes → 'page <idx|name>', 'emit <controlId> [value]', 'send <type> <params>', 'reset', 'state <load|rm>', 'sync', 'show <pages>', 'pages', 'midi-ports', 'midi-open <idx|name>', 'midi-close', 'learn <id>', 'fader <ch> <0..16383>', 'xtouch-stop', 'xtouch-start', 'lcd <strip0-7> <upper> [lower]', 'latency:report', 'latency:reset', 'test-midi [all|custom|buttons|faders]', 'help', 'exit|quit'");
   rl.setPrompt("app> ");
   rl.prompt();
 
@@ -262,6 +262,68 @@ export function attachCli(ctx: CliContext): () => void {
           }
           break;
         }
+        case "sync": {
+          // 1) Reset X-Touch
+          if (ctx.xtouch) {
+            logger.info("Reset de la surface X-Touch...");
+            try { await xtapi.resetAll(ctx.xtouch, { clearLcds: true }); logger.info("Reset terminé"); } catch (err) { logger.error("Erreur lors du reset:", err as any); }
+          } else {
+            logger.warn("X-Touch non connectée, reset ignoré");
+          }
+
+          // 2) Recharger les états depuis le snapshot
+          logger.info("Rechargement des états depuis le snapshot...");
+          try {
+            const stateRef = (ctx.router as any).state;
+            if (stateRef && typeof stateRef.hydrateFromSnapshot === "function") {
+              const fs = await import("fs/promises");
+              const path = await import("path");
+              const snapshotPath = path.resolve(process.cwd(), ".state", "snapshot.json");
+              try {
+                const raw = await fs.readFile(snapshotPath, { encoding: "utf8" });
+                const snap = JSON.parse(raw) as { ts?: number; apps?: Record<string, any[]> };
+                const apps = ["voicemeeter", "qlc", "obs", "midi-bridge"] as const;
+                if (snap && snap.apps) {
+                  for (const app of apps) {
+                    const entries = Array.isArray((snap.apps as any)[app]) ? (snap.apps as any)[app] : [];
+                    if (entries.length > 0) {
+                      stateRef.hydrateFromSnapshot(app, entries);
+                      logger.info(`État rechargé pour ${app}: ${entries.length} entrées`);
+                    }
+                  }
+                  logger.info("Rechargement terminé");
+                } else {
+                  logger.warn("Snapshot vide ou absent");
+                }
+              } catch (err) {
+                logger.warn("Aucun snapshot ou lecture impossible:", err as any);
+              }
+            } else {
+              logger.warn("StateStore non accessible");
+            }
+          } catch (err) {
+            logger.error("Erreur lors du rechargement des états:", err as any);
+          }
+
+          // 3) Synchroniser les drivers (ex: OBS: scenes, studio mode...)
+          try {
+            logger.info("Synchronisation des drivers...");
+            await ctx.router.syncDrivers();
+            logger.info("Drivers synchronisés");
+          } catch (err) {
+            logger.error("Erreur lors de la synchronisation des drivers:", err as any);
+          }
+
+          // 4) Rafraîchir la page active et LCD
+          try {
+            if (ctx.xtouch) {
+              const { applyLcdForActivePage } = await import("../ui/lcd");
+              applyLcdForActivePage(ctx.router, ctx.xtouch);
+            }
+          } catch {}
+          try { ctx.router.refreshPage(); } catch {}
+          break;
+        }
         case "state": {
           const subcmd = rest[0];
           if (subcmd === "load") {
@@ -446,7 +508,7 @@ export function attachCli(ctx: CliContext): () => void {
           break;
         }
         case "help":
-          logger.info("help: page <idx|name> | pages | emit <controlId> [value] | send <type> <params> | reset | state <load|rm> | show <pages> | midi-ports | midi-open <idx|name> | midi-close | learn <id> | fader <ch> <0..16383> | latency:report | latency:reset | exit|quit");
+          logger.info("help: page <idx|name> | pages | emit <controlId> [value] | send <type> <params> | reset | state <load|rm> | sync | show <pages> | midi-ports | midi-open <idx|name> | midi-close | learn <id> | fader <ch> <0..16383> | latency:report | latency:reset | exit|quit");
           break;
         case "latency:report": {
           const rpt = (ctx.router as any).getLatencyReport?.();

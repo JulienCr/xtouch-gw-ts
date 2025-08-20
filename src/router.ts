@@ -306,6 +306,15 @@ export class Router {
     this.emitter?.send(entriesToSend);
   }
 
+  /**
+   * Demande à tous les drivers enregistrés d'effectuer une resynchronisation best-effort.
+   */
+  async syncDrivers(): Promise<void> {
+    for (const [key, d] of this.drivers.entries()) {
+      try { await d.sync?.(); } catch (err) { logger.warn(`Driver '${key}': sync a échoué:`, err as any); }
+    }
+  }
+
 
   // addrKeyForXTouch/addrKeyForApp/getAppShadow extraits vers router/shadows.ts
 
