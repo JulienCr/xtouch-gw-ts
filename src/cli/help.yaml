@@ -1,92 +1,145 @@
-# CLI help specification (YAML)
-# Columns: commande | options | description
-commands:
-  - command: page
-    options: "<idx|name>"
-    description: Activer une page par index (1..N) ou par nom exact.
+meta:
+  program: xtouch-gw
+  version: "0.4.0"
+  usage: "xtouch-gw <commande> [options]"
+  legend:
+    - "<obligatoire> [optionnel] {choix1|choix2}"
+    - "Les noms avec espaces doivent être entre guillemets."
+context:
+  show: true
+  items:
+    - "Config: ${config.path}"
+    - "Page active: ${page.active}"
+    - "MIDI IN: ${midi.in}  |  OUT: ${midi.out}"
+    - "LOG_LEVEL: ${log.level}  |  Modes: ${modes}"
+categories:
+  - id: basics
+    title: "Démarrage & pages"
+    commands:
+      - id: page
+        name: "page"
+        usage: "page <idx|name>"
+        description: "Activer une page par index (1..N) ou par nom"
+        examples:
+          - "page 1"
+          - "page \"Voicemeeter Main\""
+        aliases: []
+      - id: pages
+        name: "pages"
+        usage: "pages"
+        description: "Lister les pages disponibles"
+        notes: ["Voir 'show pages' pour le détail"]
+        examples: ["pages"]
+      - id: show-pages
+        name: "show pages"
+        usage: "show pages"
+        description: "Lister pages avec index et marqueur actif"
+      - id: sync
+        name: "sync"
+        usage: "sync"
+        danger: true
+        description: "Resynchronisation globale (reset surface → reload snapshot → sync drivers → refresh page/LCD)"
+        notes: ["Peut faire bouger les faders motorisés."]
+        examples: ["sync"]
+      - id: state
+        name: "state"
+        usage: "state <load|rm>"
+        description: "Gérer les états en mémoire (load/rm, n'affecte pas le hardware)"
+      - id: reset
+        name: "reset"
+        usage: "reset"
+        danger: true
+        description: "Reset complet de la surface X‑Touch (LCD/LED/faders)"
+      - id: version
+        name: "version"
+        usage: "version"
+        description: "Afficher version & build info"
+      - id: completion
+        name: "completion"
+        usage: "completion <bash|zsh|powershell>"
+        description: "Installer l’auto-complétion"
 
-  - command: pages
-    options: ""
-    description: Lister les pages disponibles (noms).
+  - id: midi
+    title: "MIDI I/O"
+    commands:
+      - id: midi-ports
+        name: "midi:ports"
+        usage: "midi:ports"
+        description: "Lister les ports MIDI détectés (IN/OUT)"
+        aliases: ["midi-ports"]
+      - id: midi-open
+        name: "midi:open"
+        usage: "midi:open <idx|name>"
+        description: "Ouvrir le port MIDI d'entrée"
+        examples: ["midi:open 1", "midi:open \"UM-One\""]
+        aliases: ["midi-open"]
+      - id: midi-close
+        name: "midi:close"
+        usage: "midi:close"
+        description: "Fermer le port MIDI d'entrée"
+        aliases: ["midi-close"]
+      - id: send
+        name: "send"
+        usage: "send {noteon|noteoff|cc|pb|raw} <params…>"
+        description: "Envoyer un message MIDI brut"
+        examples:
+          - "send noteon 1 0x66 127"
+          - "send pb 1 0 8192"
+          - "send raw \"F0 00 20 32 7F F7\""
+        notes: ["Sans arguments → affiche des exemples détaillés.", "⚠️  Attention: send raw peut envoyer des trames SysEx potentiellement dangereuses"]
+      - id: test-midi
+        name: "test:midi"
+        usage: "test:midi [all|custom|buttons|faders]"
+        description: "Lancer les tests de sortie MIDI"
+        aliases: ["test-midi"]
 
-  - command: emit
-    options: "<controlId> [value]"
-    description: Émettre un événement de contrôle côté router (bypass mapping X‑Touch).
+  - id: xtouch
+    title: "Contrôles X-Touch"
+    commands:
+      - id: fader
+        name: "fader"
+        usage: "fader <ch> <0..16383>"
+        description: "Déplacer un fader (Pitch Bend 14 bits)"
+        examples: ["fader 1 8192"]
+      - id: lcd
+        name: "lcd"
+        usage: "lcd <strip0-7> <upper> [lower]"
+        description: "Écrire sur l’afficheur LCD d’un strip"
+        examples: ["lcd 0 \"Mic\" \"Baba\""]
+      - id: emit
+        name: "emit"
+        usage: "emit <controlId> [value]"
+        description: "Émettre un événement côté router (bypass mapping X-Touch)"
+        examples: ["emit fader1 8192", "emit btn.play 1"]
+      - id: learn
+        name: "learn"
+        usage: "learn <id>"
+        description: "Armer un learn (suggère un mapping YAML)"
+        examples: ["learn fader1"]
 
-  - command: send
-    options: "<type> <params>"
-    description: Envoyer une commande MIDI directe (noteon|noteoff|cc|pb|raw). Exemples via "send" sans arguments.
-
-  - command: reset
-    options: ""
-    description: Reset complet de la surface X‑Touch (LCD/LED/faders selon logique).
-
-  - command: state
-    options: "<load|rm>"
-    description: load → recharge les états depuis snapshot; rm → efface tous les états en mémoire.
-
-  - command: sync
-    options: ""
-    description: Resynchronisation globale (reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD).
-
-  - command: show
-    options: "<pages>"
-    description: Afficher des informations (actuellement supporte "pages" détaillées avec index et marqueur actif).
-
-  - command: midi-ports
-    options: ""
-    description: Lister les ports MIDI d'entrée détectés.
-
-  - command: midi-open
-    options: "<idx|name>"
-    description: Ouvrir un port MIDI d'entrée par index ou par nom.
-
-  - command: midi-close
-    options: ""
-    description: Fermer le port MIDI d'entrée ouvert.
-
-  - command: learn
-    options: "<id>"
-    description: Armer un learn pour un controlId (suggère un mapping YAML d'après l'événement reçu).
-
-  - command: fader
-    options: "<ch> <0..16383>"
-    description: Déplacer un fader (Pitch Bend 14 bits) du canal indiqué.
-
-  - command: xtouch-stop
-    options: ""
-    description: Arrêter le driver X‑Touch et libérer les ports (utilisez ensuite midi-open).
-
-  - command: xtouch-start
-    options: ""
-    description: (Info) Redémarrage X‑Touch non supporté ici; utilisez le redémarrage de l'app.
-
-  - command: lcd
-    options: "<strip0-7> <upper> [lower]"
-    description: Écrire du texte sur l'afficheur LCD d'un strip.
-
-  - command: latency:report
-    options: ""
-    description: Afficher un rapport synthétique de latence par app et type d'événement.
-
-  - command: latency:reset
-    options: ""
-    description: Réinitialiser les compteurs de latence.
-
-  - command: test-midi
-    options: "[all|custom|buttons|faders]"
-    description: Lancer les tests de sortie MIDI (inclut reset/replay et animations LCD selon mode).
-
-  - command: help
-    options: ""
-    description: Afficher cette aide.
-
-  - command: exit|quit
-    options: ""
-    description: Quitter l'application.
-
-  - command: clear
-    options: ""
-    description: Effacer l'écran/scrollback du terminal (ne passe pas par le logger).
-
-
+  - id: diag
+    title: "Diag & latence"
+    commands:
+      - id: latency-report
+        name: "latency:report"
+        usage: "latency:report"
+        description: "Rapport de latence par app et type d’événement"
+      - id: latency-reset
+        name: "latency:reset"
+        usage: "latency:reset"
+        description: "Réinitialiser les compteurs de latence"
+      - id: xtouch-stop
+        name: "xtouch:stop"
+        usage: "xtouch:stop"
+        description: "Arrêter le driver X-Touch (libère les ports)"
+        aliases: ["xtouch-stop"]
+        notes: ["Ré-ouvrez ensuite le port avec 'midi:open'"]
+      - id: help
+        name: "help"
+        usage: "help [<commande|catégorie>|all|examples|json|search <texte>]"
+        description: "Aide générale, par catégorie ou détaillée"
+      - id: exit
+        name: "exit"
+        usage: "exit | quit"
+        description: "Quitter l’application"
+        aliases: ["quit"]

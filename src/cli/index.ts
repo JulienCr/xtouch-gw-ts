@@ -1,6 +1,7 @@
 import readline from "readline";
 import { logger } from "../logger";
 import { loadHelpSpec, printHelp } from "./help";
+import { buildHelpRuntimeContext, suggestFromSpec } from "./helpSupport";
 import type { Router } from "../router";
 import type { XTouchDriver } from "../xtouch/driver";
 import { MidiInputSniffer, listInputPorts } from "../midi/sniffer";
@@ -78,7 +79,8 @@ export function attachCli(ctx: CliContext): () => void {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   try {
     const spec = loadHelpSpec();
-    printHelp(spec);
+    const runtime = buildHelpRuntimeContext(ctx);
+    printHelp(spec, runtime);
   } catch (err) {
     process.stdout.write("Aide CLI indisponible (help.yaml introuvable ou invalide). Tapez 'help'.\n");
   }
@@ -86,7 +88,8 @@ export function attachCli(ctx: CliContext): () => void {
   rl.prompt();
 
   rl.on("line", async (line) => {
-    const [cmd, ...rest] = line.trim().split(/\s+/);
+    const [rawCmd, ...rest] = line.trim().split(/\s+/);
+    const cmd = rawCmd === "-h" || rawCmd === "--help" ? "help" : (rawCmd === "-v" || rawCmd === "--version" ? "version" : rawCmd);
     try {
       switch (cmd) {
         case "page": {
@@ -107,6 +110,7 @@ export function attachCli(ctx: CliContext): () => void {
           await ctx.router.handleControl(controlId, Number.isFinite(value as number) ? value : valueRaw);
           break;
         }
+        case "midi:ports":
         case "midi-ports": {
           const ports = listInputPorts();
           if (ports.length === 0) {
@@ -116,10 +120,11 @@ export function attachCli(ctx: CliContext): () => void {
           }
           break;
         }
+        case "midi:open":
         case "midi-open": {
           const arg = rest.join(" ");
           if (!arg) {
-            logger.warn("Usage: midi-open <idx|name>");
+            logger.warn("Usage: midi:open <idx|name>");
             break;
           }
           const n = Number(arg);
@@ -132,10 +137,12 @@ export function attachCli(ctx: CliContext): () => void {
           }
           break;
         }
+        case "midi:close":
         case "midi-close": {
           midiSniffer?.close();
           break;
         }
+        case "xtouch:stop":
         case "xtouch-stop": {
           if (!ctx.xtouch) {
             logger.info("X-Touch déjà stoppé.");
@@ -524,12 +531,53 @@ export function attachCli(ctx: CliContext): () => void {
           }
           break;
         }
+        case "completion": {
+          const target = (rest[0] || "zsh").toLowerCase();
+          try {
+            const spec = loadHelpSpec();
+            if (target === "zsh") {
+              const cmds = spec.categories.flatMap((c) => c.commands.map((x) => x.name));
+              const aliases = spec.categories.flatMap((c) => c.commands.flatMap((x) => x.aliases || []));
+              const all = Array.from(new Set(["help", "exit", ...cmds, ...aliases]));
+              const script = `#compdef xtouch-gw\n_arguments '*::command:->cmds'\ncase $state in\n  cmds)\n    _values 'commands' ${all.map((c) => `\\"${c}\\"`).join(" ")};;\n  esac\n`;
+              process.stdout.write(script + "\n");
+            } else if (target === "bash" || target === "powershell") {
+              const all = spec.categories.flatMap((c) => c.commands.map((x) => x.name)).join(" ");
+              process.stdout.write(`# Commands:\n${all}\n`);
+            } else {
+              logger.warn("Shell non supporté. Utilisez: completion <bash|zsh|powershell>");
+            }
+          } catch (e) {
+            logger.warn("Impossible de générer l'autocomplétion:", e as any);
+          }
+          break;
+        }
         case "help": {
           try {
             const spec = loadHelpSpec();
-            printHelp(spec);
+            const runtime = buildHelpRuntimeContext(ctx);
+            const arg = rest.join(" ").trim();
+            if (arg === "--json" || arg === "json") { printHelp(spec, runtime, { kind: "json" }); break; }
+            if (!arg) { printHelp(spec, runtime); break; }
+            if (arg === "all") { printHelp(spec, runtime, { kind: "all" }); break; }
+            if (arg === "examples") { printHelp(spec, runtime, { kind: "examples" }); break; }
+            if (arg.startsWith("search ")) { printHelp(spec, runtime, { kind: "search", value: arg.slice(7) }); break; }
+            const cat = spec.categories.find((c) => c.id === arg || c.title.toLowerCase().includes(arg.toLowerCase()));
+            if (cat) { printHelp(spec, runtime, { kind: "category", value: cat.id }); break; }
+            // Command details
+            printHelp(spec, runtime, { kind: "command", value: arg });
           } catch (err) {
             process.stdout.write("Aide CLI indisponible (help.yaml introuvable ou invalide).\n");
+          }
+          break;
+        }
+        case "version": {
+          try {
+            const spec = loadHelpSpec();
+            const v = spec.meta?.version || require("../../package.json").version || "0.0.0";
+            logger.info(`xtouch-gw ${v}`);
+          } catch {
+            logger.info("xtouch-gw");
           }
           break;
         }
@@ -558,6 +606,7 @@ export function attachCli(ctx: CliContext): () => void {
           logger.info("Latence: compteurs réinitialisés.");
           break;
         }
+        case "test:midi":
         case "test-midi": {
           const which = (rest[0] || "all").toLowerCase();
           // Forcer le mode via param pour éviter les interférences d'environnement
@@ -578,7 +627,18 @@ export function attachCli(ctx: CliContext): () => void {
           }
           break;
         default:
-          if (cmd.length > 0) logger.warn("Commande inconnue. Tapez 'help'.");
+          if (cmd.length > 0) {
+            try {
+              const spec = loadHelpSpec();
+              const runtime = buildHelpRuntimeContext(ctx);
+              const s = suggestFromSpec(spec, cmd);
+              logger.warn("Commande inconnue. Tapez 'help'.");
+              if (s.length > 0) process.stdout.write(`Suggestions: ${s.join(", ")}\n`);
+              printHelp(spec, runtime, { kind: "category", value: "basics" });
+            } catch {
+              logger.warn("Commande inconnue.");
+            }
+          }
       }
     } catch (err) {
       logger.error("Erreur CLI:", err as any);
@@ -602,5 +662,7 @@ export function attachCli(ctx: CliContext): () => void {
     rl.close();
   };
 }
+
+// help-related helpers moved to ./helpSupport
 
 

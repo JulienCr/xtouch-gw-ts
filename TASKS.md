@@ -85,7 +85,7 @@
 ## Fait
 - [x] CLI: nouvelle commande `sync` + hook `Driver.sync()` + `Router.syncDrivers()`; implémentation OBS (studio mode, scènes) et mise à jour docs CLI — 2025‑08‑20
 - [x] Fix: LEDs navigation (Prev/Next) et F1..F8 s'éteignaient immédiatement à l'arrivée sur une page — la logique générique des indicateurs n'écrase plus les LEDs de navigation gérées par `fkeys` (n'émet que pour les contrôles avec indicateur explicite). Tests verts. — 2025‑08‑20
-- [x] CLI: aide multi‑colonnes depuis YAML (`src/cli/help.yaml`) + commande `clear` (stdout, sans logger) — 2025‑08‑20
+- [x] CLI: refonte aide UX‑first — YAML v2 (meta/context/categories), rendu cheatsheet coloré, `help <cmd|cat|all|examples|json>`, alias `:` avec compat, suggestions, completion; `clear` reste stdout — 2025‑08‑20
 - [x] BUG: Latence/loop perceptible (≈1 s) sur feedback boutons et « recalage » des faders — métriques, anti‑echo par type, LWW, setpoints moteurs, échos locaux — 2025‑08‑15
 - [x] Page "Lum Latéraux": fader 9 forcé sur CC 78 via `cc_by_channel` – 2025-08-10
 - [x] Pages 3 et 4 configurées: P3 "Néons Latéraux RGB" (base_cc 0x45, ch=2, fader 9→CC78), P4 "Néons Contres RGB" (base_cc 0x50, ch=2, fader 9→CC78) – 2025-08-10

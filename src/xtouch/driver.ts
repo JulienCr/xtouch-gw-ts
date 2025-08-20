@@ -45,6 +45,8 @@ export class XTouchDriver {
   private handlers: Set<MessageHandler> = new Set();
   private readonly options: Required<XTouchOptions>;
   private suppressPitchBendUntilMs = 0;
+  private connectedInputName: string | null = null;
+  private connectedOutputName: string | null = null;
 
   constructor(private readonly ports: XTouchPortsConfig, options?: XTouchOptions) {
     this.options = {
@@ -69,7 +71,8 @@ export class XTouchDriver {
     }
     out.openPort(outIdx);
     this.output = out;
-    logger.info(`X-Touch OUTPUT connecté sur '${out.getPortName(outIdx)}' (#${outIdx}).`);
+    this.connectedOutputName = out.getPortName(outIdx);
+    logger.info(`X-Touch OUTPUT connecté sur '${this.connectedOutputName}' (#${outIdx}).`);
 
     // Ouvrir Input et écouter
     const inp = new Input();
@@ -88,7 +91,8 @@ export class XTouchDriver {
     });
     inp.openPort(inIdx);
     this.input = inp;
-    logger.info(`X-Touch INPUT connecté sur '${inp.getPortName(inIdx)}' (#${inIdx}).`);
+    this.connectedInputName = inp.getPortName(inIdx);
+    logger.info(`X-Touch INPUT connecté sur '${this.connectedInputName}' (#${inIdx}).`);
   }
 
   /**
@@ -261,6 +265,8 @@ export class XTouchDriver {
     } catch {}
     this.input = null;
     this.output = null;
+    this.connectedInputName = null;
+    this.connectedOutputName = null;
     this.handlers.clear();
     logger.info("X-Touch: ports MIDI fermés.");
   }
@@ -300,6 +306,14 @@ export class XTouchDriver {
         if (isPress) { try { this.output?.sendMessage(data); } catch {} }
       }
     }
+  }
+
+  /**
+   * Retourne les noms des ports MIDI actuellement connectés.
+   * Utile pour les en‑têtes contextuels de la CLI.
+   */
+  getConnectedPortNames(): { input: string | null; output: string | null } {
+    return { input: this.connectedInputName, output: this.connectedOutputName };
   }
 }
 
