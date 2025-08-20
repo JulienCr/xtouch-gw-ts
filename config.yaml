@@ -45,7 +45,7 @@ pages_global:
       params: ["--- CAM Cour"]
       indicator: { signal: "obs.selectedScene", equals: "--- CAM Cour" }
 
-    scrub:
+    global_view:
       app: "obs"
       action: "toggleStudioMode"
       indicator: { signal: "obs.studioMode", truthy: true }
