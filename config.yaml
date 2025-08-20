@@ -21,7 +21,7 @@ pages_global:
     vpot7_rotate: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 1] }
     vpot8_rotate: { app: "obs", action: "scaleUniform", params: ["--- CAM Main 2", "--- CAM Main", 0.02] }
 
-    fader9:
+    fader_master:
       app: "qlc"
       midi: { type: "cc", channel: 1, cc: 78 }
 
@@ -87,16 +87,12 @@ pages:
         filter:
           channels: [1,2,3,4,5,6,7]
           types: ["noteOn","noteOff","controlChange","pitchBend"]
-      - driver: "midi"
-        to_port: "qlc-in"
-        from_port: "qlc-out"
-        filter:
-          channels: [8,9]
-          types: ["noteOn","noteOff","controlChange","pitchBend"]
-        transform:
-          pb_to_cc:
-            target_channel: 1   # Envoyer vers canal 1 (QLC+)
-            base_cc: "0x46"     # Mapping: ch1→0x46, ch2→0x47, ch3→0x48, ch4→0x49, etc.
+      # - driver: "midi"
+      #   to_port: "qlc-in"
+      #   from_port: "qlc-out"
+      #   filter:
+      #     channels: [8,9]
+      #     types: ["noteOn","noteOff","controlChange","pitchBend"]
   - name: "Lum Latéraux"
     lcd:
       labels:
@@ -146,16 +142,25 @@ pages:
         - "-"
         - "-"
       colors: [1,2,4,1,2,4,0,0]
-    passthroughs:
-      - driver: "midi"
-        to_port: "qlc-in"
-        from_port: "qlc-out"
-        transform:
-          pb_to_cc:
-            target_channel: 1   # P3 = même CC que P1 mais sur canal MIDI 2 (QLC+ = +128)
-            base_cc: 90     # Base CC P1 (69) → P3 = 198–205 en QLC
-            cc_by_channel:
-              9: 78  # Master Dimmer (Fader 9)
+    controls:
+      fader1:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 90 }
+      fader2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 91 }
+      fader3:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 92 }
+      fader4:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 93 }
+      fader5:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 94 }
+      fader6:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 95 }
 
   - name: "Néons Contres RGB"
     lcd:
@@ -166,9 +171,26 @@ pages:
         - "Contre C\nRouge"
         - "Contre C\nVert"
         - "Contre C\nBleu"
-        - "-"
-        - "-"
       colors: [1,2,4,1,2,4,0,0]
+    controls:
+      fader1:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 96 }
+      fader2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 97 }
+      fader3:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 98 }
+      fader4:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 99 }
+      fader5:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 100 }
+      fader6:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 101 }
     passthroughs:
       - driver: "midi"
         to_port: "qlc-in"
@@ -179,4 +201,3 @@ pages:
             base_cc: 96     # Base CC P2 (80) → P4 = 209–216 en QLC
             cc_by_channel:
               9: 78  # Master Dimmer (Fader 9)
-    controls: {} 

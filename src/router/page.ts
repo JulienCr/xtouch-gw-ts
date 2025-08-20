@@ -1,5 +1,6 @@
 import type { AppKey, MidiStateEntry, MidiStatus } from "../state";
 import type { PageConfig } from "../config";
+import { getPbChannelForControlId } from "../xtouch/matching";
 import { getPagePassthroughItems } from "../config/passthrough";
 import { resolveAppKey } from "../shared/appKey";
 import type { ControlMapping } from "../types";
@@ -9,10 +10,8 @@ export function getAppsForPage(page: PageConfig): AppKey[] {
 	const viaPassthrough: AppKey[] = Array.isArray(items)
 		? Array.from(new Set(items.map((it: any) => resolveAppKey(it?.to_port, it?.from_port) as AppKey)))
 		: [];
-	// MODIF: priorité aux apps déclarées par passthroughs pour éviter l'écoute double
-	if (viaPassthrough.length > 0) return viaPassthrough;
-	const set = new Set<AppKey>();
-	// MODIF: inclure aussi les apps référencées par controls.* (mapping/app), utile sans passthrough
+	const set = new Set<AppKey>(viaPassthrough);
+	// MODIF: inclure aussi les apps référencées par controls.* (mapping/app), même s'il existe des passthroughs
 	const controls = (page.controls as Record<string, unknown>) || {};
 	for (const [, raw] of Object.entries(controls)) {
 		const m = raw as unknown as { app?: string };
@@ -21,7 +20,7 @@ export function getAppsForPage(page: PageConfig): AppKey[] {
 		}
 	}
 	const out = Array.from(set.values());
-	return out.length > 0 ? out : ["voicemeeter"];
+	return out;
 }
 
 export function getChannelsForApp(page: PageConfig, app: AppKey): number[] {
@@ -79,14 +78,8 @@ export function resolvePbToCcMappingForApp(page: PageConfig, app: AppKey): { map
 			if (!mapping || mapping.app !== app || !mapping.midi) continue;
 			const spec = mapping.midi;
 			if (spec.type !== "cc") continue;
-			// Déduction du canal fader à partir de l'id de contrôle (fader1..fader9)
-			let ch: number | null = null;
-			const m = /^fader(\d+)$/.exec(controlId);
-			if (m) {
-				const n = Number(m[1]);
-				if (Number.isFinite(n) && n >= 1 && n <= 9) ch = n;
-			}
-			if (controlId === "fader_master") ch = 9;
+			// Déterminer le canal PB associé au control_id via le CSV (générique)
+			let ch: number | null = getPbChannelForControlId(controlId, "mcu") ?? null;
 			if (ch == null) continue;
 			const cc = Number(spec.cc);
 			if (Number.isFinite(cc)) {

@@ -1,49 +1,9 @@
 import type { Router } from "../router";
 import type { XTouchDriver } from "./driver";
-import { promises as fs } from "fs";
-import path from "path";
 declare const process: any;
 import { logger } from "../logger";
 
-type CsvRow = { control_id: string; group: string; ctrl_message: string; mcu_message: string };
-
-function parseMessageSpec(spec: string): { type: "note" | "cc" | "pb"; ch?: number; d1?: number } | null {
-  // Accept patterns: note=XX, cc=YY, pb=chN
-  const s = spec.trim();
-  if (s.startsWith("note=")) {
-    const n = Number(s.slice(5));
-    return Number.isFinite(n) ? { type: "note", d1: n } : null;
-  }
-  if (s.startsWith("cc=")) {
-    const n = Number(s.slice(3));
-    return Number.isFinite(n) ? { type: "cc", d1: n } : null;
-  }
-  if (s.startsWith("pb=")) {
-    // Expected format: pb=chN
-    const m = /pb=ch(\d+)/i.exec(s);
-    if (m) {
-      const ch = Number(m[1]);
-      if (Number.isFinite(ch) && ch >= 1 && ch <= 16) return { type: "pb", ch };
-      return { type: "pb" };
-    }
-    return { type: "pb" };
-  }
-  return null;
-}
-
-async function loadCsv(p: string): Promise<CsvRow[]> {
-  const raw = await fs.readFile(p, "utf8");
-  const lines = raw.split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);
-  const out: CsvRow[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (i === 0 && line.toLowerCase().startsWith("control_id,")) continue;
-    const parts = line.split(/\s*,\s*/);
-    if (parts.length < 4) continue;
-    out.push({ control_id: parts[0], group: parts[1], ctrl_message: parts[2], mcu_message: parts[3] });
-  }
-  return out;
-}
+import { getInputLookups } from "./matching";
 
 export interface InputMapperOptions {
   router: Router;
@@ -60,26 +20,7 @@ export interface InputMapperOptions {
 export async function attachInputMapper(opts: InputMapperOptions): Promise<() => void> {
   const { router, xtouch, mode } = opts;
   const channel = opts.channel ?? 1;
-  const csvPath = opts.matchingCsvPath ?? path.join(process.cwd(), "docs", "xtouch-matching.csv");
-  const rows = await loadCsv(csvPath);
-  // Build reverse maps per type (note/cc/pb) for fast lookup on CH1
-  const noteToControl = new Map<number, string>();
-  const ccToControl = new Map<number, string>();
-  // For MCU PB, map the MIDI channel → control_id using CSV (e.g., pb=ch2 → fader2)
-  const pbChannelToControl = new Map<number, string>();
-  for (const r of rows) {
-    const spec = mode === "ctrl" ? r.ctrl_message : r.mcu_message;
-    const m = parseMessageSpec(spec);
-    if (!m) continue;
-    if (m.type === "note" && typeof m.d1 === "number") noteToControl.set(m.d1, r.control_id);
-    if (m.type === "cc" && typeof m.d1 === "number") ccToControl.set(m.d1, r.control_id);
-    if (m.type === "pb") {
-      // In MCU, pb carries the fader on its own channel (1..9)
-      if (typeof m.ch === "number") {
-        pbChannelToControl.set(m.ch, r.control_id);
-      }
-    }
-  }
+  const { noteToControl, ccToControl, pbChannelToControl } = getInputLookups(mode, opts.matchingCsvPath);
 
   const unsub = xtouch.subscribe((_delta, data) => {
     try {

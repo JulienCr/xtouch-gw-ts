@@ -77,8 +77,8 @@ class ControlMidiSenderImpl {
     if (this.inPerApp.has(app)) return;
     const needle = this.appToInName.get(app);
     if (!needle) return;
-    // MODIF: ne pas ouvrir si la config possède déjà un passthrough pour cette app
-    if (hasPassthroughForApp(app)) {
+    // MODIF: ne pas ouvrir si la page active ou n'importe quelle page possède un passthrough pour cette app
+    if (hasPassthroughForApp(app) || hasPassthroughAnywhereForApp(app)) {
       logger.debug(`ControlMidi: skip IN for app='${app}' (handled by passthrough/background).`);
       return;
     }
@@ -271,6 +271,25 @@ function hasPassthroughForApp(app: string): boolean {
     for (const it of (items as any[])) {
       const appKey = resolveAppKey(String(it?.to_port || ""), String(it?.from_port || ""));
       if (appKey === app) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// MODIF: détecte s'il existe des passthroughs sur n'importe quelle page (utiles pour listeners background)
+function hasPassthroughAnywhereForApp(app: string): boolean {
+  try {
+    const g = (global as unknown as { __router__?: { getPagesMerged: () => any[] } });
+    const pages = g?.__router__?.getPagesMerged?.();
+    if (!Array.isArray(pages)) return false;
+    for (const p of pages) {
+      const items = (p as any).passthroughs ?? ((p as any).passthrough ? [(p as any).passthrough] : []);
+      for (const it of (items as any[])) {
+        const appKey = resolveAppKey(String(it?.to_port || ""), String(it?.from_port || ""));
+        if (appKey === app) return true;
+      }
     }
     return false;
   } catch {

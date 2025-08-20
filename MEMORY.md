@@ -27,6 +27,14 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
     - **Filtrage des événements**: Ne traiter les événements controls.midi que quand ils sont explicitement mappés sur la page active.
     - **Mutualisation du code**: Factoriser la logique de setpoint des faders dans un utilitaire partagé pour éviter la duplication.
     - **Coexistence des systèmes**: Les passthroughs et controls.midi peuvent coexister mais nécessitent une gestion stricte des priorités et des ports.
+    - **Feedback manquant sur pages avec passthroughs**: QLC feedback (CC 78) n'était pas transformé vers X‑Touch sur les pages avec seulement un passthrough Voicemeeter. Fix: `getAppsForPage()` doit toujours inclure les apps référencées par `controls.*` en plus des passthroughs.
+    - **Ports MIDI en double sur Windows**: ControlMidiSender tentait d'ouvrir un port IN pour QLC même si un passthrough existait ailleurs, causant "port already in use" et "ouverture IN échouée". Fix: vérifier les passthroughs sur toutes les pages, pas seulement la page active.
+    - **Hardcoding des noms de contrôles**: Logique spécifique à `fader_master` et regex `fader(\d+)` rendait le code non extensible. Fix: centraliser la lecture de `docs/xtouch-matching.csv` dans un module `matching.ts` générique, avec des lookups `getPbChannelForControlId()` et `getInputLookups()`.
+    - **Duplication de la logique CSV**: Parsing du CSV dupliqué entre `inputMapper` et `router/page.ts`. Fix: factoriser dans `matching.ts` avec cache et API unifiée, éviter la duplication des chemins par défaut.
+  - **Leçons de design:**
+    - **Généricité des mappings**: Ne jamais hardcoder des noms de contrôles ou d'apps dans la logique. Utiliser des sources de données externes (CSV, config) pour rester extensible.
+    - **Centralisation des parsers**: Un seul endroit doit connaître le format et l'emplacement des fichiers de mapping. Exposer des APIs génériques plutôt que de dupliquer la logique.
+    - **Union des sources d'apps**: Une page peut avoir des apps via passthroughs ET via controls, les deux doivent être considérés pour le feedback et le routing.
 - 2025-08-20 — Ajout d'un cycle de resynchronisation global (CLI `sync`)
 - 2025-08-20 — Mapping MIDI direct par contrôle
   - Décision: introduire `controls.*.midi { type, channel, cc|note }` pour un routage global générique (toutes apps) sans dupliquer de logique dans les drivers.
