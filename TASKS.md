@@ -29,6 +29,7 @@
 - [ ] CI GitHub Actions: pnpm i --frozen-lockfile, lint, check:types, test
 
 ## En cours
+- [x] Pages: support d'un bloc `pages_global` (defaults fusionnés dans chaque page; override par page)
 - [x] Indiquer le nom de la page sur le grand afficheur 7-segments
 - [x] Utilise les boutons F1 -> F8 pour naviguer entre les pages (notes channel 1 64..57) et LED active sur la page courante
 - [x] Router: pages OK + mapping d’actions implémenté
@@ -74,6 +75,14 @@
 - [x] Transformer MIDI: Pitch Bend → Control Change (canal cible configurable, CC par canal source)
 - [x] Passthrough pages – fallback d’état: au refresh, utiliser les valeurs du state si présentes pour PB ch 1..9 et Notes 0..31 (ch1), sinon envoyer des valeurs nulles (0), comme sur la page "Default".
 - [x] Refactor: extraction utilitaires MIDI (`src/midi/{utils,filter,transform,ports}.ts`) et LCD (`src/ui/lcd.ts`), simplification `drivers/midiBridge.ts` (ingestion only; pas d'echo direct), mutualisation recherche ports, déduplication LCD, extraction CLI (`src/cli/`).
+
+- [ ] CLI — Refactor progress (lot par étapes)
+  - [x] M1: Extraire `CliContext` vers `src/cli/types.ts`
+  - [x] M2: Extraire l’auto-complétion REPL vers `src/cli/completer.ts`
+  - [ ] M3: Extraire le dispatcher de commandes vers des handlers modulaires (`src/cli/commands/*`) et connecter depuis `src/cli/index.ts`
+  - [ ] M4: Scinder les commandes par catégories (≤150 lignes/fichier)
+  - [ ] M5: Tests unitaires purs sur le compléteur (génération de candidats) et le suggesteur (`suggestFromSpec`)
+  - [ ] M6: Nettoyage: retirer code mort et dupliqué dans `src/cli/index.ts`
 - [x] Bugfix: refresh pages 3 & 4 — conserver `transform.pb_to_cc.target_channel` = 1 (QLC attend CH1) et uniformiser `base_cc` (0x45, 0x50) pour permettre la remontée d'état CC → PB et le refresh à l'arrivée sur la page.
 - [x] Suppression: Voicemeeter Sync app‑based (obsolète) — code et références retirés
  - [x] Router cleanup & modularisation: suppression listes exhaustives d’apps dans `router`, latence et ombres par app dynamiques, extraction logique pages/transformations dans `src/router/page.ts`, typage latence générique par clé string, suppression du champ inutilisé `refreshTempoMs`, mise à jour de `attachXTouch()` et appels associés.
@@ -82,6 +91,10 @@
  - [x] Animation LCD rainbow + contrôle stepDelayMs: `src/animations/lcdRainbow.ts` + runner `runLcdRainbow()`, intégrée à la pipeline (modes `all`/`lcd`). Resets complets au début et à la fin des tests avec effacement LCD/7‑seg (`resetAll({ clearLcds: true })`). Séparation API: `src/xtouch/{api-midi,api-lcd}.ts`. — 2025‑08‑16
 
 ## Fait
+- [x] CLI: nouvelle commande `sync` + hook `Driver.sync()` + `Router.syncDrivers()`; implémentation OBS (studio mode, scènes) et mise à jour docs CLI — 2025‑08‑20
+- [x] Fix: LEDs navigation (Prev/Next) et F1..F8 s'éteignaient immédiatement à l'arrivée sur une page — la logique générique des indicateurs n'écrase plus les LEDs de navigation gérées par `fkeys` (n'émet que pour les contrôles avec indicateur explicite). Tests verts. — 2025‑08‑20
+- [x] CLI: refonte aide UX‑first — YAML v2 (meta/context/categories), rendu cheatsheet coloré, `help <cmd|cat|all|examples|json>`, alias `:` avec compat, suggestions, completion; `clear` reste stdout — 2025‑08‑20
+ - [x] CLI: REPL — ajout de la complétion Tab via `readline.completer` (commandes, sous-commandes et complétions contextuelles: pages, ports MIDI, fader/lcd) — 2025‑08‑20
 - [x] BUG: Latence/loop perceptible (≈1 s) sur feedback boutons et « recalage » des faders — métriques, anti‑echo par type, LWW, setpoints moteurs, échos locaux — 2025‑08‑15
 - [x] Page "Lum Latéraux": fader 9 forcé sur CC 78 via `cc_by_channel` – 2025-08-10
 - [x] Pages 3 et 4 configurées: P3 "Néons Latéraux RGB" (base_cc 0x45, ch=2, fader 9→CC78), P4 "Néons Contres RGB" (base_cc 0x50, ch=2, fader 9→CC78) – 2025-08-10

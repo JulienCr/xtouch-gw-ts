@@ -42,6 +42,11 @@ export interface Driver {
   sendInitialFeedback?(): Promise<void>;
   onConfigChanged?(): Promise<void>;
   /**
+   * Optionnel: Demande au driver de se resynchroniser avec la réalité externe.
+   * Typiquement, relire les états courants et/ou republier les signaux initiaux.
+   */
+  sync?(): Promise<void>;
+  /**
    * Optionnel: Permet au driver de publier des signaux nommés (observables)
    * vers la couche d'indicateurs génériques.
    */

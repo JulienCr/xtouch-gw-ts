@@ -71,9 +71,15 @@ export async function attachIndicators(options: {
   // State: controlId → lit?
   const litByControlId = new Map<string, boolean>();
 
+  /**
+   * Met à jour les LEDs uniquement pour les contrôles ayant un indicateur explicite.
+   *
+   * Évite d'écraser les LEDs de navigation (Prev/Next, F1..F8) gérées par `fkeys`.
+   */
   const updateLeds = async (): Promise<void> => {
-    for (const [controlId, note] of maps.noteByControlId.entries()) {
-      const isOn = !!litByControlId.get(controlId);
+    for (const [controlId, isOn] of litByControlId.entries()) {
+      const note = maps.noteByControlId.get(controlId);
+      if (typeof note !== "number") continue;
       try { xtapi.sendNoteOn(xtouch, channel, note, isOn ? 127 : 0); } catch {}
     }
   };

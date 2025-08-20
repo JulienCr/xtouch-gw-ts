@@ -8,6 +8,26 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
 - Tenir `TASKS.md` à jour après chaque lot de travail.
 
 ## Entrées
+- 2025-08-20 — Ajout d’un cycle de resynchronisation global (CLI `sync`)
+  - Besoin: recaler rapidement surface/états/drivers après dérive (déconnexions OBS, reboot, etc.).
+  - Solution: nouveau hook optionnel `Driver.sync()` appelé via `Router.syncDrivers()`, et commande CLI `sync` enchaînant reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD.
+  - Leçon: centraliser la resynchro côté Router/CLI, laisser chaque driver gérer sa lecture d’état.
+- 2025-08-20 — Aide CLI illisible via logger
+  - Symptôme: liste de commandes sur une seule ligne via logger, dépendante du niveau de logs.
+  - Solution: refonte UX-first de l'aide: `help.yaml` v2 (meta/context/categories), rendu cheatsheet coloré avec catégories, usages et exemples; support `help <cmd|cat|all|examples|json>`, suggestions Levenshtein, alias `:` (ex: `midi:open`) + compat; ajout `completion <zsh|bash|powershell>`; header contextuel (config/page/ports/logs). `clear` conserve un effacement stdout.
+  - Leçon: éviter le logger pour les aides interactives; privilégier stdout et une source éditable (YAML).
+ - 2025-08-20 — Complétion REPL manquante
+  - Symptôme: pas de Tab-complete dans la REPL, malgré un script `completion` rudimentaire côté shell.
+  - Solution: ajout d’un `readline.completer` avec suggestions contextuelles (commandes de base, `page` → pages/index, `midi-open` → noms/index de ports, `state`/`show`/`completion` → sous-commandes, `fader`/`lcd` → bornes).
+  - Leçon: pour une REPL, préférer la complétion intégrée (stateful) plutôt que des scripts shell statiques.
+- 2025-08-20 — LEDs navigation écrasées par indicateurs génériques
+  - Symptôme: à l'arrivée sur une page, Prev/Next et F1..F8 s'allument puis s'éteignent immédiatement.
+  - Cause: `attachIndicators()` ré-émettait des NoteOn à 0 pour tous les contrôles mappés par CSV, y compris ceux sans indicateur actif, écrasant les LEDs gérées par `fkeys`.
+  - Fix: dans `src/xtouch/indicators.ts`, ne toucher qu'aux LEDs présentes dans `litByControlId` (celles avec un indicateur explicite). Les LEDs navigation restent gérées par `updateFKeyLedsForActivePage`/`updatePrevNextLeds`.
+  - Leçon: isoler les responsabilités LED — navigation vs indicateurs d'app — et éviter les write-all par défaut.
+ - 2025-08-20 — Defaults globaux pages
+   - Décision: introduire `pages_global` dans `config.yaml` pour définir des contrôles/LCD/passthroughs communs.
+   - Implémentation: fusion au runtime dans `Router.mergeGlobalIntoPage()` sans muter la config; override par page.
  - 2025-08-16 — Infra tests
    - Décision: utiliser Vitest avec couverture v8 et convention `_tests` (tests co-localisés dans des sous-dossiers `_tests` à côté du code, ex: `src/midi/_tests/utils.test.ts`).
    - Scripts: `pnpm test`, `pnpm test:watch`, `pnpm lint`, `pnpm format`.

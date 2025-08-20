@@ -23,6 +23,18 @@ export class ObsDriver implements Driver {
 	private lastSelectedSent: string | null = null;
 
 	async init(): Promise<void> { await this.connectFromConfig(); }
+
+	/**
+	 * Resynchronise l'état connu (studio mode, scènes) et republie les signaux d'indicateurs.
+	 */
+	async sync(): Promise<void> {
+		try {
+			await this.refreshIndicatorSignals();
+			logger.info("OBS: sync effectué (studioMode/program/preview)");
+		} catch (err) {
+			logger.warn("OBS: sync a échoué:", err as any);
+		}
+	}
 	subscribeIndicators(emit: (signal: string, value: unknown) => void): () => void {
 		this.indicatorEmitters.push(emit);
 		// Emit initial values best-effort

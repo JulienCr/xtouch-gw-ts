@@ -210,6 +210,27 @@ Prochaines étapes
 
 ## Journal d’avancement (MàJ continue)
 
+2025-08-20 — Correctif LEDs navigation
+- Les LEDs Prev/Next et F1..F8 étaient éteintes par la couche d'indicateurs génériques.
+- Changement: `updateLeds()` n'émet plus que pour les contrôles avec indicateur explicite.
+- Résultat: suite `pnpm test` entièrement verte après modification.
+
+2025-08-20 — pages_global (defaults) ajouté
+- Typecheck OK, suite de tests complète verte après fusion globale des pages.
+
+2025-08-20 — CLI: commande `sync` et hook `Driver.sync()`
+- Ajout d’un cycle de resynchronisation global (reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD).
+- Impact tests: pas de tests ajoutés immédiatement (fonctionnalité CLI). Prévoir des tests d’intégration simulant `Router.syncDrivers()` avec drivers fakes exposant `sync()`.
+
+2025-08-20 — CLI REPL: complétion Tab
+- Ajout d’un `readline.completer` pour la REPL (suggestions de commandes et complétions contextuelles: pages, ports MIDI, sous-commandes `state|show|completion`).
+- Impact tests: non couvert (interaction terminal). Option: tests unitaires sur une fonction pure d’extraction de candidats si extraite ultérieurement.
+
+2025-08-20 — CLI: aide YAML + commande clear
+- Aide CLI rendue via `src/cli/help.ts` à partir de `src/cli/help.yaml`; affichage sur stdout (pas de logger).
+- Nouvelle commande `clear` qui efface l’écran et le scrollback.
+- Impact tests: non couvert par des tests unitaires (IO terminal). Option: test d’instantané pour le formateur de table (`printHelp`) avec stdout capturé.
+
 2025-08-16 — Progression Lot 2 + Orchestration Router
 - Suites: 28 fichiers, 57 tests verts. Couverture globale ~59.7%.
 - Nouveaux: midi/ports, midi/sniffer, router (orchestration), router-more (handleControl/updateConfig), drivers (voicemeeter), state/persistence (timers asynchrones).

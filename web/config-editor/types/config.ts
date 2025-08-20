@@ -45,12 +45,23 @@ export interface PageConfig {
   };
 }
 
+export interface GlobalPageDefaults {
+  controls?: Record<string, unknown>;
+  lcd?: {
+    labels?: Array<string | { upper?: string; lower?: string }>;
+    colors?: Array<number | string>;
+  };
+  passthrough?: PassthroughConfig;
+  passthroughs?: PassthroughConfig[];
+}
+
 export interface AppConfig {
   midi: {
     input_port: string;
     output_port: string;
   };
   paging?: { channel?: number; prev_note?: number; next_note?: number };
+  pages_global?: GlobalPageDefaults;
   pages: PageConfig[];
 }
 

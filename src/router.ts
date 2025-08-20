@@ -1,6 +1,6 @@
 import { logger } from "./logger";
 import type { ControlMapping, Driver, ExecutionContext } from "./types";
-import type { AppConfig, PageConfig } from "./config";
+import type { AppConfig, PageConfig, GlobalPageDefaults } from "./config";
 import { StateStore, MidiStateEntry, AppKey, MidiStatus, buildEntryFromRaw } from "./state";
 import type { XTouchDriver } from "./xtouch/driver";
 import { human, hex, getTypeNibble, isPB, isCC, isNoteOn } from "./midi/utils";
@@ -75,7 +75,8 @@ export class Router {
 
   /** Retourne la configuration de la page active. */
   getActivePage(): PageConfig | undefined {
-    return this.config.pages[this.activePageIndex];
+    const raw = this.config.pages[this.activePageIndex];
+    return raw ? this.mergeGlobalIntoPage(raw) : undefined;
   }
 
   /** Retourne le nom de la page active, ou "(none)" si aucune page. */
@@ -165,6 +166,45 @@ export class Router {
       await d.onConfigChanged?.();
     }
     logger.info("Router: configuration mise à jour.");
+  }
+
+  /**
+   * Fusionne `pages_global` dans une `PageConfig` (sans muter l'originale).
+   * - controls: merge profond clé → mapping (la page écrase le global en cas de conflit)
+   * - lcd: labels/colors pris depuis la page si définis, sinon depuis global
+   * - passthrough(s): si la page n'en définit aucun, hérite des globaux
+   */
+  private mergeGlobalIntoPage(page: PageConfig): PageConfig {
+    const g: GlobalPageDefaults | undefined = this.config.pages_global;
+    if (!g) return page;
+    const pageControls = (page as any).controls ?? {};
+    const globalControls = (g as any).controls ?? {};
+    const mergedControls = { ...globalControls, ...pageControls } as Record<string, unknown>;
+
+    const pageLcd = (page as any).lcd ?? {};
+    const globalLcd = (g as any).lcd ?? {};
+    const mergedLcd = {
+      labels: (pageLcd.labels ?? globalLcd.labels) as any,
+      colors: (pageLcd.colors ?? globalLcd.colors) as any,
+    };
+    if (!mergedLcd.labels && !mergedLcd.colors) {
+      // garder undefined si rien
+    }
+
+    const hasPagePassthrough = !!(page as any).passthrough || (Array.isArray((page as any).passthroughs) && (page as any).passthroughs.length > 0);
+    const merged: PageConfig = {
+      name: page.name,
+      controls: mergedControls,
+      lcd: (mergedLcd.labels || mergedLcd.colors) ? (mergedLcd as any) : (page as any).lcd,
+      passthrough: hasPagePassthrough ? (page as any).passthrough : (g as any).passthrough,
+      passthroughs: hasPagePassthrough ? (page as any).passthroughs : (g as any).passthroughs,
+    } as PageConfig;
+    return merged;
+  }
+
+  /** Retourne toutes les pages avec les valeurs globales fusionnées. */
+  getPagesMerged(): PageConfig[] {
+    return this.config.pages.map((p) => this.mergeGlobalIntoPage(p));
   }
 
   /** Attache le driver X‑Touch au router et prépare l'émetteur. */
@@ -264,6 +304,15 @@ export class Router {
     } catch {}
     const entriesToSend = planRefresh(page, this.state);
     this.emitter?.send(entriesToSend);
+  }
+
+  /**
+   * Demande à tous les drivers enregistrés d'effectuer une resynchronisation best-effort.
+   */
+  async syncDrivers(): Promise<void> {
+    for (const [key, d] of this.drivers.entries()) {
+      try { await d.sync?.(); } catch (err) { logger.warn(`Driver '${key}': sync a échoué:`, err as any); }
+    }
   }
 
 
