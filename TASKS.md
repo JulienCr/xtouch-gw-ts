@@ -75,6 +75,7 @@
   - [x] Docs mises à jour: `docs/driver-obs.md`
 
 ## Nouveau
+- [x] Intégration Docs MCP locale — scripts pnpm, scraper file:// vers lib `<name>-api` (version `package.json`), doc d’usage (`docs/docs-mcp.md`).
 - [x] Infra de tests (Lot 0): Vitest + couverture v8, scripts pnpm (`test`, `test:watch`, `test:unit`, `test:integration`, `lint`, `format`), convention de placement des tests sous `_tests` (ex: `src/**/_tests/*.test.ts`) – 2025-08-16
 - [x] Stack docs JSDoc/TypeDoc: config `typedoc.json`, scripts pnpm (`docs`, `docs:clean`), sortie Markdown `docs/api` – 2025-08-15
 - [x] Docs: suppression des warnings TypeDoc en ajoutant `src/config.ts` aux entry points et en exportant `MessageHandler`; JSDoc enrichie (`config.ts`, `xtouch/driver.ts`) – 2025-08-15

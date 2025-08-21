@@ -1,3 +1,5 @@
+### 2025-08-21 — Intégration Docs MCP
+- Aucun test impacté. Ajout d’infra de documentation (TypeDoc → Docs MCP) uniquement.
 # xtouch-gw-v2 — Audit des tests (lots et plan d’implémentation)
 
 Objectif
@@ -44,21 +46,24 @@ Carte du dépôt (Repository Map)
   - FS: persistance .state (journal.log, snapshot.json)
 - CI/CD: non détecté (.github non listé)
 
-État actuel des tests (2025-08-16)
+État actuel des tests (2025-08-21)
 - Vitest configuré avec couverture v8, convention `_tests` active
-- Suites présentes: 28 fichiers, 57 tests passés (100%)
+- Suites présentes: 28 fichiers, 78 tests passés (100%)
   - midi: utils (incl. fast-check), transform, filter, decoder, ports, sniffer
+  - midi/appClient: core, feedback, index (nouveau client partagé modulaire)
   - state: store, builders, persistence
   - router: antiEcho, emit, forward, page, planner, latency, shadows, router (orchestration)
   - shared: addrKey, appKey
   - config: load/findConfig, watchConfig
   - drivers: midiBridge, voicemeeter (fakes)
+  - services: controlMidiSender (refactoré pour utiliser MidiAppClient)
 - Couverture globale: ~59.7% lignes
   - router.ts ≈ 74.9%, router/* ≈ 95.5%
   - drivers/midiBridge ≈ 71.2%, drivers/voicemeeter ≈ 75.4%
   - state/persistence ≈ 100%
   - midi/sniffer ≈ 100%, midi/ports ≈ 100%, midi/decoder ≈ 76.1%
   - logger ≈ 96.1%
+  - **midi/appClient: nouveau module à tester (conversion PB→CC, updates optimistes)**
 
 Barre de qualité cible
 - Couverture
