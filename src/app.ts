@@ -159,6 +159,12 @@ export async function startApp(): Promise<() => Promise<void>> {
       (p) => !!(p as any).passthrough || (Array.isArray((p as any).passthroughs) && (p as any).passthroughs.length > 0)
     );
     if (!hasPagePassthrough) {
+      // Enregistrer un claim global pour éviter l'ouverture en double côté MidiAppClient
+      try {
+        const g = (global as unknown as { __appBridges__?: Set<string> });
+        if (!g.__appBridges__) (global as any).__appBridges__ = new Set<string>();
+        (global as any).__appBridges__.add("voicemeeter");
+      } catch {}
       vmBridge = new VoicemeeterDriver(x, {
         toVoicemeeterOutName: "xtouch-gw",
         fromVoicemeeterInName: "xtouch-gw-feedback",
@@ -208,6 +214,7 @@ export async function startApp(): Promise<() => Promise<void>> {
     try { stopWatch(); } catch {}
     try { for (const b of pageBridges) b.shutdown().catch(() => {}); } catch {}
     try { vmBridge?.shutdown(); } catch {}
+    try { (global as any).__appBridges__?.delete?.("voicemeeter"); } catch {}
     try { await shutdownControlMidiSender(); } catch {}
     
     try { xtouch?.stop(); } catch {}

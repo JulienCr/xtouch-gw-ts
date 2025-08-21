@@ -10,14 +10,26 @@ import { MidiAppClient } from "../midi/appClient";
  * - Envoie des trames Note On, Control Change ou Pitch Bend selon la spécification
  */
 class ControlMidiSenderImpl {
-  // MODIF: délègue au client partagé
+  // délègue au client partagé
   private readonly client = new MidiAppClient();
 
   /**
    * Initialise le service (pré‑ouverture best‑effort des ports connus).
    * @param cfg Configuration applicative courante
    */
-  async init(cfg: AppConfig): Promise<void> { await this.client.init(cfg); }
+  async init(cfg: AppConfig): Promise<void> {
+    await this.client.init(cfg);
+    // Pré-ouvrir les entrées de feedback pour les apps connues afin de
+    // capter immédiatement les états (ex. Voicemeeter) sans attendre un envoi.
+    try {
+      const apps = (cfg?.midi?.apps ?? [])
+        .map((it: any) => String(it?.name || "").trim())
+        .filter((s: string) => !!s);
+      for (const app of apps) {
+        try { await (this.client as any).ensureFeedback(app); } catch {}
+      }
+    } catch {}
+  }
 
   /**
    * Réapplique la configuration et redémarre proprement les ports ouverts par ce service.
@@ -30,7 +42,7 @@ class ControlMidiSenderImpl {
    * @param needle Sous-chaîne à rechercher dans le nom du port OUT
    * @param optional Si false, jette une erreur si le port n'est pas trouvé
    */
-  // MODIF: plus de helpers internes d'ouverture — délégué au client partagé
+
 
   /**
    * Ferme les entrées feedback ouvertes par ce service pour les apps gérées par des passthroughs sur la page.
@@ -46,6 +58,12 @@ class ControlMidiSenderImpl {
   async send(app: string, spec: ControlMidiSpec, value: unknown): Promise<void> { await this.client.send(app, spec, value); }
 
   /**
+   * S'assure que l'entrée feedback de l'app est ouverte (best‑effort, noop si passthrough actif ailleurs).
+   * Utile pour forcer l'écoute au démarrage sans attendre un premier envoi.
+   */
+  async ensureFeedback(app: string): Promise<void> { await (this.client as any).ensureFeedback(app); }
+
+  /**
    * Ferme tous les ports OUT ouverts par le service.
    */
   async shutdown(): Promise<void> {
@@ -55,14 +73,12 @@ class ControlMidiSenderImpl {
 
 const ControlMidiSender = new ControlMidiSenderImpl();
 
-// MODIF: helpers déplacés dans midi/appClient.ts
-
 /**
  * Initialise le service global d'émission MIDI.
  */
 export async function initControlMidiSender(cfg: AppConfig): Promise<void> {
   await ControlMidiSender.init(cfg);
-  // MODIF: exposer pour orchestration (reconcile on page change)
+  // exposer pour orchestration (reconcile on page change)
   try { (global as any).__controlMidiSender__ = ControlMidiSender; } catch {}
 }
 

@@ -1,7 +1,7 @@
 import { Input } from "@julusian/midi";
 import { logger } from "../../logger";
 import { findPortIndexByNameFragment } from "../ports";
-import { hasPassthroughAnywhereForApp } from "./core";
+import { hasPassthroughAnywhereForApp, hasBridgeForApp } from "./core";
 
 export type FeedbackState = {
   inPerApp: Map<string, Input>;
@@ -12,7 +12,7 @@ export async function ensureFeedbackOpen(app: string, state: FeedbackState): Pro
   if (state.inPerApp.has(app)) return;
   const needle = state.appToInName.get(app);
   if (!needle) return;
-  if (hasPassthroughAnywhereForApp(app)) {
+  if (hasPassthroughAnywhereForApp(app) || hasBridgeForApp(app)) {
     logger.debug(`MidiAppClient: skip IN for app='${app}' (handled elsewhere).`);
     return;
   }
