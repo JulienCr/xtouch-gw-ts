@@ -40,7 +40,7 @@ export function applyTransform(data: number[], t?: TransformConfig): number[] | 
       if (ccRaw === undefined) {
         const baseRaw = t.pb_to_cc.base_cc ?? 45; // default base
         const base = parseNumberMaybeHex(baseRaw, 45);
-        ccRaw = base + srcChannel1; // ch1 → base+1, etc.
+        ccRaw = base + (srcChannel1 - 1); // ch1 → base, ch2 → base+1, etc.
       }
       let cc = parseNumberMaybeHex(ccRaw, 0);
       cc = Math.max(0, Math.min(127, cc));

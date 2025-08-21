@@ -1,14 +1,28 @@
 import type { AppKey, MidiStateEntry, MidiStatus } from "../state";
 import type { PageConfig } from "../config";
+import { getPbChannelForControlId, getMessageTypeForControlId, getInputLookups } from "../xtouch/matching";
 import { getPagePassthroughItems } from "../config/passthrough";
 import { resolveAppKey } from "../shared/appKey";
+import type { ControlMapping } from "../types";
 
 export function getAppsForPage(page: PageConfig): AppKey[] {
 	const items = getPagePassthroughItems(page);
-	const appKeys: AppKey[] = Array.isArray(items)
+	const viaPassthrough: AppKey[] = Array.isArray(items)
 		? Array.from(new Set(items.map((it: any) => resolveAppKey(it?.to_port, it?.from_port) as AppKey)))
 		: [];
-	return appKeys.length > 0 ? appKeys : ["voicemeeter"];
+	const set = new Set<AppKey>(viaPassthrough);
+	// MODIF: inclure aussi les apps référencées par controls.* (mapping/app), même s'il existe des passthroughs
+	const controls = (page.controls as Record<string, unknown>) || {};
+	for (const [, raw] of Object.entries(controls)) {
+		const m = raw as unknown as { app?: string };
+		if (m && typeof m.app === "string") {
+			set.add(m.app as AppKey);
+		}
+	}
+	const out = Array.from(set.values());
+	// Fallback historique: si aucune app explicite, considérer 'voicemeeter' par défaut
+	if (out.length === 0) return ["voicemeeter" as AppKey];
+	return out;
 }
 
 export function getChannelsForApp(page: PageConfig, app: AppKey): number[] {
@@ -42,27 +56,77 @@ export function resolvePbToCcMappingForApp(page: PageConfig, app: AppKey): { map
 		.map((it: any) => ({ app: resolveAppKey(it?.to_port, it?.from_port) as AppKey, transform: it?.transform }))
 		.find((x: any) => x.app === app);
 	const pb2cc = cfg?.transform?.pb_to_cc;
-	if (!pb2cc) return null;
 	const out = new Map<number, number>();
 	const reverse = new Map<number, number>();
-	const baseRaw = pb2cc.base_cc;
-	const base = typeof baseRaw === "string" ? parseInt(baseRaw, 16) : (typeof baseRaw === "number" ? baseRaw : undefined);
-	for (let ch = 1; ch <= 9; ch++) {
-		let cc = pb2cc.cc_by_channel?.[ch];
-		if (cc == null && base != null) {
-			cc = base + (ch - 1);
+	if (pb2cc) {
+		const baseRaw = pb2cc.base_cc;
+		const base = typeof baseRaw === "string" ? parseInt(baseRaw, 16) : (typeof baseRaw === "number" ? baseRaw : undefined);
+		for (let ch = 1; ch <= 9; ch++) {
+			let cc = pb2cc.cc_by_channel?.[ch];
+			if (cc == null && base != null) {
+				cc = base + (ch - 1);
+			}
+			if (typeof cc === "string") {
+				cc = cc.startsWith("0x") ? parseInt(cc, 16) : parseInt(cc, 10);
+			}
+			if (typeof cc === "number") { out.set(ch, cc); reverse.set(cc, ch); }
 		}
-		if (typeof cc === "string") {
-			cc = cc.startsWith("0x") ? parseInt(cc, 16) : parseInt(cc, 10);
-		}
-		if (typeof cc === "number") { out.set(ch, cc); reverse.set(cc, ch); }
 	}
+
+	// MODIF: si aucune transform pb_to_cc n'est définie, construire une table depuis les controls.*.midi
+	if (out.size === 0 && page?.controls) {
+		const entries = Object.entries((page.controls as Record<string, unknown>) || {}) as Array<[string, ControlMapping]>;
+		for (const [controlId, mapping] of entries) {
+			if (!mapping || mapping.app !== app || !mapping.midi) continue;
+			const spec = mapping.midi;
+			if (spec.type !== "cc") continue;
+			// Déterminer le canal PB associé au control_id via le CSV (générique)
+			let ch: number | null = getPbChannelForControlId(controlId, "mcu") ?? null;
+			if (ch == null) continue;
+			const cc = Number(spec.cc);
+			if (Number.isFinite(cc)) {
+				out.set(ch, cc);
+				reverse.set(cc, ch);
+			}
+		}
+	}
+
 	return out.size > 0 ? { map: out, channelForCc: reverse } : null;
 }
 
 export function transformAppToXTouch(page: PageConfig, app: AppKey, entry: MidiStateEntry): MidiStateEntry | null {
 	const status = entry.addr.status as MidiStatus;
-	if (status === "note" || status === "pb" || status === "sysex") {
+	// Ne pas relayer les Notes sauf si explicitement autorisé par un passthrough (filters.types)
+	if (status === "note") {
+		const items = getPagePassthroughItems(page);
+		const relevant = (Array.isArray(items) ? items : [])
+			.filter((it: any) => (resolveAppKey(it?.to_port, it?.from_port) as AppKey) === app);
+		let allow = false;
+		for (const it of relevant) {
+			const types: string[] | undefined = it?.filter?.types;
+			if (Array.isArray(types) && (types.includes("noteOn") || types.includes("noteOff"))) { allow = true; break; }
+		}
+		// Symétrie stricte: autoriser Note uniquement si la page a un contrôle mappé correspondant à cette note pour cette app
+		if (!allow) {
+			try {
+				const note = entry.addr.data1 ?? -1;
+				if (typeof note === "number" && note >= 0) {
+					const lookup = getInputLookups("mcu");
+					const controlId = lookup.noteToControl.get(note) || null;
+					if (controlId) {
+						const m = (page.controls as Record<string, ControlMapping | undefined>)[controlId];
+						if (m && m.app === app && m.midi) {
+							const kind = getMessageTypeForControlId(controlId, "mcu");
+							if (kind === "note") allow = true;
+						}
+					}
+				}
+			} catch {}
+		}
+		if (!allow) return null;
+		return entry;
+	}
+	if (status === "pb" || status === "sysex") {
 		return entry;
 	}
 	if (status === "cc") {

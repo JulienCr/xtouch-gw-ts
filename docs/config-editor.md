@@ -24,6 +24,11 @@ pages:
       labels: ["Mic\nBaba", "Mic\nMath", "Mic\nJu", "Son\nMac", "Son\nPC", "Son\nMASTER", "Son\nRetours", "Lum\nFace"]
       # Couleurs par strip (0..7): 0=off, 1=red, 2=green, 3=yellow, 4=blue, 5=magenta, 6=cyan, 7=white
       colors: [2,2,2,4,4,7,3,6]
+    controls:
+      # Exemple: mapping global MIDI direct (indépendant du passthrough)
+      fader1:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 81 }
 ```
 
 

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import YAML from "yaml";
-import type { AppConfig, PageConfig, PassthroughConfig, MidiEventTypeName, MidiFilterConfig, TransformConfig } from "@/types/config";
+import type { AppConfig, PageConfig, PassthroughConfig, MidiEventTypeName, MidiFilterConfig, TransformConfig, ControlMapping } from "@/types/config";
 import { useMidiPorts } from "@/hooks/useMidiPorts";
 import LcdEditor from "@/components/LcdEditor";
 
@@ -61,6 +61,11 @@ export default function PageEditorSsr({ index, page }: { index: number; page: Pa
         passthroughs={state.passthroughs || (state.passthrough ? [state.passthrough] : [])}
         onChange={(list) => setState({ ...state, passthrough: undefined, passthroughs: list })}
       />
+
+      <ControlsEditor
+        controls={(state.controls || {}) as Record<string, ControlMapping>}
+        onChange={(controls) => setState({ ...state, controls })}
+      />
     </div>
   );
 }
@@ -102,6 +107,54 @@ function PassthroughsEditor({ passthroughs, onChange }: { passthroughs: Passthro
 
             <div className="flex justify-end">
               <button className="rounded border px-2 py-1 text-xs" onClick={() => onChange(passthroughs.filter((_, i) => i !== idx))}>Supprimer</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ControlsEditor({ controls, onChange }: { controls: Record<string, ControlMapping>; onChange: (v: Record<string, ControlMapping>) => void }) {
+  const ids = Object.keys(controls);
+  const [newId, setNewId] = useState<string>("");
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h3 className="font-medium">Controls</h3>
+        <div className="flex items-center gap-2">
+          <input className="rounded border px-2 py-1 text-sm" placeholder="controlId (ex: fader1)" value={newId} onChange={(e) => setNewId(e.target.value)} />
+          <button
+            className="rounded border px-2 py-1 text-sm"
+            onClick={() => {
+              const id = newId.trim();
+              if (!id) return;
+              onChange({ ...controls, [id]: { app: "qlc", midi: { type: "cc", channel: 1, cc: 81 } } as any });
+              setNewId("");
+            }}
+          >
+            + Ajouter
+          </button>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {ids.length === 0 && <div className="text-sm text-gray-500">Aucun control</div>}
+        {ids.map((id) => (
+          <div key={id} className="rounded border p-2 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="font-mono text-sm">{id}</div>
+              <button className="rounded border px-2 py-1 text-xs" onClick={() => { const copy = { ...controls }; delete copy[id]; onChange(copy); }}>Supprimer</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <LabeledSelect label="App" value={controls[id]?.app || "qlc"} onChange={(v) => onChange({ ...controls, [id]: { ...(controls[id] || {}), app: v } as any })} options={["voicemeeter", "qlc", "obs", "console"]} />
+              <LabeledSelect label="Type" value={controls[id]?.midi?.type || "cc"} onChange={(v) => onChange({ ...controls, [id]: { ...(controls[id] || {}), midi: { ...(controls[id]?.midi || {}), type: v as any } } })} options={["cc", "note", "pb", "passthrough"]} />
+              <LabeledInput label="Channel" value={String(controls[id]?.midi?.channel ?? 1)} onChange={(v) => onChange({ ...controls, [id]: { ...(controls[id] || {}), midi: { ...(controls[id]?.midi || {}), channel: Number(v) } } })} />
+              {controls[id]?.midi?.type === "cc" && (
+                <LabeledInput label="CC" value={String(controls[id]?.midi?.cc ?? 0)} onChange={(v) => onChange({ ...controls, [id]: { ...(controls[id] || {}), midi: { ...(controls[id]?.midi || {}), cc: Number(v) } } })} />
+              )}
+              {controls[id]?.midi?.type === "note" && (
+                <LabeledInput label="Note" value={String(controls[id]?.midi?.note ?? 0)} onChange={(v) => onChange({ ...controls, [id]: { ...(controls[id] || {}), midi: { ...(controls[id]?.midi || {}), note: Number(v) } } })} />
+              )}
             </div>
           </div>
         ))}

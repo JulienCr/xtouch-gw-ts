@@ -16,9 +16,6 @@
     "src/types.ts"
   ],
   "tsconfig": "tsconfig.json",
-  "plugin": [
-    "typedoc-plugin-markdown"
-  ],
   "readme": "none",
   "hideGenerator": true,
   "includeVersion": true,
@@ -34,7 +31,8 @@
     "**/node_modules/**",
     "web/**"
   ],
-  "out": "docs/api"
+  "out": "docs/api",
+  "theme": "default"
 }
 
 

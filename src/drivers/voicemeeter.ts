@@ -2,6 +2,7 @@ import { Input, Output } from "@julusian/midi";
 import { logger } from "../logger";
 import type { Driver, ExecutionContext } from "../types";
 import { decodeMidi } from "../midi/decoder";
+import { markAppOutgoingAndForward } from "../midi/appClient"; // MODIF: unifier shadow/forward
 import type { XTouchDriver } from "../xtouch/driver";
 import { findPortIndexByNameFragment } from "../midi/ports";
 
@@ -60,8 +61,8 @@ export class VoicemeeterDriver implements Driver {
       // Transférer tel quel vers VM
       try {
         this.outToVM?.sendMessage(data);
-        // Anti-echo: marquer shadow de l'app pour ignorer l'echo immédiat côté Router
-        try { (global as any).__router__?.markAppShadowForOutgoing?.("voicemeeter", data, this.cfg.toVoicemeeterOutName); } catch {}
+        // MODIF: shadow + forward unifiés (parité avec midiBridge/controlMidi)
+        try { markAppOutgoingAndForward("voicemeeter", data, this.cfg.toVoicemeeterOutName); } catch {}
       } catch (err) {
         logger.warn("Voicemeeter bridge send error:", err as any);
       }

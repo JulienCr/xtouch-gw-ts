@@ -11,12 +11,13 @@ describe("midi/transform.applyTransform", () => {
     expect(out).toEqual([0x90, 12, 64]);
   });
 
-  it("pb_to_cc converts PB to CC on target channel with base_cc", () => {
+  it("pb_to_cc converts PB to CC on target channel with base_cc (ch1 → base, ch2 → base+1)", () => {
     const t: TransformConfig = { pb_to_cc: { target_channel: 1, base_cc: "0x45" } };
     // Source PB on channel 3 (0-indexed 2) maps to CC base+3 = 0x48 on target ch1 (per current logic)
     const pbCh3 = [0xE0 + 2, 0x00, 0x7f]; // value14 ~ 16256 → value7 ~ 127
     const out = applyTransform(pbCh3, t);
-    expect(out).toEqual([0xB0 + 0, 0x48, 126]);
+    // Avec la règle ch1 → base (0x45), ch3 → base+(3-1) = 0x47
+    expect(out).toEqual([0xB0 + 0, 0x47, 126]);
   });
 
   it("returns original data when not PitchBend or no transform applies", () => {

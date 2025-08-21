@@ -148,6 +148,15 @@ export interface AppConfig {
   midi: {
     input_port: string;
     output_port: string;
+    /** Mapping explicite des ports par application (override des heuristiques) */
+    apps?: Array<{
+      /** Clé d'application (ex: "voicemeeter", "qlc", "obs") */
+      name: string;
+      /** Nom du port de sortie (vers l'application) */
+      output_port?: string;
+      /** Nom du port d'entrée (feedback depuis l'application) */
+      input_port?: string;
+    }>;
   };
   /** Paramètres de connexion à OBS WebSocket. */
   obs?: {

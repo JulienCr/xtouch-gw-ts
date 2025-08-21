@@ -1,0 +1,38 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/app.ts",
+    "src/router.ts",
+    "src/router/page.ts",
+    "src/config.ts",
+    "src/midi/**/*.ts",
+    "src/ui/**/*.ts",
+    "src/xtouch/**/*.ts",
+    "src/drivers/**/*.ts",
+    "src/state/**/*.ts",
+    "src/bridges/**/*.ts",
+    "src/shared/**/*.ts",
+    "src/types.ts"
+  ],
+  "tsconfig": "tsconfig.json",
+  "plugin": [
+    "typedoc-plugin-markdown"
+  ],
+  "readme": "none",
+  "hideGenerator": true,
+  "includeVersion": true,
+  "entryPointStrategy": "expand",
+  "categorizeByGroup": true,
+  "sort": ["source-order", "alphabetical"],
+  "skipErrorChecking": false,
+  "logLevel": "Info",
+  "disableSources": false,
+  "githubPages": false,
+  "exclude": [
+    "**/*.test.ts",
+    "**/node_modules/**",
+    "web/**"
+  ],
+  "out": "docs/api"
+}

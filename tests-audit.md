@@ -1,3 +1,5 @@
+### 2025-08-21 — Intégration Docs MCP
+- Aucun test impacté. Ajout d’infra de documentation (TypeDoc → Docs MCP) uniquement.
 # xtouch-gw-v2 — Audit des tests (lots et plan d’implémentation)
 
 Objectif
@@ -44,21 +46,24 @@ Carte du dépôt (Repository Map)
   - FS: persistance .state (journal.log, snapshot.json)
 - CI/CD: non détecté (.github non listé)
 
-État actuel des tests (2025-08-16)
+État actuel des tests (2025-08-21)
 - Vitest configuré avec couverture v8, convention `_tests` active
-- Suites présentes: 28 fichiers, 57 tests passés (100%)
+- Suites présentes: 28 fichiers, 78 tests passés (100%)
   - midi: utils (incl. fast-check), transform, filter, decoder, ports, sniffer
+  - midi/appClient: core, feedback, index (nouveau client partagé modulaire)
   - state: store, builders, persistence
   - router: antiEcho, emit, forward, page, planner, latency, shadows, router (orchestration)
   - shared: addrKey, appKey
   - config: load/findConfig, watchConfig
   - drivers: midiBridge, voicemeeter (fakes)
+  - services: controlMidiSender (refactoré pour utiliser MidiAppClient)
 - Couverture globale: ~59.7% lignes
   - router.ts ≈ 74.9%, router/* ≈ 95.5%
   - drivers/midiBridge ≈ 71.2%, drivers/voicemeeter ≈ 75.4%
   - state/persistence ≈ 100%
   - midi/sniffer ≈ 100%, midi/ports ≈ 100%, midi/decoder ≈ 76.1%
   - logger ≈ 96.1%
+  - **midi/appClient: nouveau module à tester (conversion PB→CC, updates optimistes)**
 
 Barre de qualité cible
 - Couverture
@@ -215,6 +220,11 @@ Prochaines étapes
 - Changement: `updateLeds()` n'émet plus que pour les contrôles avec indicateur explicite.
 - Résultat: suite `pnpm test` entièrement verte après modification.
 
+2025-08-20 — InputMapper (MCU) — routage PB multi-canaux
+- Problème: seuls les PB canal 1 (fader1) passaient; faders 2..8 rejetés par un filtre de canal global.
+- Fix: parsing `pb=chN` depuis `docs/xtouch-matching.csv` et table `pbChannelToControl`; filtrage de canal maintenu pour Note/CC uniquement; PB accepté sur 1..9 puis résolu vers `control_id`.
+- Tests: suite unitaire complète verte (`pnpm test:unit`). Ajouter plus tard des tests ciblés sur `attachInputMapper` avec driver X‑Touch fake.
+
 2025-08-20 — pages_global (defaults) ajouté
 - Typecheck OK, suite de tests complète verte après fusion globale des pages.
 
@@ -259,4 +269,9 @@ Prochaines étapes
   - Cache `sceneItemId`: hit/miss, invalidation après erreur, re-resolve OK
   - Lecture fraîche: si `readCurrent` ≠ cache, ne “recolle” pas à l’ancienne position
   - Non-écriture `width/height`: vérifier qu’aucun champ interdit n’est envoyé
+
+2025-08-20 — Controls MIDI directs (nouvelle feature)
+- Ajout: `src/services/controlMidiSender.ts` (nouveau module, non couvert par tests pour l’instant)
+- Changements: `src/router.ts` (priorise `mapping.midi`), `src/xtouch/inputMapper.ts` (émission valeur14 pour PB)
+- Impact couverture: dossier `services` partiellement couvert; prévoir tests unitaires stubs Output pour valider conversion 14b→7b et ouverture de ports.
 

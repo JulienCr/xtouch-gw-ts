@@ -1,5 +1,6 @@
 import { logger } from "./logger";
 import type { ControlMapping, Driver, ExecutionContext } from "./types";
+import { sendControlMidi } from "./services/controlMidiSender";
 import type { AppConfig, PageConfig, GlobalPageDefaults } from "./config";
 import { StateStore, MidiStateEntry, AppKey, MidiStatus, buildEntryFromRaw } from "./state";
 import type { XTouchDriver } from "./xtouch/driver";
@@ -142,6 +143,18 @@ export class Router {
       logger.debug(`Aucun mapping pour '${controlId}' sur '${page?.name}'.`);
       return;
     }
+    // 1) Mode MIDI direct si défini: envoi immédiat vers l'app cible
+    if (mapping.midi) {
+      try {
+        // En mode passthrough, si la valeur n'est pas une trame brute mais un scalaire (ex: PB 14b),
+        // laisser le sender décider; sinon transmettre tel quel.
+        await sendControlMidi(mapping.app, mapping.midi, value);
+      } catch (err) {
+        logger.warn(`Envoi MIDI direct échoué pour '${controlId}':`, err as any);
+      }
+      return;
+    }
+    // 2) Sinon, exécuter une action de driver classique
     const driver = this.drivers.get(mapping.app);
     if (!driver) {
       logger.warn(`Driver '${mapping.app}' non enregistré. Action '${mapping.action}' ignorée.`);
@@ -149,7 +162,7 @@ export class Router {
     }
     const context: ExecutionContext = { controlId, value: value as any };
     try {
-      await driver.execute(mapping.action, mapping.params ?? [], context);
+      await driver.execute(mapping.action!, mapping.params ?? [], context);
     } catch (err) {
       logger.error(`Erreur lors de l'exécution '${mapping.app}.${mapping.action}':`, err);
     }

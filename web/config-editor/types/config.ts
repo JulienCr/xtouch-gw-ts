@@ -34,6 +34,21 @@ export interface PassthroughConfig {
   transform?: TransformConfig;
 }
 
+export interface ControlMidiSpec {
+  type: "cc" | "note" | "pb" | "passthrough";
+  channel: number;
+  cc?: number;
+  note?: number;
+}
+
+export interface ControlMapping {
+  app: string;
+  action?: string;
+  params?: unknown[];
+  midi?: ControlMidiSpec;
+  indicator?: { signal: string; equals?: unknown; in?: unknown[]; truthy?: boolean };
+}
+
 export interface PageConfig {
   name: string;
   passthrough?: PassthroughConfig;
@@ -59,6 +74,7 @@ export interface AppConfig {
   midi: {
     input_port: string;
     output_port: string;
+    apps?: Array<{ name: string; output_port?: string; input_port?: string }>;
   };
   paging?: { channel?: number; prev_note?: number; next_note?: number };
   pages_global?: GlobalPageDefaults;

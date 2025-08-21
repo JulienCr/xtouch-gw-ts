@@ -25,8 +25,12 @@
     "sniff:web": "tsx src/sniffer-server.ts",
     "test:midi": "tsx src/test-midi-send.ts",
     "docs": "typedoc",
-    "docs:clean": "rimraf docs/api",
+    "docs:html": "typedoc --options typedoc.html.json",
+    "docs:md": "typedoc --options typedoc.md.json",
+    "docs:clean": "rimraf docs/api docs/api-html",
+    "docs:build": "pnpm run docs:clean && pnpm run docs:markdown && pnpm run docs:html",
     "docs:open": "pwsh -NoProfile -Command \"Start-Process docs/api/README.md\"",
+    "docs:open:html": "pwsh -NoProfile -Command \"Start-Process docs/api-html/index.html\"",
     "web": "node scripts/check-next-build.mjs && pnpm -C web/config-editor start",
     "web:build": "pnpm -C web/config-editor build",
     "web:dev": "pnpm -C web/config-editor dev"

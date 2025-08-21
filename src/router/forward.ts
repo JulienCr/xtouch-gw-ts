@@ -29,6 +29,7 @@ export function forwardFromApp(
 
   const app = appKey as AppKey;
   const appsInPage = getAppsForPage(page);
+  // MODIF: toujours autoriser l'app si un passthrough actif est présent sur la page courante
   if (!appsInPage.includes(app)) return;
 
   const k = deps.addrKeyForApp(entry.addr);

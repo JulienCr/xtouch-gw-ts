@@ -27,6 +27,12 @@
 - [ ] Learn page (assistant): enchaîner plusieurs learns pour produire un bloc `controls`
 - [ ] Tests de perf/jitter (< 20 ms) et micro-bench sur hot paths
 - [ ] CI GitHub Actions: pnpm i --frozen-lockfile, lint, check:types, test
+- [x] Refactor MIDI: extraire un client partagé `MidiAppClient` (ports IN/OUT, cache, feedback → Router, optimistic shadow) et l'utiliser dans `drivers/midiBridge.ts` et `services/controlMidiSender.ts` pour supprimer la duplication
+- [ ] Clarifier l'API: renommer `controlMidiSender` → `midiAppClient` (ou similaire) et adapter `Router.handleControl()` pour appeler ce client générique pour `controls.*.midi`
+- [x] Garder `MidiBridgeDriver` focalisé sur le « passthrough » page-scopé (X‑Touch ⇄ App) en s'appuyant sur `MidiAppClient` pour l'accès port/émission; éviter d'y intégrer la logique `controls.midi`
+- [ ] Tests: couvrir les conversions PB→CC (14b→7b) et la résolution `channelForCc` via `resolvePbToCcMappingForApp()` côté `controlMidiSender`/client partagé
+- [x] Diviser `src/midi/appClient.ts` (>150 lignes) en modules plus petits: `midi/appClient/core.ts` (send/convert/ports), `midi/appClient/feedback.ts` (wiring IN), `midi/appClient/index.ts` (API publique)
+- [ ] JSDoc sur `midi/appClient/*` et points de contact service/driver mis à jour
 
 ## En cours
 - [x] Pages: support d'un bloc `pages_global` (defaults fusionnés dans chaque page; override par page)
@@ -54,6 +60,9 @@
     - [x] src/router/forward.ts
     - [x] src/config.ts (load/find)
 
+## Fait
+- [x] Controls MIDI directs (global): ajout de `controls.*.midi` pour adresser n'importe quelle app via CC/Note/PB, avec conversion automatique PB→CC si besoin. Service `controlMidiSender` (ports cache) + heuristiques ports (voicemeeter→`xtouch-gw`, qlc→`qlc-in`). UI éditeur mise à jour. Docs README/CLI/specs.
+
 - [ ] Driver OBS (WIP): connexion obs-websocket v5, actions `nudgeX`/`nudgeY`/`scaleUniform`, cache `sceneItemId` et transforms, reconnexion/backoff. Mapping encoders `enc6..enc8` via CC 21–23. Docs: `docs/driver-obs.md`.
   - [x] Input layer générique: attacher `inputMapper` (CSV → controlId → router.handleControl)
   - [x] Navigation: pagination uniquement (suppression du mapping CC 16..23 → enc1..8)
@@ -66,6 +75,7 @@
   - [x] Docs mises à jour: `docs/driver-obs.md`
 
 ## Nouveau
+- [x] Intégration Docs MCP locale — scripts pnpm, scraper file:// vers lib `<name>-api` (version `package.json`), doc d’usage (`docs/docs-mcp.md`).
 - [x] Infra de tests (Lot 0): Vitest + couverture v8, scripts pnpm (`test`, `test:watch`, `test:unit`, `test:integration`, `lint`, `format`), convention de placement des tests sous `_tests` (ex: `src/**/_tests/*.test.ts`) – 2025-08-16
 - [x] Stack docs JSDoc/TypeDoc: config `typedoc.json`, scripts pnpm (`docs`, `docs:clean`), sortie Markdown `docs/api` – 2025-08-15
 - [x] Docs: suppression des warnings TypeDoc en ajoutant `src/config.ts` aux entry points et en exportant `MessageHandler`; JSDoc enrichie (`config.ts`, `xtouch/driver.ts`) – 2025-08-15
@@ -94,6 +104,7 @@
 - [x] CLI: nouvelle commande `sync` + hook `Driver.sync()` + `Router.syncDrivers()`; implémentation OBS (studio mode, scènes) et mise à jour docs CLI — 2025‑08‑20
 - [x] Fix: LEDs navigation (Prev/Next) et F1..F8 s'éteignaient immédiatement à l'arrivée sur une page — la logique générique des indicateurs n'écrase plus les LEDs de navigation gérées par `fkeys` (n'émet que pour les contrôles avec indicateur explicite). Tests verts. — 2025‑08‑20
 - [x] CLI: refonte aide UX‑first — YAML v2 (meta/context/categories), rendu cheatsheet coloré, `help <cmd|cat|all|examples|json>`, alias `:` avec compat, suggestions, completion; `clear` reste stdout — 2025‑08‑20
+- [x] Fix: InputMapper (MCU) — prise en charge `pb=chN` depuis `docs/xtouch-matching.csv`; PB non filtré par canal, Note/CC filtrés par `paging.channel`; faders 2..8 désormais routés — 2025‑08‑20
  - [x] CLI: REPL — ajout de la complétion Tab via `readline.completer` (commandes, sous-commandes et complétions contextuelles: pages, ports MIDI, fader/lcd) — 2025‑08‑20
 - [x] BUG: Latence/loop perceptible (≈1 s) sur feedback boutons et « recalage » des faders — métriques, anti‑echo par type, LWW, setpoints moteurs, échos locaux — 2025‑08‑15
 - [x] Page "Lum Latéraux": fader 9 forcé sur CC 78 via `cc_by_channel` – 2025-08-10

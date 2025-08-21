@@ -8,7 +8,50 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
 - Tenir `TASKS.md` à jour après chaque lot de travail.
 
 ## Entrées
-- 2025-08-20 — Ajout d’un cycle de resynchronisation global (CLI `sync`)
+- 2025-08-21 — Intégration Docs MCP locale
+  - Décision: générer la doc API (TypeDoc Markdown/HTML) puis indexer `docs/api` via `file://` dans une librairie `<package-name>-api` versionnée.
+  - Implémentation: scripts pnpm (`docs:build`, `docs:mcp`, `docs:mcp:web`, `docs:mcp:scrape`) et helper `scripts/docs-mcp-scrape.mjs` (construction file:// robuste via `pathToFileURL`).
+  - Leçon: privilégier Markdown (`docs/api`) pour un parsing plus propre côté serveur; garder HTML à disposition.
+- 2025-08-20 — Fonctionnalité controls.midi et résolution des bugs de coexistence
+  - Décision: introduire `controls.*.midi { type, channel, cc|note }` pour un routage global générique (toutes apps) sans dupliquer de logique dans les drivers.
+  - Implémentation: service `src/services/controlMidiSender.ts` (cache de ports, conversion 14b→7b pour CC), `Router.handleControl()` priorise `midi` sur `action`, `inputMapper` émet valeur14 pour faders PB.
+  - Leçon: factoriser la logique d'envoi MIDI hors drivers spécifiques, conserver OBS/Voicemeeter/QLC pur API côté drivers.
+  - Besoin: recaler rapidement surface/états/drivers après dérive (déconnexions OBS, reboot, etc.).
+  - Solution: nouveau hook optionnel `Driver.sync()` appelé via `Router.syncDrivers()`, et commande CLI `sync` enchaînant reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD.
+  - Leçon: centraliser la resynchro côté Router/CLI, laisser chaque driver gérer sa lecture d'état.
+  - **Bugs rencontrés et solutions:**
+    - **Offset pb_to_cc (+1)**: Le calcul `base_cc + channel_source` était incorrect. Fix: `base_cc + (channel_source - 1)` pour que fader1→CC81, fader2→CC82, etc.
+    - **Passthrough cassé après controls.midi**: L'inputMapper appelait `handleControl` même sur les pages sans mapping controls. Fix: filtrer les appels PB→handleControl uniquement si le control_id existe dans la page active.
+    - **Passthrough et controls.midi en conflit**: Double écoute des ports MIDI causant des conflits. Fix: prioriser les passthroughs, fermer les ports controlMidiSender quand un passthrough est actif.
+    - **Feedback manquant pour controls.midi**: Pas de mise à jour de l'état après envoi. Fix: ouverture de ports d'entrée dédiés + optimistic update immédiat du state.
+    - **Désynchronisation entre pages**: Fader déplacé sur page passthrough non reflété sur page controls.midi. Fix: optimistic update dans midiBridge + controlMidiSender pour maintenir le state à jour.
+  - **Leçons apprises:**
+    - **Gestion des ports MIDI**: Un seul service doit "posséder" les ports IN/OUT pour une app donnée. Prioriser les passthroughs sur les controls.midi.
+    - **Optimistic updates**: Mettre à jour le state immédiatement après envoi MIDI pour éviter les désynchronisations lors des changements de page.
+    - **Filtrage des événements**: Ne traiter les événements controls.midi que quand ils sont explicitement mappés sur la page active.
+    - **Mutualisation du code**: Factoriser la logique de setpoint des faders dans un utilitaire partagé pour éviter la duplication.
+    - **Coexistence des systèmes**: Les passthroughs et controls.midi peuvent coexister mais nécessitent une gestion stricte des priorités et des ports.
+    - **Feedback manquant sur pages avec passthroughs**: QLC feedback (CC 78) n'était pas transformé vers X‑Touch sur les pages avec seulement un passthrough Voicemeeter. Fix: `getAppsForPage()` doit toujours inclure les apps référencées par `controls.*` en plus des passthroughs.
+    - **Ports MIDI en double sur Windows**: ControlMidiSender tentait d'ouvrir un port IN pour QLC même si un passthrough existait ailleurs, causant "port already in use" et "ouverture IN échouée". Fix: vérifier les passthroughs sur toutes les pages, pas seulement la page active.
+    - **Hardcoding des noms de contrôles**: Logique spécifique à `fader_master` et regex `fader(\d+)` rendait le code non extensible. Fix: centraliser la lecture de `docs/xtouch-matching.csv` dans un module `matching.ts` générique, avec des lookups `getPbChannelForControlId()` et `getInputLookups()`.
+    - **Duplication de la logique CSV**: Parsing du CSV dupliqué entre `inputMapper` et `router/page.ts`. Fix: factoriser dans `matching.ts` avec cache et API unifiée, éviter la duplication des chemins par défaut.
+  - **Leçons de design:**
+    - **Généricité des mappings**: Ne jamais hardcoder des noms de contrôles ou d'apps dans la logique. Utiliser des sources de données externes (CSV, config) pour rester extensible.
+    - **Centralisation des parsers**: Un seul endroit doit connaître le format et l'emplacement des fichiers de mapping. Exposer des APIs génériques plutôt que de dupliquer la logique.
+    - **Union des sources d'apps**: Une page peut avoir des apps via passthroughs ET via controls, les deux doivent être considérés pour le feedback et le routing.
+  - Décision (architecture): chevauchement observé entre `drivers/midiBridge.ts` et `services/controlMidiSender.ts` (gestion des ports IN/OUT, optimistic update/shadow, setpoints faders). Facteur commun à extraire: un client partagé `MidiAppClient` (ouverte/fermeture ports, envoi Note/CC/PB, conversion PB→CC 14b→7b, onFeedback → `Router.onMidiFromApp`). `MidiBridgeDriver` reste l'orchestrateur de passthrough page-scopé; `controls.*.midi` utilise ce client.
+  - **Prochaines étapes de déduplication** (après extraction `MidiAppClient`):
+    - Exposer `ensureFeedback(app: string)` public dans `MidiAppClient` et l'appeler depuis `controlMidiSender` (supprimer `(client as any)["ensureFeedbackOpen"]`).
+    - Remplacer les appels directs au Router par `markAppOutgoingAndForward()`: `src/drivers/voicemeeter.ts` (shadow-only → helper partagé, ajouter optimistic forward pour parité avec `midiBridge`).
+    - Diviser `src/midi/appClient.ts` (>150 lignes) en modules plus petits: `midi/appClient/core.ts` (send/convert/ports), `midi/appClient/feedback.ts` (wiring IN), `midi/appClient/index.ts` (API publique).
+    - Tests unitaires ciblés sur `MidiAppClient`: conversion PB 14b→7b, résolution canal CC→PB via `resolvePbToCcMappingForApp`, updates optimistes, gating listener feedback (passthrough présent).
+    - JSDoc sur `midi/appClient/*` et points de contact service/driver mis à jour.
+    - Optionnel: factoriser le helper "open by fragment" retournant {device, index} pour DRY les petits patterns open-then-close dans `voicemeeter.ts` sans forcer sur `MidiAppClient` (pas app-scopé).
+- 2025-08-20 — Ajout d'un cycle de resynchronisation global (CLI `sync`)
+- 2025-08-20 — Mapping MIDI direct par contrôle
+  - Décision: introduire `controls.*.midi { type, channel, cc|note }` pour un routage global générique (toutes apps) sans dupliquer de logique dans les drivers.
+  - Implémentation: service `src/services/controlMidiSender.ts` (cache de ports, conversion 14b→7b pour CC), `Router.handleControl()` priorise `midi` sur `action`, `inputMapper` émet valeur14 pour faders PB.
+  - Leçon: factoriser la logique d’envoi MIDI hors drivers spécifiques, conserver OBS/Voicemeeter/QLC pur API côté drivers.
   - Besoin: recaler rapidement surface/états/drivers après dérive (déconnexions OBS, reboot, etc.).
   - Solution: nouveau hook optionnel `Driver.sync()` appelé via `Router.syncDrivers()`, et commande CLI `sync` enchaînant reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD.
   - Leçon: centraliser la resynchro côté Router/CLI, laisser chaque driver gérer sa lecture d’état.
@@ -25,6 +68,16 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Cause: `attachIndicators()` ré-émettait des NoteOn à 0 pour tous les contrôles mappés par CSV, y compris ceux sans indicateur actif, écrasant les LEDs gérées par `fkeys`.
   - Fix: dans `src/xtouch/indicators.ts`, ne toucher qu'aux LEDs présentes dans `litByControlId` (celles avec un indicateur explicite). Les LEDs navigation restent gérées par `updateFKeyLedsForActivePage`/`updatePrevNextLeds`.
   - Leçon: isoler les responsabilités LED — navigation vs indicateurs d'app — et éviter les write-all par défaut.
+ - 2025-08-20 — InputMapper (MCU) ne routait pas les faders 2..8
+   - Symptôme: seul `fader1` fonctionnait; logs « Aucun mapping pour 'faderX_touch' ».
+   - Cause: filtre global par `paging.channel` appliqué aussi aux Pitch Bend (faders MCU), rejetant les PB sur ch2..8.
+   - Fix: parser `pb=chN` depuis `docs/xtouch-matching.csv` et construire `pbChannelToControl`; n'appliquer le filtre de canal qu'aux Note/CC; accepter PB sur tous canaux et router selon la table.
+   - Leçon: en MCU, le canal MIDI d'un fader est sémantique (strip). Le filtrage de canal doit être spécifique au type de message.
+ - 2025-08-20 — Setpoint moteur incorrect sur faders 2..8 (controls.midi)
+  - Symptôme: après mouvement d'un fader 2..8, le moteur se recalait mal ou revenait à une position incorrecte.
+  - Cause: `scheduleFaderSetpoint()` était appelé avec le canal CC cible (souvent CH1 pour QLC) au lieu du canal du fader source (CH2..8).
+  - Fix: dans `controlMidiSender.ts`, déduire le canal fader depuis la page active via `resolvePbToCcMappingForApp()` et le mapping CC→PB, puis programmer le setpoint sur ce canal.
+  - Leçon: en MCU, le canal MIDI d'un fader (source) et le canal CC cible (destination) sont distincts. Le setpoint moteur doit toujours être sur le canal source.
  - 2025-08-20 — Defaults globaux pages
    - Décision: introduire `pages_global` dans `config.yaml` pour définir des contrôles/LCD/passthroughs communs.
    - Implémentation: fusion au runtime dans `Router.mergeGlobalIntoPage()` sans muter la config; override par page.
