@@ -57,4 +57,14 @@ export function hasPassthroughAnywhereForApp(app: string): boolean {
   }
 }
 
+/** Retourne true si une passerelle/bridge global(e) possède déjà l'IN pour cette app. */
+export function hasBridgeForApp(app: string): boolean {
+  try {
+    const g = (global as unknown as { __appBridges__?: Set<string> });
+    return g?.__appBridges__?.has(app) ?? false;
+  } catch {
+    return false;
+  }
+}
+
 
