@@ -8,6 +8,15 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
 - Tenir `TASKS.md` à jour après chaque lot de travail.
 
 ## Entrées
+- 2025-08-21 — Schémas de flux (Mermaid)
+  - Ajout de `docs/flows.md` couvrant: démarrage app, changement de page, OBS (actions/indicateurs), QLC+ (passthrough et controls.midi).
+  - Source: code actuel (`src/app.ts`, `src/app/bootstrap.ts`, `src/app/navigation.ts`, `src/router.ts`, `src/router/page.ts`, `src/drivers/*`, `src/services/controlMidiSender.ts`).
+  - Leçon: documenter les responsabilités entre Router/Bootstrap/Drivers et séparer indicateurs driver‑driven des LEDs de navigation.
+  - Règles Mermaid (compat):
+    - Éviter l’Unicode dans les labels: remplacer →, —, ’, « X‑Touch » par ASCII (->, -, ', X-Touch).
+    - Pas de parenthèses dans les titres de subgraph (utiliser _ ou mots simples sans ()).
+    - Préférer labels courts ASCII; ok pour `-- yes/no -->` et `-. label .->`.
+    - Éviter les labels d’arêtes exotiques; si besoin, rester `-- text -->`.
 - 2025-08-21 — Intégration Docs MCP locale
   - Décision: générer la doc API (TypeDoc Markdown/HTML) puis indexer `docs/api` via `file://` dans une librairie `<package-name>-api` versionnée.
   - Implémentation: scripts pnpm (`docs:build`, `docs:mcp`, `docs:mcp:web`, `docs:mcp:scrape`) et helper `scripts/docs-mcp-scrape.mjs` (construction file:// robuste via `pathToFileURL`).

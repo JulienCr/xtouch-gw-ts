@@ -102,6 +102,7 @@
 
 ## Fait
 - [x] CLI: nouvelle commande `sync` + hook `Driver.sync()` + `Router.syncDrivers()`; implémentation OBS (studio mode, scènes) et mise à jour docs CLI — 2025‑08‑20
+- [x] Docs: schémas de flux (Mermaid) — démarrage, changement de page, OBS, QLC+ (`docs/flows.md`) — 2025‑08‑21
 - [x] Fix: LEDs navigation (Prev/Next) et F1..F8 s'éteignaient immédiatement à l'arrivée sur une page — la logique générique des indicateurs n'écrase plus les LEDs de navigation gérées par `fkeys` (n'émet que pour les contrôles avec indicateur explicite). Tests verts. — 2025‑08‑20
 - [x] CLI: refonte aide UX‑first — YAML v2 (meta/context/categories), rendu cheatsheet coloré, `help <cmd|cat|all|examples|json>`, alias `:` avec compat, suggestions, completion; `clear` reste stdout — 2025‑08‑20
 - [x] Fix: InputMapper (MCU) — prise en charge `pb=chN` depuis `docs/xtouch-matching.csv`; PB non filtré par canal, Note/CC filtrés par `paging.channel`; faders 2..8 désormais routés — 2025‑08‑20

@@ -1,3 +1,6 @@
+### 2025-08-21 — Schémas de flux (Mermaid)
+- Aucun test impacté. Ajout de `docs/flows.md` (documentation pure).
+
 ### 2025-08-21 — Intégration Docs MCP
 - Aucun test impacté. Ajout d’infra de documentation (TypeDoc → Docs MCP) uniquement.
 # xtouch-gw-v2 — Audit des tests (lots et plan d’implémentation)
