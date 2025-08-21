@@ -30,13 +30,7 @@ class ControlMidiSenderImpl {
    * @param needle Sous-chaîne à rechercher dans le nom du port OUT
    * @param optional Si false, jette une erreur si le port n'est pas trouvé
    */
-  // MODIF: plus utilisé (laissé pour compat interne si des appels subsistaient)
-  private async ensureOpen(): Promise<null> { return null; }
-
-  /**
-   * Ouvre (lazy) un port d'entrée pour capter le feedback de l'app si connu, et le relaye au Router.
-   */
-  private async ensureFeedbackOpen(app: string): Promise<void> { await (this.client as any)["ensureFeedbackOpen"]?.(app); }
+  // MODIF: plus de helpers internes d'ouverture — délégué au client partagé
 
   /**
    * Ferme les entrées feedback ouvertes par ce service pour les apps gérées par des passthroughs sur la page.

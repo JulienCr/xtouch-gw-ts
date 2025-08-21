@@ -36,6 +36,13 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
     - **Centralisation des parsers**: Un seul endroit doit connaître le format et l'emplacement des fichiers de mapping. Exposer des APIs génériques plutôt que de dupliquer la logique.
     - **Union des sources d'apps**: Une page peut avoir des apps via passthroughs ET via controls, les deux doivent être considérés pour le feedback et le routing.
   - Décision (architecture): chevauchement observé entre `drivers/midiBridge.ts` et `services/controlMidiSender.ts` (gestion des ports IN/OUT, optimistic update/shadow, setpoints faders). Facteur commun à extraire: un client partagé `MidiAppClient` (ouverte/fermeture ports, envoi Note/CC/PB, conversion PB→CC 14b→7b, onFeedback → `Router.onMidiFromApp`). `MidiBridgeDriver` reste l'orchestrateur de passthrough page-scopé; `controls.*.midi` utilise ce client.
+  - **Prochaines étapes de déduplication** (après extraction `MidiAppClient`):
+    - Exposer `ensureFeedback(app: string)` public dans `MidiAppClient` et l'appeler depuis `controlMidiSender` (supprimer `(client as any)["ensureFeedbackOpen"]`).
+    - Remplacer les appels directs au Router par `markAppOutgoingAndForward()`: `src/drivers/voicemeeter.ts` (shadow-only → helper partagé, ajouter optimistic forward pour parité avec `midiBridge`).
+    - Diviser `src/midi/appClient.ts` (>150 lignes) en modules plus petits: `midi/appClient/core.ts` (send/convert/ports), `midi/appClient/feedback.ts` (wiring IN), `midi/appClient/index.ts` (API publique).
+    - Tests unitaires ciblés sur `MidiAppClient`: conversion PB 14b→7b, résolution canal CC→PB via `resolvePbToCcMappingForApp`, updates optimistes, gating listener feedback (passthrough présent).
+    - JSDoc sur `midi/appClient/*` et points de contact service/driver mis à jour.
+    - Optionnel: factoriser le helper "open by fragment" retournant {device, index} pour DRY les petits patterns open-then-close dans `voicemeeter.ts` sans forcer sur `MidiAppClient` (pas app-scopé).
 - 2025-08-20 — Ajout d'un cycle de resynchronisation global (CLI `sync`)
 - 2025-08-20 — Mapping MIDI direct par contrôle
   - Décision: introduire `controls.*.midi { type, channel, cc|note }` pour un routage global générique (toutes apps) sans dupliquer de logique dans les drivers.

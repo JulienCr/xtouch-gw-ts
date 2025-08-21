@@ -1,29 +1,20 @@
 import { Input, Output } from "@julusian/midi";
-import { logger } from "../logger";
-import type { ControlMidiSpec } from "../types";
-import type { AppConfig, PageConfig } from "../config";
-import { findPortIndexByNameFragment } from "./ports";
-import { scheduleFaderSetpoint } from "../xtouch/faderSetpoint";
-import type { XTouchDriver } from "../xtouch/driver";
-import { resolveAppKey } from "../shared/appKey";
-import { resolvePbToCcMappingForApp } from "../router/page";
+import { logger } from "../../logger";
+import type { ControlMidiSpec } from "../../types";
+import type { AppConfig, PageConfig } from "../../config";
+import { findPortIndexByNameFragment } from "../ports";
+import { scheduleFaderSetpoint } from "../../xtouch/faderSetpoint";
+import { resolvePbToCcMappingForApp } from "../../router/page";
+import { clamp, getGlobalXTouch, hasPassthroughForApp, hasPassthroughAnywhereForApp, markAppOutgoingAndForward } from "./core";
+import { ensureFeedbackOpen } from "./feedback";
+import { resolveAppKey } from "../../shared/appKey";
 
-/**
- * Client partagé de gestion des ports MIDI par application (IN/OUT) et d'émission.
- *
- * - Ouvre et met en cache les ports pour chaque app déclarée dans `config.midi.apps`
- * - Émet Note/CC/Pitch Bend selon `ControlMidiSpec`
- * - Convertit automatiquement PB 14 bits → CC 7 bits quand demandé
- * - Met à jour de façon optimiste l'état (shadow) et re-route vers le Router pour anti-echo/latence
- * - Active un listener IN facultatif pour relayer le feedback des apps quand il n'existe pas déjà un passthrough
- */
 export class MidiAppClient {
   private readonly outPerApp: Map<string, Output> = new Map();
   private readonly inPerApp: Map<string, Input> = new Map();
   private readonly appToOutName: Map<string, string> = new Map();
   private readonly appToInName: Map<string, string> = new Map();
 
-  /** Initialise/rafraîchit la table des ports cibles par app depuis la config. */
   async init(cfg: AppConfig): Promise<void> {
     this.appToOutName.clear();
     this.appToInName.clear();
@@ -38,7 +29,6 @@ export class MidiAppClient {
     } catch {}
   }
 
-  /** Ferme proprement les ports gérés, puis ré-applique la config. */
   async reconfigure(cfg: AppConfig): Promise<void> {
     try {
       for (const o of this.outPerApp.values()) { try { o.closePort(); } catch {} }
@@ -50,7 +40,6 @@ export class MidiAppClient {
     await this.init(cfg);
   }
 
-  /** Envoie un message MIDI pour l'app donnée selon la spéc; conversions et side-effects inclus. */
   async send(app: string, spec: ControlMidiSpec, value: unknown): Promise<void> {
     const needle = this.appToOutName.get(app) || app;
     const out = await this.ensureOutOpen(app, needle, true);
@@ -58,7 +47,6 @@ export class MidiAppClient {
 
     const channel = clamp(Number(spec.channel) | 0, 1, 16);
 
-    // Passthrough brut: `value` peut être un tableau [status, d1, d2...]
     if (spec.type === "passthrough") {
       const input = Array.isArray(value) ? (value as unknown[]) : null;
       if (input && input.length >= 1) {
@@ -69,8 +57,7 @@ export class MidiAppClient {
         if (!hasPassthroughForApp(app)) {
           markAppOutgoingAndForward(app, tx, needle);
         }
-        // Armer le feedback listener si pas déjà pris par un passthrough
-        this.ensureFeedbackOpen(app).catch(() => {});
+        ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
       }
       return;
     }
@@ -86,7 +73,7 @@ export class MidiAppClient {
       if (!hasPassthroughForApp(app)) {
         markAppOutgoingAndForward(app, bytes, needle);
       }
-      this.ensureFeedbackOpen(app).catch(() => {});
+      ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
       return;
     }
 
@@ -96,12 +83,9 @@ export class MidiAppClient {
       if (typeof value === "number" && Number.isFinite(value)) {
         const v = value as number;
         if (v > 127) {
-          // 14b → 7b
           v7 = Math.round(clamp(v, 0, 16383) / 16383 * 127);
-          // Programmer un setpoint moteur pour éviter le retour après mouvement
           const xt = getGlobalXTouch();
           if (xt) {
-            // Déduire le canal fader source via le mapping CC→PB si page active connue
             let faderChannel = channel;
             try {
               const g = (global as unknown as { __router__?: { getActivePage: () => PageConfig | undefined } }).__router__;
@@ -125,11 +109,10 @@ export class MidiAppClient {
       if (!hasPassthroughForApp(app)) {
         markAppOutgoingAndForward(app, bytes, needle);
       }
-      this.ensureFeedbackOpen(app).catch(() => {});
+      ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
       return;
     }
 
-    // Pitch Bend 14 bits
     const v14 = clamp(Number(value) | 0, 0, 16383);
     const lsb = v14 & 0x7f;
     const msb = (v14 >> 7) & 0x7f;
@@ -140,18 +123,22 @@ export class MidiAppClient {
     if (!hasPassthroughForApp(app)) {
       markAppOutgoingAndForward(app, bytes, needle);
     }
-    this.ensureFeedbackOpen(app).catch(() => {});
+    ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
   }
 
-  /** Ferme les ports IN/OUT gérés par ce client pour les apps couvertes par des passthroughs sur la page. */
+  async ensureFeedback(app: string): Promise<void> {
+    await ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName });
+  }
+
   reconcileForPage(page: PageConfig | undefined): void {
     try {
       if (!page) return;
       const items = (page as any).passthroughs ?? ((page as any).passthrough ? [(page as any).passthrough] : []);
       const apps = new Set<string>();
       for (const it of (items as any[])) {
-        const appKey = resolveAppKey(String(it?.to_port || ""), String(it?.from_port || ""));
-        apps.add(appKey);
+        const toPort = String(it?.to_port || "");
+        const fromPort = String(it?.from_port || "");
+        apps.add(resolveAppKey(toPort, fromPort));
       }
       for (const [app, inp] of this.inPerApp.entries()) {
         if (apps.has(app)) {
@@ -170,15 +157,12 @@ export class MidiAppClient {
     } catch {}
   }
 
-  /** Arrête et libère toutes les ressources (ports). */
   async shutdown(): Promise<void> {
     for (const o of this.outPerApp.values()) { try { o.closePort(); } catch {} }
     this.outPerApp.clear();
     for (const i of this.inPerApp.values()) { try { i.closePort(); } catch {} }
     this.inPerApp.clear();
   }
-
-  // Internals
 
   private async ensureOutOpen(app: string, needle: string, optional: boolean): Promise<Output | null> {
     let out = this.outPerApp.get(app) || null;
@@ -202,96 +186,8 @@ export class MidiAppClient {
       return null;
     }
   }
-
-  /** Ouvre un port IN pour capter le feedback si connu et pertinent (pas de passthrough concurrent). */
-  private async ensureFeedbackOpen(app: string): Promise<void> {
-    if (this.inPerApp.has(app)) return;
-    const needle = this.appToInName.get(app);
-    if (!needle) return;
-    if (hasPassthroughForApp(app) || hasPassthroughAnywhereForApp(app)) {
-      logger.debug(`MidiAppClient: skip IN for app='${app}' (handled elsewhere).`);
-      return;
-    }
-    try {
-      const inp = new Input();
-      const idx = findPortIndexByNameFragment(inp, needle);
-      if (idx == null) {
-        inp.closePort?.();
-        logger.debug(`MidiAppClient: port IN introuvable '${needle}' (optional)`);
-        return;
-      }
-      inp.ignoreTypes(false, false, false);
-      inp.on("message", (_delta, data) => {
-        try {
-          const r = (global as unknown as { __router__?: { onMidiFromApp: (appKey: string, raw: number[], portId: string) => void } }).__router__;
-          r?.onMidiFromApp?.(app, data, needle);
-        } catch {}
-      });
-      inp.openPort(idx);
-      this.inPerApp.set(app, inp);
-      logger.info(`MidiAppClient: IN ouvert app='${app}' via '${needle}'.`);
-    } catch (err) {
-      logger.debug(`MidiAppClient: ouverture IN échouée pour app='${app}':`, err as any);
-    }
-  }
 }
 
-/** Marque l'envoi côté app et reboucle vers Router pour anti‑echo/latence/state. */
-export function markAppOutgoingAndForward(app: string, raw: number[], portId: string): void {
-  try {
-    const g = (global as unknown as { __router__?: any }).__router__;
-    g?.markAppShadowForOutgoing?.(app, raw, portId);
-    g?.onMidiFromApp?.(app, raw, portId);
-  } catch {}
-}
-
-// Helpers locaux
-
-function clamp(n: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, n));
-}
-
-function getGlobalXTouch(): XTouchDriver | null {
-  try {
-    const g = (global as unknown as { __xtouch__?: XTouchDriver });
-    return g?.__xtouch__ ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function hasPassthroughForApp(app: string): boolean {
-  try {
-    const g = (global as unknown as { __router__?: { getActivePage: () => any } });
-    const page = g?.__router__?.getActivePage?.();
-    if (!page) return false;
-    const items = (page as any).passthroughs ?? ((page as any).passthrough ? [(page as any).passthrough] : []);
-    for (const it of (items as any[])) {
-      const appKey = resolveAppKey(String(it?.to_port || ""), String(it?.from_port || ""));
-      if (appKey === app) return true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-function hasPassthroughAnywhereForApp(app: string): boolean {
-  try {
-    const g = (global as unknown as { __router__?: { getPagesMerged: () => any[] } });
-    const pages = g?.__router__?.getPagesMerged?.();
-    if (!Array.isArray(pages)) return false;
-    for (const p of pages) {
-      const items = (p as any).passthroughs ?? ((p as any).passthrough ? [(p as any).passthrough] : []);
-      for (const it of (items as any[])) {
-        const appKey = resolveAppKey(String(it?.to_port || ""), String(it?.from_port || ""));
-        if (appKey === app) return true;
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
+export { markAppOutgoingAndForward } from "./core";
 
 
