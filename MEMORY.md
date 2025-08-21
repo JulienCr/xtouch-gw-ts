@@ -35,6 +35,7 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
     - **Généricité des mappings**: Ne jamais hardcoder des noms de contrôles ou d'apps dans la logique. Utiliser des sources de données externes (CSV, config) pour rester extensible.
     - **Centralisation des parsers**: Un seul endroit doit connaître le format et l'emplacement des fichiers de mapping. Exposer des APIs génériques plutôt que de dupliquer la logique.
     - **Union des sources d'apps**: Une page peut avoir des apps via passthroughs ET via controls, les deux doivent être considérés pour le feedback et le routing.
+  - Décision (architecture): chevauchement observé entre `drivers/midiBridge.ts` et `services/controlMidiSender.ts` (gestion des ports IN/OUT, optimistic update/shadow, setpoints faders). Facteur commun à extraire: un client partagé `MidiAppClient` (ouverte/fermeture ports, envoi Note/CC/PB, conversion PB→CC 14b→7b, onFeedback → `Router.onMidiFromApp`). `MidiBridgeDriver` reste l'orchestrateur de passthrough page-scopé; `controls.*.midi` utilise ce client.
 - 2025-08-20 — Ajout d'un cycle de resynchronisation global (CLI `sync`)
 - 2025-08-20 — Mapping MIDI direct par contrôle
   - Décision: introduire `controls.*.midi { type, channel, cc|note }` pour un routage global générique (toutes apps) sans dupliquer de logique dans les drivers.

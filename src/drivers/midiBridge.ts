@@ -9,6 +9,7 @@ import { matchFilter } from "../midi/filter";
 import { applyTransform } from "../midi/transform";
 import { findPortIndexByNameFragment } from "../midi/ports";
 import { resolveAppKeyFromPort } from "../shared/appKey";
+import { markAppOutgoingAndForward } from "../midi/appClient"; // MODIF: dédup shadow/forward
 
 // MODIF: typage sûr pour accès au squelch PB
 type PitchBendSquelchCapable = { isPitchBendSquelched?: () => boolean };
@@ -106,9 +107,8 @@ export class MidiBridgeDriver implements Driver {
                 }
               } catch {}
               // Marquer shadow app pour anti-echo côté router (exposé globalement par app.ts)
-              try { (global as any).__router__?.markAppShadowForOutgoing?.(resolveAppKeyFromPort(this.toPort), tx, this.toPort); } catch {}
-              // MODIF: mise à jour optimiste du state pour assurer un refresh correct après changement de page
-              try { (global as any).__router__?.onMidiFromApp?.(resolveAppKeyFromPort(this.toPort), tx, this.toPort); } catch {}
+              // MODIF: délégué au helper commun (shadow + forward → Router)
+              try { markAppOutgoingAndForward(resolveAppKeyFromPort(this.toPort), tx, this.toPort); } catch {}
               // Note: On ne met pas à jour le state avec les commandes sortantes
               // Le state ne doit être mis à jour QUE par les feedbacks entrants
             } else {
