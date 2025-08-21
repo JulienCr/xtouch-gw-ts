@@ -11,7 +11,8 @@
   "type": "commonjs",
   "scripts": {
     "dev": "node --watch --import=tsx src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && pnpm run build:copy-assets",
+    "build:copy-assets": "node -e \"const fs=require('fs');const path=require('path');const src='src';const dist='dist';function copyDir(srcPath,distPath){if(!fs.existsSync(distPath))fs.mkdirSync(distPath,{recursive:true});const items=fs.readdirSync(srcPath);for(const item of items){const srcItem=path.join(srcPath,item);const distItem=path.join(distPath,item);const stat=fs.statSync(srcItem);if(stat.isDirectory()){copyDir(srcItem,distItem);}else if(item.endsWith('.yaml')||item.endsWith('.yml')){fs.copyFileSync(srcItem,distItem);console.log('Copied:',item);}}};copyDir(src,dist);\"",
     "start": "node dist/index.js",
     "check:types": "tsc --noEmit",
     "test": "vitest run --coverage",

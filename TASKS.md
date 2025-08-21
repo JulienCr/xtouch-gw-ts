@@ -89,8 +89,9 @@
 - [ ] CLI — Refactor progress (lot par étapes)
   - [x] M1: Extraire `CliContext` vers `src/cli/types.ts`
   - [x] M2: Extraire l’auto-complétion REPL vers `src/cli/completer.ts`
-  - [ ] M3: Extraire le dispatcher de commandes vers des handlers modulaires (`src/cli/commands/*`) et connecter depuis `src/cli/index.ts`
-  - [ ] M4: Scinder les commandes par catégories (≤150 lignes/fichier)
+  - [x] M3: Extraire le dispatcher de commandes vers des handlers modulaires (`src/cli/commands/*`) et connecter depuis `src/cli/index.ts`
+- [x] M4: Résoudre le problème de chargement du fichier d'aide `help.yaml` - ajout du script de build pour copier les fichiers YAML dans `dist/`
+- [ ] M5: Scinder les commandes par catégories (≤150 lignes/fichier)
   - [ ] M5: Tests unitaires purs sur le compléteur (génération de candidats) et le suggesteur (`suggestFromSpec`)
   - [ ] M6: Nettoyage: retirer code mort et dupliqué dans `src/cli/index.ts`
 - [x] Bugfix: refresh pages 3 & 4 — conserver `transform.pb_to_cc.target_channel` = 1 (QLC attend CH1) et uniformiser `base_cc` (0x45, 0x50) pour permettre la remontée d'état CC → PB et le refresh à l'arrivée sur la page.

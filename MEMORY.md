@@ -21,6 +21,12 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Décision: générer la doc API (TypeDoc Markdown/HTML) puis indexer `docs/api` via `file://` dans une librairie `<package-name>-api` versionnée.
   - Implémentation: scripts pnpm (`docs:build`, `docs:mcp`, `docs:mcp:web`, `docs:mcp:scrape`) et helper `scripts/docs-mcp-scrape.mjs` (construction file:// robuste via `pathToFileURL`).
   - Leçon: privilégier Markdown (`docs/api`) pour un parsing plus propre côté serveur; garder HTML à disposition.
+- 2025-08-21 — Problème de chargement du fichier d'aide `help.yaml`
+  - Symptôme: erreur "ENOENT: no such file or directory, open 'help.yaml'" lors de l'exécution du CLI compilé.
+  - Cause: le processus de build TypeScript (`tsc`) ne copie que les fichiers `.ts` et `.js`, pas les fichiers `.yaml` ou autres assets.
+  - Solution: ajout d'un script de build `build:copy-assets` qui copie récursivement tous les fichiers `.yaml` et `.yml` de `src/` vers `dist/` après la compilation TypeScript.
+  - Implémentation: modification du script `build` dans `package.json` pour exécuter `tsc` puis `pnpm run build:copy-assets`.
+  - Leçon: TypeScript ne gère que la compilation, pas la copie d'assets. Toujours prévoir un script de post-build pour copier les fichiers non-TypeScript nécessaires au runtime.
 - 2025-08-20 — Fonctionnalité controls.midi et résolution des bugs de coexistence
   - Décision: introduire `controls.*.midi { type, channel, cc|note }` pour un routage global générique (toutes apps) sans dupliquer de logique dans les drivers.
   - Implémentation: service `src/services/controlMidiSender.ts` (cache de ports, conversion 14b→7b pour CC), `Router.handleControl()` priorise `midi` sur `action`, `inputMapper` émet valeur14 pour faders PB.
