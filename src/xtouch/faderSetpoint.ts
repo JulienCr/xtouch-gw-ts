@@ -1,12 +1,59 @@
 import type { XTouchDriver } from "./driver";
+import { logger } from "../logger";
 
 /**
- * Gestion centralisée des setpoints moteurs de faders (Pitch Bend 14 bits) avec anti-rebond.
- * Évite que le fader « revienne » après un mouvement utilisateur, en fixant la dernière valeur
- * après une courte inactivité.
+ * Contrôleur state‑based des setpoints moteurs (Pitch Bend 14b).
+ * - Source de vérité: desired14 par canal
+ * - Anti‑obsolescence: planifie un applyLatest(epoch) qui relit desired14
+ * - Extrêmes (0/16383): application immédiate (delay=0)
  */
-const timersByChannel = new Map<number, NodeJS.Timeout>();
-const lastValue14ByChannel = new Map<number, number>();
+type ChannelState = {
+  desired14: number;
+  lastTx14: number;
+  lastRx14: number;
+  epoch: number;
+  timer: NodeJS.Timeout | null;
+};
+
+const stateByChannel = new Map<number, ChannelState>();
+
+function getChannelState(ch: number): ChannelState {
+  let st = stateByChannel.get(ch);
+  if (!st) {
+    st = { desired14: 0, lastTx14: -1, lastRx14: -1, epoch: 0, timer: null };
+    stateByChannel.set(ch, st);
+  }
+  return st;
+}
+
+function clearTimerIfAny(st: ChannelState): void {
+  if (st.timer) {
+    try { clearTimeout(st.timer); } catch {}
+    st.timer = null;
+  }
+}
+
+function scheduleApply(xtouch: XTouchDriver, ch: number, epochAtPlan: number, delayMs: number): void {
+  const st = getChannelState(ch);
+  clearTimerIfAny(st);
+  const t = setTimeout(() => applyLatest(xtouch, ch, epochAtPlan), Math.max(0, delayMs | 0));
+  st.timer = t;
+}
+
+function applyLatest(xtouch: XTouchDriver, ch: number, epochAtPlan: number): void {
+  const st = getChannelState(ch);
+  // Si une mise à jour plus récente est arrivée, laisser son propre timer faire le travail
+  if (epochAtPlan !== st.epoch) return;
+  const v = Math.max(0, Math.min(16383, st.desired14 | 0));
+  
+  try { logger.trace(`FaderSetpoint apply ch=${ch} v=${v}`); } catch {}
+  
+  try { xtouch.setFader14(ch, v); st.lastTx14 = v; } catch (err) {
+    // En cas d'échec/IO/suppression (ex: squelch/touch côté driver), re-tenter plus tard
+    try { logger.trace(`FaderSetpoint requeue ch=${ch} v=${v}`); } catch {}
+    scheduleApply(xtouch, ch, st.epoch, 120);
+  }
+}
 
 /**
  * Programme (debounce) la mise à jour du moteur du fader après une courte inactivité.
@@ -22,20 +69,14 @@ export function scheduleFaderSetpoint(
   delayMs: number = 90
 ): void {
   const ch = Math.max(1, Math.min(16, channel1 | 0));
-  const v = Math.max(0, Math.min(16383, value14 | 0));
-  lastValue14ByChannel.set(ch, v);
-  const prev = timersByChannel.get(ch);
-  if (prev) {
-    try { clearTimeout(prev); } catch {}
-  }
-  const t = setTimeout(() => {
-    const last = lastValue14ByChannel.get(ch);
-    if (last != null) {
-      try { xtouch.setFader14(ch, last); } catch {}
-    }
-    timersByChannel.delete(ch);
-  }, delayMs);
-  timersByChannel.set(ch, t);
+  // Clamp strict sans zone morte aux extrémités
+  const clamped = Math.max(0, Math.min(16383, value14 | 0));
+  const st = getChannelState(ch);
+  st.desired14 = clamped;
+  st.epoch++;
+  // Toujours appliquer après le délai configuré (même pour 0/16383)
+  try { logger.trace(`FaderSetpoint schedule ch=${ch} raw=${value14 | 0} clamped=${clamped} delay=${delayMs}`); } catch {}
+  scheduleApply(xtouch, ch, st.epoch, delayMs);
 }
 
 
