@@ -243,6 +243,12 @@ export class XTouchDriver {
     xtapi.sendLcdStripText(this, stripIndex0to7, upper, lower);
   }
 
+  /** Écrit uniquement la ligne basse d'un strip LCD. */
+  sendLcdStripLowerText(stripIndex0to7: number, lower: string): void {
+    if (!this.output) return;
+    (xtapi as any).sendLcdStripLowerText?.(this, stripIndex0to7, lower);
+  }
+
   /** Définis les couleurs des 8 LCD (firmware >= 1.22). */
   setLcdColors(colors: number[]): void {
     if (!this.output) return;
@@ -279,18 +285,19 @@ export class XTouchDriver {
     const typeNibble = (status & 0xf0) >> 4;
     const isPitchBend = typeNibble === 0xE;
 
-    if (!(isPitchBend && now < this.suppressPitchBendUntilMs)) {
+    const isSuppressedPb = isPitchBend && now < this.suppressPitchBendUntilMs;
+    if (!isSuppressedPb) {
       for (const h of this.handlers) {
         try { h(deltaSeconds, data); } catch (err) { logger.warn("X-Touch handler error:", err as any); }
       }
     }
 
     // Écho PitchBend local si activé
-    if (this.options.echoPitchBend) {
+    if (this.options.echoPitchBend && !isSuppressedPb) {
       const decoded = decodeMidi(data);
       if (decoded.type === "pitchBend") {
         const pb = decoded as PitchBendEvent;
-        if (pb.channel) this.setFader14(pb.channel, pb.value14);
+        if (pb.channel) { this.setFader14(pb.channel, pb.value14); }
       }
     }
 

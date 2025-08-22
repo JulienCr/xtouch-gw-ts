@@ -86,7 +86,7 @@ export function makeXTouchEmitter(
     const syx = entries.filter((e) => e.addr.status === "sysex");
     const pbs = entries.filter((e) => e.addr.status === "pb");
 
-    // Anti-boucle moteurs: ignorer les PB entrants depuis X-Touch pendant le temps d'établissement
+    // Anti-boucle moteurs: ignorer les PB entrants depuis X-Touch pendant l'établissement
     try { x.squelchPitchBend(120); } catch {}
 
     const batches = [notes, ccs, syx, pbs];
@@ -98,9 +98,7 @@ export function makeXTouchEmitter(
           try { markLocalActionTs(getAddrKeyWithoutPort(e.addr as any), Date.now()); } catch {}
         }
         emitIfNotDuplicate(e, bytes);
-        if (logPitchBend && e.addr.status === "pb") {
-          try { logger.trace(`Send PB -> X-Touch: ${human(bytes)} [${hex(bytes)}]`); } catch {}
-        }
+        // (Nettoyé) Pas de logs PB ni de programmation de setpoint ici; géré côté forward/state
       }
     }
   }

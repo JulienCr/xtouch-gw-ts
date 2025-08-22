@@ -142,7 +142,7 @@ export function transformAppToXTouch(page: PageConfig, app: AppKey, entry: MidiS
 		if (faderChannel == null) return null;
 		const v7 = typeof entry.value === "number" ? entry.value : 0;
 		const v7c = Math.max(0, Math.min(127, Math.floor(v7)));
-		const v14 = (v7c << 7) | (v7c & 0x01);
+		const v14 = (v7c << 7) | v7c;
 		return {
 			addr: { portId: app, status: "pb", channel: faderChannel, data1: 0 },
 			value: v14,

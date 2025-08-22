@@ -6,6 +6,7 @@ import type { AppConfig, PagingConfig, PageConfig } from "../config";
 import { XTouchDriver } from "../xtouch/driver";
 import { applyLcdForActivePage } from "../ui/lcd";
 import { updateFKeyLedsForActivePage, updatePrevNextLeds } from "../xtouch/fkeys";
+import { attachFaderValueOverlay } from "../xtouch/valueOverlay";
 import { BackgroundListenerManager } from "../midi/backgroundListeners";
 import { attachNavigation } from "./navigation";
 import * as xtapi from "../xtouch/api";
@@ -81,6 +82,9 @@ export async function startXTouchAndNavigation(router: Router, options: StartXTo
     paging,
     onAfterPageChange: (page) => onAfterPageChange(xtouch, page, paging),
   });
+
+  // Overlay des valeurs de faders sur LCD (ligne basse)
+  try { attachFaderValueOverlay(xtouch, () => router.getActivePage(), config); } catch {}
 
   return { xtouch, unsubscribeNavigation, paging };
 }

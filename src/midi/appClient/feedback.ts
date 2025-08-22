@@ -16,7 +16,7 @@ export async function ensureFeedbackOpen(app: string, state: FeedbackState): Pro
   // Skip opening if ANY page has a passthrough for this app, or a global bridge owns it.
   // Background listeners (for other pages) or the owning bridge will handle IN to avoid double-open.
   if (hasPassthroughAnywhereForApp(appKey) || hasBridgeForApp(appKey)) {
-    logger.debug(`MidiAppClient: skip IN for app='${appKey}' (handled elsewhere).`);
+    //logger.trace(`MidiAppClient: skip IN for app='${appKey}' (handled elsewhere).`);
     return;
   }
   try {

@@ -11,6 +11,11 @@ midi:
 
 xtouch:
   mode: "mcu"  # "mcu" (par défaut) ou "ctrl"
+  overlay_per_app:
+    qlc:
+      mode: "8bit"
+    voicemeeter:
+      mode: "percent"
 
 obs:
   host: "127.0.0.1"
@@ -110,6 +115,8 @@ pages:
       fader8:
         app: "qlc "
         midi: {type: "cc", channel: 1, cc: 77}
+        overlay:
+          mode: "8bit"
       mute1:
         app: "voicemeeter"
         midi: {type: "passthrough"}

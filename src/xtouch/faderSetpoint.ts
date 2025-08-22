@@ -74,9 +74,10 @@ export function scheduleFaderSetpoint(
   const st = getChannelState(ch);
   st.desired14 = clamped;
   st.epoch++;
-  // Toujours appliquer après le délai configuré (même pour 0/16383)
-  try { logger.trace(`FaderSetpoint schedule ch=${ch} raw=${value14 | 0} clamped=${clamped} delay=${delayMs}`); } catch {}
-  scheduleApply(xtouch, ch, st.epoch, delayMs);
+  const isExtreme = clamped === 0 || clamped === 16383;
+  const effDelay = isExtreme ? 0 : delayMs;
+  try { logger.trace(`FaderSetpoint schedule ch=${ch} raw=${value14 | 0} clamped=${clamped} delay=${effDelay}`); } catch {}
+  scheduleApply(xtouch, ch, st.epoch, effDelay);
 }
 
 

@@ -30,6 +30,15 @@ export function setLcdColors(driver: RawSender, colors: number[]): void {
   driver.sendRawMessage([0xF0, 0x00, 0x00, 0x66, 0x14, 0x72, ...payload, 0xF7]);
 }
 
+/** Écrit uniquement la ligne basse d'un strip LCD (7 caractères). */
+export function sendLcdStripLowerText(driver: RawSender, stripIndex0to7: number, lower: string): void {
+  const strip = Math.max(0, Math.min(7, Math.floor(stripIndex0to7)));
+  const lo = ascii7(lower, 7);
+  const header = [0xF0, 0x00, 0x00, 0x66, 0x14, 0x12];
+  const posBot = 0x38 + strip * 7;
+  driver.sendRawMessage([...header, posBot, ...lo, 0xF7]);
+}
+
 /** Met à jour l’afficheur 7-segments (timecode) avec centrage et points optionnels. */
 export function setSevenSegmentText(
   driver: RawSender,

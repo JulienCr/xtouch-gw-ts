@@ -13,6 +13,8 @@ export interface ForwardDeps {
   antiLoopWindows: Record<MidiStateEntry["addr"]["status"], number>;
   lastUserActionTs: Map<string, number>;
   emitIfNotDuplicate: (entry: MidiStateEntry) => void;
+  /** Optionnel: permet de programmer un setpoint moteur de fader indépendamment de l'émission. */
+  scheduleSetpoint?: (channel1to16: number, value14: number) => void;
 }
 
 /**
@@ -32,6 +34,21 @@ export function forwardFromApp(
   // MODIF: toujours autoriser l'app si un passthrough actif est présent sur la page courante
   if (!appsInPage.includes(app)) return;
 
+  // 1) Construire immédiatement la cible X‑Touch afin de programmer le setpoint même si l'émission est bloquée
+  const maybeForward = transformAppToXTouch(page, app, entry);
+  if (!maybeForward) return;
+
+  // 2) Toujours programmer le setpoint moteur pour les PB, indépendamment de l'anti‑echo émission
+  if (maybeForward.addr.status === "pb") {
+    try {
+      const ch = Math.max(1, Math.min(16, (maybeForward.addr.channel ?? 1) | 0));
+      const v14 = typeof maybeForward.value === "number" && Number.isFinite(maybeForward.value)
+        ? (maybeForward.value as number) | 0
+        : 0;
+      deps.scheduleSetpoint?.(ch, v14);
+    } catch {}
+  }
+
   const k = deps.addrKeyForApp(entry.addr);
   const prev = deps.getAppShadow(app).get(k);
   const now = Date.now();
@@ -43,9 +60,6 @@ export function forwardFromApp(
       return;
     }
   }
-
-  const maybeForward = transformAppToXTouch(page, app, entry);
-  if (!maybeForward) return;
 
   const targetKey = deps.addrKeyForXTouch(maybeForward.addr);
   const lastLocal = deps.lastUserActionTs.get(targetKey) ?? 0;

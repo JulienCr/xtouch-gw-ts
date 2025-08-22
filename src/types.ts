@@ -36,6 +36,14 @@ export interface ControlMapping {
    */
   midi?: ControlMidiSpec;
   /**
+   * Configuration d'overlay de valeur pendant le mouvement (affichage LCD ligne basse).
+   * Par défaut: enabled=true, mode="percent".
+   */
+  overlay?: {
+    enabled?: boolean;
+    mode?: "percent" | "7bit" | "8bit";
+  };
+  /**
    * Spécification optionnelle d'un indicateur (LED) à allumer/éteindre
    * en fonction d'un signal publié par le driver.
    * Exemple: { signal: "obs.studioMode", equals: true }

@@ -24,6 +24,19 @@ export type XTouchMode = "mcu" | "ctrl";
 export interface XTouchConfig {
   /** Mode de fonctionnement. Défaut: "mcu" */
   mode?: XTouchMode;
+  /** Options d'affichage de la valeur sur les LCD lors d'un mouvement de fader. */
+  overlay?: {
+    /** Activer l'overlay de valeur en bas du strip LCD pendant le touch. Défaut: true */
+    enabled?: boolean;
+    /** Affichage pour CC (7 bits): "7bit" (0..127) ou "8bit" (0..255). Défaut: "7bit" */
+    cc_bits?: "7bit" | "8bit";
+  };
+  /**
+   * Défauts d'overlay par application (override du fallback global; override par contrôle prioritaire).
+   * Exemple:
+   *   overlay_per_app: { qlc: { mode: "8bit" }, voicemeeter: { mode: "percent" } }
+   */
+  overlay_per_app?: Record<string, { enabled?: boolean; mode?: "percent" | "7bit" | "8bit" }>;
 }
 
 /**

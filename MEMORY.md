@@ -9,6 +9,11 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
 
 ## Entrées
 - 2025-08-21 — Schémas de flux (Mermaid)
+- 2025-08-22 — Overlay valeur fader sur LCD (UX)
+  - Contexte: besoin d'afficher la valeur courante lors du mouvement d'un fader et restaurer ensuite.
+  - Implémentation: `sendLcdStripLowerText()` (LCD bas uniquement), `attachFaderValueOverlay()` (MCU: % sur PB 14b; CTRL: 7b par défaut avec option 8b), per-control override, per-app default (`xtouch.overlay_per_app`), wiring dans `bootstrap`.
+  - Choix: ne pas tenter de « restaurer » les labels haut (inchangés); la ligne basse est recalée au baseline page.
+  - Edge: master strip non dédié — overlay ignoré.
   - Ajout de `docs/flows.md` couvrant: démarrage app, changement de page, OBS (actions/indicateurs), QLC+ (passthrough et controls.midi).
   - Source: code actuel (`src/app.ts`, `src/app/bootstrap.ts`, `src/app/navigation.ts`, `src/router.ts`, `src/router/page.ts`, `src/drivers/*`, `src/services/controlMidiSender.ts`).
   - Leçon: documenter les responsabilités entre Router/Bootstrap/Drivers et séparer indicateurs driver‑driven des LEDs de navigation.

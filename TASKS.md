@@ -36,6 +36,11 @@
 
 ## En cours
 - [x] Pages: support d'un bloc `pages_global` (defaults fusionnés dans chaque page; override par page)
+ - [x] [Haute][UX] Overlay valeur fader sur LCD (pendant touch) + restauration
+   - [x] API LCD: `sendLcdStripLowerText()` et wrapper driver
+   - [x] Module `attachFaderValueOverlay()` (MCU: %; CTRL: 7b/8b configurable)
+   - [x] Config: `xtouch.overlay { enabled?, cc_bits }` + `xtouch.overlay_per_app.{app} { enabled?, mode }`
+   - [x] Wiring bootstrap: attacher l’overlay au démarrage
 - [x] Indiquer le nom de la page sur le grand afficheur 7-segments
 - [x] Utilise les boutons F1 -> F8 pour naviguer entre les pages (notes channel 1 64..57) et LED active sur la page courante
 - [x] Router: pages OK + mapping d’actions implémenté
