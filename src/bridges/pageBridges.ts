@@ -1,6 +1,6 @@
 import type { Router } from "../router";
 import type { XTouchDriver } from "../xtouch/driver";
-import { MidiBridgeDriver } from "../drivers/midiBridge";
+import { MidiBridgeDriver } from "../drivers/midibridge";
 import { resolveAppKey } from "../shared/appKey";
 import { logger } from "../logger";
 

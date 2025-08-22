@@ -3,7 +3,7 @@ import { loadConfig, findConfigPath, watchConfig, AppConfig } from "./config";
 import type { PageConfig } from "./config";
 import { Router } from "./router";
 import { VoicemeeterDriver } from "./drivers/voicemeeter";
-import { MidiBridgeDriver } from "./drivers/midiBridge";
+import { MidiBridgeDriver } from "./drivers/midibridge";
 import { attachCli } from "./cli";
 import { getPagePassthroughItems } from "./config/passthrough";
 import { buildPageBridges } from "./bridges/pageBridges";

@@ -34,6 +34,12 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Besoin: recaler rapidement surface/états/drivers après dérive (déconnexions OBS, reboot, etc.).
   - Solution: nouveau hook optionnel `Driver.sync()` appelé via `Router.syncDrivers()`, et commande CLI `sync` enchaînant reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD.
   - Leçon: centraliser la resynchro côté Router/CLI, laisser chaque driver gérer sa lecture d'état.
+ - 2025-08-22 — Perte de ports MIDI Windows (RtMidi WinMM) et reconnexion
+  - Symptôme: erreurs "MidiOutWinMM::openPort" / "Internal RtMidi error" lors de pertes ou verrouillages de ports (ex: qlc-in), parfois après déconnexions.
+  - Solution: ajout d'une reconnexion automatique avec backoff léger.
+    - MidiAppClient: `sendSafe()` et `scheduleOutRetry()`; relance OUT quand open ou send échoue.
+    - MidiBridgeDriver: `tryOpenInOnce/tryOpenOutOnce` + `scheduleInRetry/scheduleOutRetry`; envoi via `sendSafe()`.
+  - Leçon: sous Windows/WinMM, les ports peuvent devenir indisponibles à chaud; il faut réessayer agressivement mais avec backoff pour éviter de surcharger le stack MIDI.
   - **Bugs rencontrés et solutions:**
     - **Offset pb_to_cc (+1)**: Le calcul `base_cc + channel_source` était incorrect. Fix: `base_cc + (channel_source - 1)` pour que fader1→CC81, fader2→CC82, etc.
     - **Passthrough cassé après controls.midi**: L'inputMapper appelait `handleControl` même sur les pages sans mapping controls. Fix: filtrer les appels PB→handleControl uniquement si le control_id existe dans la page active.

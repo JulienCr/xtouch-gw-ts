@@ -104,6 +104,12 @@ pages:
       fader6:
         app: "voicemeeter"
         midi: {type: "passthrough"}
+      fader7:
+        app: "voicemeeter"
+        midi: {type: "passthrough"}
+      fader8:
+        app: "qlc "
+        midi: {type: "cc", channel: 1, cc: 77}
       mute1:
         app: "voicemeeter"
         midi: {type: "passthrough"}

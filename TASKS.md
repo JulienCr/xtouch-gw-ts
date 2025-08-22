@@ -121,6 +121,11 @@
 - [x] Passthrough MIDI par page (bridge to/from port) + navigation prev/next (notes 46/47 ch=1)
 - [x] Bridge global Voicemeeter (désactivé automatiquement si passthrough par page présent)
 - [x] Création du système de gestion de projet (`TASKS.md`, `MEMORY.md`)
+
+### 2025-08-22 — Robustesse MIDI (reconnexion automatique)
+- [x] MidiAppClient: reconnexion OUT auto avec backoff (sendSafe + scheduleOutRetry)
+- [x] MidiBridgeDriver: reconnexion IN/OUT auto avec backoff (tryOpen*Once + schedule*Retry + sendSafe)
+- [ ] Tests d'intégration: simuler indisponibilité de port et valider reprise (à ajouter)
 - [x] Ajout d’un squelette Node.js + TypeScript
 - [x] Initialisation du projet (structure, scripts pnpm, TypeScript) 
 - ~~ [ ] Bridge: reverse transform automatique du feedback (CC/Note → Pitch Bend)~~ — abandonné, remplacé par anti‑echo et setpoint moteurs via `midiBridge` + `Router`
