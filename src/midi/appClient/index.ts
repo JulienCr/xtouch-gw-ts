@@ -48,8 +48,9 @@ export class MidiAppClient {
   }
 
   async send(app: string, spec: ControlMidiSpec, value: unknown): Promise<void> {
-    const needle = this.appToOutName.get(app) || app;
-    const out = await this.ensureOutOpen(app, needle, true);
+    const appKey = String(app).trim();
+    const needle = this.appToOutName.get(appKey) || appKey;
+    const out = await this.ensureOutOpen(appKey, needle, true);
     if (!out) return;
 
     const channel = clamp(Number(spec.channel) | 0, 1, 16);
@@ -60,11 +61,11 @@ export class MidiAppClient {
         const status = (Number(input[0]) | 0) & 0xff;
         const dataBytes = input.slice(1).map((n) => clamp(Number(n) | 0, 0, 127));
         const tx: number[] = [status, ...dataBytes];
-        this.sendSafe(app, out, tx, needle);
-        if (!hasPassthroughForApp(app)) {
-          markAppOutgoingAndForward(app, tx, needle);
+        this.sendSafe(appKey, out, tx, needle);
+        if (!hasPassthroughForApp(appKey)) {
+          markAppOutgoingAndForward(appKey, tx, needle);
         }
-        ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+        ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
       }
       return;
     }
@@ -76,11 +77,11 @@ export class MidiAppClient {
       const note = clamp(Number(spec.note) | 0, 0, 127);
       const vel = clamp(Number(value) | 0, 0, 127);
       const bytes: number[] = [status, note, vel];
-      this.sendSafe(app, out, bytes, needle);
-      if (!hasPassthroughForApp(app)) {
-        markAppOutgoingAndForward(app, bytes, needle);
+      this.sendSafe(appKey, out, bytes, needle);
+      if (!hasPassthroughForApp(appKey)) {
+        markAppOutgoingAndForward(appKey, bytes, needle);
       }
-      ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+      ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
       return;
     }
 
@@ -93,30 +94,30 @@ export class MidiAppClient {
           v7 = Math.round(clamp(v, 0, 16383) / 16383 * 127);
           const xt = getGlobalXTouch();
           if (xt) {
-            let faderChannel = channel;
+            let mappedChannel: number | null = null;
             try {
               const g = (global as unknown as { __router__?: { getActivePage: () => PageConfig | undefined } }).__router__;
               const page = g?.getActivePage?.();
               if (page) {
-                const m = resolvePbToCcMappingForApp(page, app as any);
+                const m = resolvePbToCcMappingForApp(page, appKey as any);
                 const ch = m?.channelForCc?.get(cc);
-                if (typeof ch === "number" && Number.isFinite(ch) && ch >= 1 && ch <= 16) {
-                  faderChannel = ch;
-                }
+                if (typeof ch === "number" && Number.isFinite(ch) && ch >= 1 && ch <= 16) mappedChannel = ch;
               }
             } catch {}
-            scheduleFaderSetpoint(xt, faderChannel, clamp((value as number) | 0, 0, 16383));
+            if (mappedChannel != null) {
+              scheduleFaderSetpoint(xt, mappedChannel, clamp((value as number) | 0, 0, 16383));
+            }
           }
         } else {
           v7 = clamp(v | 0, 0, 127);
         }
       }
       const bytes: number[] = [status, cc, v7];
-      this.sendSafe(app, out, bytes, needle);
-      if (!hasPassthroughForApp(app)) {
-        markAppOutgoingAndForward(app, bytes, needle);
+      this.sendSafe(appKey, out, bytes, needle);
+      if (!hasPassthroughForApp(appKey)) {
+        markAppOutgoingAndForward(appKey, bytes, needle);
       }
-      ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+      ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
       return;
     }
 
@@ -124,17 +125,18 @@ export class MidiAppClient {
     const lsb = v14 & 0x7f;
     const msb = (v14 >> 7) & 0x7f;
     const bytes: number[] = [status, lsb, msb];
-    this.sendSafe(app, out, bytes, needle);
+    this.sendSafe(appKey, out, bytes, needle);
     const xt = getGlobalXTouch();
     if (xt) scheduleFaderSetpoint(xt, channel, v14);
-    if (!hasPassthroughForApp(app)) {
-      markAppOutgoingAndForward(app, bytes, needle);
+    if (!hasPassthroughForApp(appKey)) {
+      markAppOutgoingAndForward(appKey, bytes, needle);
     }
-    ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+    ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
   }
 
   async ensureFeedback(app: string): Promise<void> {
-    await ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName });
+    const appKey = String(app).trim();
+    await ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName });
   }
 
   reconcileForPage(page: PageConfig | undefined): void {

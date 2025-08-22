@@ -88,7 +88,7 @@ export async function attachIndicators(options: {
   const unsubs: Array<() => void> = [];
   const pageControls = ((router.getActivePage() as any)?.controls ?? {}) as Record<string, any>;
   const involvedApps = new Set<string>();
-  for (const m of Object.values(pageControls)) { if (m && typeof (m as any).app === "string") involvedApps.add((m as any).app); }
+  for (const m of Object.values(pageControls)) { if (m && typeof (m as any).app === "string") { const k = String((m as any).app).trim(); if (k) involvedApps.add(k); } }
   for (const app of involvedApps) {
     const driver = (router as any).getDriver?.(app) as Driver | undefined;
     if (!driver) continue;
@@ -147,7 +147,7 @@ export async function refreshIndicators(options: {
   // subscription will consume these and update LEDs accordingly.
   const controls = ((router.getActivePage() as any)?.controls ?? {}) as Record<string, any>;
   const involvedApps = new Set<string>();
-  for (const m of Object.values(controls)) { if (m && typeof (m as any).app === "string") involvedApps.add((m as any).app); }
+  for (const m of Object.values(controls)) { if (m && typeof (m as any).app === "string") { const k = String((m as any).app).trim(); if (k) involvedApps.add(k); } }
   for (const app of involvedApps) {
     try {
       const driver = (router as any).getDriver?.(app) as Driver | undefined;

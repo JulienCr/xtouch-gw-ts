@@ -16,7 +16,8 @@ export function getAppsForPage(page: PageConfig): AppKey[] {
 	for (const [, raw] of Object.entries(controls)) {
 		const m = raw as unknown as { app?: string };
 		if (m && typeof m.app === "string") {
-			set.add(m.app as AppKey);
+			const key = (m.app || "").trim();
+			if (key) set.add(key as AppKey);
 		}
 	}
 	const out = Array.from(set.values());
@@ -77,7 +78,7 @@ export function resolvePbToCcMappingForApp(page: PageConfig, app: AppKey): { map
 	if (out.size === 0 && page?.controls) {
 		const entries = Object.entries((page.controls as Record<string, unknown>) || {}) as Array<[string, ControlMapping]>;
 		for (const [controlId, mapping] of entries) {
-			if (!mapping || mapping.app !== app || !mapping.midi) continue;
+			if (!mapping || (mapping.app || "").trim() !== (app as string) || !mapping.midi) continue;
 			const spec = mapping.midi;
 			if (spec.type !== "cc") continue;
 			// Déterminer le canal PB associé au control_id via le CSV (générique)

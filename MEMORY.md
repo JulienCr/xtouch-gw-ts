@@ -44,7 +44,7 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
     - **Offset pb_to_cc (+1)**: Le calcul `base_cc + channel_source` était incorrect. Fix: `base_cc + (channel_source - 1)` pour que fader1→CC81, fader2→CC82, etc.
     - **Passthrough cassé après controls.midi**: L'inputMapper appelait `handleControl` même sur les pages sans mapping controls. Fix: filtrer les appels PB→handleControl uniquement si le control_id existe dans la page active.
     - **Passthrough et controls.midi en conflit**: Double écoute des ports MIDI causant des conflits. Fix: prioriser les passthroughs, fermer les ports controlMidiSender quand un passthrough est actif.
-    - **Feedback manquant pour controls.midi**: Pas de mise à jour de l'état après envoi. Fix: ouverture de ports d'entrée dédiés + optimistic update immédiat du state.
+    - **Feedback manquant pour controls.midi**: Pas de mise à jour de l'état après envoi. Fix: ouverture de ports d'entrée dédiés + optimistic update immédiat du state. Ajustement: éviter les double-ouvertures en skip si passthrough sur n'importe quelle page.
     - **Désynchronisation entre pages**: Fader déplacé sur page passthrough non reflété sur page controls.midi. Fix: optimistic update dans midiBridge + controlMidiSender pour maintenir le state à jour.
   - **Leçons apprises:**
     - **Gestion des ports MIDI**: Un seul service doit "posséder" les ports IN/OUT pour une app donnée. Prioriser les passthroughs sur les controls.midi.
@@ -52,7 +52,8 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
     - **Filtrage des événements**: Ne traiter les événements controls.midi que quand ils sont explicitement mappés sur la page active.
     - **Mutualisation du code**: Factoriser la logique de setpoint des faders dans un utilitaire partagé pour éviter la duplication.
     - **Coexistence des systèmes**: Les passthroughs et controls.midi peuvent coexister mais nécessitent une gestion stricte des priorités et des ports.
-    - **Feedback manquant sur pages avec passthroughs**: QLC feedback (CC 78) n'était pas transformé vers X‑Touch sur les pages avec seulement un passthrough Voicemeeter. Fix: `getAppsForPage()` doit toujours inclure les apps référencées par `controls.*` en plus des passthroughs.
+    - **Feedback manquant sur pages avec passthroughs**: QLC feedback (CC 78) n'était pas transformé vers X‑Touch sur les pages avec seulement un passthrough Voicemeeter. Fix: `getAppsForPage()` inclut aussi les apps référencées par `controls.*` (trim des clés app).
+    - **Double ouverture 'qlc-out'**: En ouvrant un IN controls.midi alors qu'un passthrough existe sur une autre page, RtMidi échouait (WinMM). Fix: gating `ensureFeedbackOpen()` par passthrough « anywhere » + normalisation `app.trim()`.
     - **Ports MIDI en double sur Windows**: ControlMidiSender tentait d'ouvrir un port IN pour QLC même si un passthrough existait ailleurs, causant "port already in use" et "ouverture IN échouée". Fix: vérifier les passthroughs sur toutes les pages, pas seulement la page active.
     - **Hardcoding des noms de contrôles**: Logique spécifique à `fader_master` et regex `fader(\d+)` rendait le code non extensible. Fix: centraliser la lecture de `docs/xtouch-matching.csv` dans un module `matching.ts` générique, avec des lookups `getPbChannelForControlId()` et `getInputLookups()`.
     - **Duplication de la logique CSV**: Parsing du CSV dupliqué entre `inputMapper` et `router/page.ts`. Fix: factoriser dans `matching.ts` avec cache et API unifiée, éviter la duplication des chemins par défaut.
