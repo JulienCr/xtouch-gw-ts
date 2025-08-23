@@ -265,6 +265,14 @@ export class Router {
         antiLoopWindows: this.antiLoopWindowMsByStatus,
         lastUserActionTs: this.lastUserActionTs,
         emitIfNotDuplicate: (e: MidiStateEntry) => this.emitter?.emitIfNotDuplicate(e),
+        scheduleSetpoint: (ch: number, v14: number) => {
+          try {
+            const xt = this.xtouch;
+            if (!xt) return;
+            const { scheduleFaderSetpoint } = require("./xtouch/faderSetpoint");
+            scheduleFaderSetpoint(xt, ch, v14);
+          } catch {}
+        },
       } as const;
       forwardFromApp(deps, app, entry);
     } catch {}

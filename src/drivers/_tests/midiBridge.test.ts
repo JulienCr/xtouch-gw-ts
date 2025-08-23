@@ -23,7 +23,7 @@ vi.mock("@julusian/midi", () => {
 
 vi.mock("../../midi/ports", () => ({ findPortIndexByNameFragment: (_instance: any, _frag: string) => 0 }));
 
-import { MidiBridgeDriver } from "../midiBridge";
+import { MidiBridgeDriver } from "../midibridge";
 
 function makeXTouch() {
   const subs: Array<(delta: number, data: number[]) => void> = [];

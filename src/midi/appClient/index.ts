@@ -14,6 +14,11 @@ export class MidiAppClient {
   private readonly inPerApp: Map<string, Input> = new Map();
   private readonly appToOutName: Map<string, string> = new Map();
   private readonly appToInName: Map<string, string> = new Map();
+  /**
+   * Retry timers for reopening OUT ports per app. Keyed by app key.
+   * The delay grows linearly up to a small cap to avoid spamming the MIDI stack.
+   */
+  private readonly outRetryTimers = new Map<string, { count: number; timer: NodeJS.Timeout }>();
 
   async init(cfg: AppConfig): Promise<void> {
     this.appToOutName.clear();
@@ -36,13 +41,16 @@ export class MidiAppClient {
     } finally {
       this.outPerApp.clear();
       this.inPerApp.clear();
+      for (const t of this.outRetryTimers.values()) { try { clearTimeout(t.timer); } catch {} }
+      this.outRetryTimers.clear();
     }
     await this.init(cfg);
   }
 
   async send(app: string, spec: ControlMidiSpec, value: unknown): Promise<void> {
-    const needle = this.appToOutName.get(app) || app;
-    const out = await this.ensureOutOpen(app, needle, true);
+    const appKey = String(app).trim();
+    const needle = this.appToOutName.get(appKey) || appKey;
+    const out = await this.ensureOutOpen(appKey, needle, true);
     if (!out) return;
 
     const channel = clamp(Number(spec.channel) | 0, 1, 16);
@@ -53,11 +61,11 @@ export class MidiAppClient {
         const status = (Number(input[0]) | 0) & 0xff;
         const dataBytes = input.slice(1).map((n) => clamp(Number(n) | 0, 0, 127));
         const tx: number[] = [status, ...dataBytes];
-        out.sendMessage(tx);
-        if (!hasPassthroughForApp(app)) {
-          markAppOutgoingAndForward(app, tx, needle);
+        this.sendSafe(appKey, out, tx, needle);
+        if (!hasPassthroughForApp(appKey)) {
+          markAppOutgoingAndForward(appKey, tx, needle);
         }
-        ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+        ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
       }
       return;
     }
@@ -69,11 +77,11 @@ export class MidiAppClient {
       const note = clamp(Number(spec.note) | 0, 0, 127);
       const vel = clamp(Number(value) | 0, 0, 127);
       const bytes: number[] = [status, note, vel];
-      out.sendMessage(bytes);
-      if (!hasPassthroughForApp(app)) {
-        markAppOutgoingAndForward(app, bytes, needle);
+      this.sendSafe(appKey, out, bytes, needle);
+      if (!hasPassthroughForApp(appKey)) {
+        markAppOutgoingAndForward(appKey, bytes, needle);
       }
-      ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+      ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
       return;
     }
 
@@ -86,30 +94,30 @@ export class MidiAppClient {
           v7 = Math.round(clamp(v, 0, 16383) / 16383 * 127);
           const xt = getGlobalXTouch();
           if (xt) {
-            let faderChannel = channel;
+            let mappedChannel: number | null = null;
             try {
               const g = (global as unknown as { __router__?: { getActivePage: () => PageConfig | undefined } }).__router__;
               const page = g?.getActivePage?.();
               if (page) {
-                const m = resolvePbToCcMappingForApp(page, app as any);
+                const m = resolvePbToCcMappingForApp(page, appKey as any);
                 const ch = m?.channelForCc?.get(cc);
-                if (typeof ch === "number" && Number.isFinite(ch) && ch >= 1 && ch <= 16) {
-                  faderChannel = ch;
-                }
+                if (typeof ch === "number" && Number.isFinite(ch) && ch >= 1 && ch <= 16) mappedChannel = ch;
               }
             } catch {}
-            scheduleFaderSetpoint(xt, faderChannel, clamp((value as number) | 0, 0, 16383));
+            if (mappedChannel != null) {
+              scheduleFaderSetpoint(xt, mappedChannel, clamp((value as number) | 0, 0, 16383));
+            }
           }
         } else {
           v7 = clamp(v | 0, 0, 127);
         }
       }
       const bytes: number[] = [status, cc, v7];
-      out.sendMessage(bytes);
-      if (!hasPassthroughForApp(app)) {
-        markAppOutgoingAndForward(app, bytes, needle);
+      this.sendSafe(appKey, out, bytes, needle);
+      if (!hasPassthroughForApp(appKey)) {
+        markAppOutgoingAndForward(appKey, bytes, needle);
       }
-      ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+      ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
       return;
     }
 
@@ -117,17 +125,18 @@ export class MidiAppClient {
     const lsb = v14 & 0x7f;
     const msb = (v14 >> 7) & 0x7f;
     const bytes: number[] = [status, lsb, msb];
-    out.sendMessage(bytes);
+    this.sendSafe(appKey, out, bytes, needle);
     const xt = getGlobalXTouch();
     if (xt) scheduleFaderSetpoint(xt, channel, v14);
-    if (!hasPassthroughForApp(app)) {
-      markAppOutgoingAndForward(app, bytes, needle);
+    if (!hasPassthroughForApp(appKey)) {
+      markAppOutgoingAndForward(appKey, bytes, needle);
     }
-    ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+    ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
   }
 
   async ensureFeedback(app: string): Promise<void> {
-    await ensureFeedbackOpen(app, { inPerApp: this.inPerApp, appToInName: this.appToInName });
+    const appKey = String(app).trim();
+    await ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName });
   }
 
   reconcileForPage(page: PageConfig | undefined): void {
@@ -162,6 +171,8 @@ export class MidiAppClient {
     this.outPerApp.clear();
     for (const i of this.inPerApp.values()) { try { i.closePort(); } catch {} }
     this.inPerApp.clear();
+    for (const t of this.outRetryTimers.values()) { try { clearTimeout(t.timer); } catch {} }
+    this.outRetryTimers.clear();
   }
 
   private async ensureOutOpen(app: string, needle: string, optional: boolean): Promise<Output | null> {
@@ -174,17 +185,53 @@ export class MidiAppClient {
         o.closePort?.();
         if (!optional) throw new Error(`Port OUT introuvable pour '${needle}'`);
         logger.warn(`MidiAppClient: port OUT introuvable '${needle}' (optional).`);
+        this.scheduleOutRetry(app, needle);
         return null;
       }
       o.openPort(idx);
       this.outPerApp.set(app, o);
       logger.info(`MidiAppClient: OUT ouvert app='${app}' via '${needle}'.`);
+      // On success, cancel any pending retry
+      const cur = this.outRetryTimers.get(app);
+      if (cur) { try { clearTimeout(cur.timer); } catch {} this.outRetryTimers.delete(app); }
       return o;
     } catch (err) {
       if (!optional) throw err;
       logger.warn(`MidiAppClient: ouverture OUT échouée pour '${needle}':`, err as any);
+      this.scheduleOutRetry(app, needle);
       return null;
     }
+  }
+
+  /**
+   * Envoie un message MIDI et gère les erreurs (port débranché/indisponible).
+   * En cas d'échec, ferme le port, l'enlève du cache et programme une reconnexion.
+   */
+  private sendSafe(app: string, out: Output, bytes: number[], needle: string): void {
+    try {
+      out.sendMessage(bytes);
+    } catch (err) {
+      logger.warn(`MidiAppClient: envoi OUT échoué vers '${needle}', tentative de reconnexion...`, err as any);
+      try { out.closePort(); } catch {}
+      this.outPerApp.delete(app);
+      this.scheduleOutRetry(app, needle);
+    }
+  }
+
+  /**
+   * Programme une tentative de réouverture du port OUT pour une app avec backoff léger.
+   */
+  private scheduleOutRetry(app: string, needle: string): void {
+    const prev = this.outRetryTimers.get(app);
+    const nextCount = (prev?.count ?? 0) + 1;
+    if (prev) { try { clearTimeout(prev.timer); } catch {} }
+    const delay = Math.min(10_000, 250 * nextCount);
+    const timer = setTimeout(() => {
+      // best-effort: ensureOpen will re-plan on failure
+      this.ensureOutOpen(app, needle, true).catch(() => {});
+    }, delay);
+    this.outRetryTimers.set(app, { count: nextCount, timer });
+    try { logger.info(`MidiAppClient: RETRY OUT ${nextCount} pour app='${app}' dans ${delay}ms.`); } catch {}
   }
 }
 

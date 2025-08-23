@@ -11,6 +11,11 @@ midi:
 
 xtouch:
   mode: "mcu"  # "mcu" (par défaut) ou "ctrl"
+  overlay_per_app:
+    qlc:
+      mode: "8bit"
+    voicemeeter:
+      mode: "percent"
 
 obs:
   host: "127.0.0.1"
@@ -104,6 +109,14 @@ pages:
       fader6:
         app: "voicemeeter"
         midi: {type: "passthrough"}
+      fader7:
+        app: "voicemeeter"
+        midi: {type: "passthrough"}
+      fader8:
+        app: "qlc "
+        midi: {type: "cc", channel: 1, cc: 77}
+        overlay:
+          mode: "8bit"
       mute1:
         app: "voicemeeter"
         midi: {type: "passthrough"}
@@ -113,19 +126,7 @@ pages:
       mute3:
         app: "voicemeeter"
         midi: {type: "passthrough"}
-    # passthroughs:
-    #   - driver: "midi"
-    #     to_port: "xtouch-gw"
-    #     from_port: "xtouch-gw-feedback"
-    #     filter:
-    #       channels: [1,2,3,4,5,6,7]
-    #       types: ["noteOn","noteOff","controlChange"] #,"pitchBend"]
-    #   - driver: "midi"
-    #     to_port: "qlc-in"
-    #     from_port: "qlc-out"
-    #     filter:
-    #       channels: [8,9]
-    #       types: ["noteOn","noteOff","controlChange","pitchBend"]
+        
   - name: "Lum Latéraux"
     lcd:
       labels:

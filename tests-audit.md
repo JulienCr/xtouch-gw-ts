@@ -217,6 +217,10 @@ Prochaines étapes
 - Créer issues par module (P0 d’abord), ajouter checklists et critères de sortie
 
 ## Journal d’avancement (MàJ continue)
+2025-08-22 — Overlay valeur fader (LCD)
+- Ajout API LCD partielle (ligne basse) + module overlay basé sur input X‑Touch.
+- Impact tests: à ajouter (fake driver X‑Touch, vérif qu’en PB/CC sous touch, la ligne basse affiche la valeur attendue; fin touch restaure baseline).
+- Pas d’impact sur suites existantes; linter/typecheck OK.
 
 2025-08-20 — Correctif LEDs navigation
 - Les LEDs Prev/Next et F1..F8 étaient éteintes par la couche d'indicateurs génériques.
@@ -277,4 +281,11 @@ Prochaines étapes
 - Ajout: `src/services/controlMidiSender.ts` (nouveau module, non couvert par tests pour l’instant)
 - Changements: `src/router.ts` (priorise `mapping.midi`), `src/xtouch/inputMapper.ts` (émission valeur14 pour PB)
 - Impact couverture: dossier `services` partiellement couvert; prévoir tests unitaires stubs Output pour valider conversion 14b→7b et ouverture de ports.
+
+2025-08-22 — Reconnexion automatique des ports MIDI (WinMM)
+- Ajout logique de backoff et retry côté `MidiAppClient` (OUT) et `MidiBridgeDriver` (IN/OUT).
+- À tester (à faire):
+  - Simuler `Output.sendMessage` qui jette, vérifier fermeture et planification retry.
+  - Simuler ports introuvables (`findPortIndexByNameFragment` renvoie null), vérifier retries et succès après retour.
+  - Valider que les timers sont nettoyés au `shutdown()`.
 

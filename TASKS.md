@@ -36,6 +36,11 @@
 
 ## En cours
 - [x] Pages: support d'un bloc `pages_global` (defaults fusionnés dans chaque page; override par page)
+ - [x] [Haute][UX] Overlay valeur fader sur LCD (pendant touch) + restauration
+   - [x] API LCD: `sendLcdStripLowerText()` et wrapper driver
+   - [x] Module `attachFaderValueOverlay()` (MCU: %; CTRL: 7b/8b configurable)
+   - [x] Config: `xtouch.overlay { enabled?, cc_bits }` + `xtouch.overlay_per_app.{app} { enabled?, mode }`
+   - [x] Wiring bootstrap: attacher l’overlay au démarrage
 - [x] Indiquer le nom de la page sur le grand afficheur 7-segments
 - [x] Utilise les boutons F1 -> F8 pour naviguer entre les pages (notes channel 1 64..57) et LED active sur la page courante
 - [x] Router: pages OK + mapping d’actions implémenté
@@ -105,6 +110,7 @@
 - [x] CLI: nouvelle commande `sync` + hook `Driver.sync()` + `Router.syncDrivers()`; implémentation OBS (studio mode, scènes) et mise à jour docs CLI — 2025‑08‑20
 - [x] Docs: schémas de flux (Mermaid) — démarrage, changement de page, OBS, QLC+ (`docs/flows.md`) — 2025‑08‑21
 - [x] Fix: LEDs navigation (Prev/Next) et F1..F8 s'éteignaient immédiatement à l'arrivée sur une page — la logique générique des indicateurs n'écrase plus les LEDs de navigation gérées par `fkeys` (n'émet que pour les contrôles avec indicateur explicite). Tests verts. — 2025‑08‑20
+ - [x] Fix: Feedback QLC fader8 sur Page 1 — éviter les doubles ouvertures IN: skip si un passthrough existe sur n'importe quelle page (background listeners/bridge propriétaires gèrent l'IN). Normalisation des clés d'app (trim) pour supporter `app: "qlc "`. Tests verts. — 2025‑08‑22
 - [x] CLI: refonte aide UX‑first — YAML v2 (meta/context/categories), rendu cheatsheet coloré, `help <cmd|cat|all|examples|json>`, alias `:` avec compat, suggestions, completion; `clear` reste stdout — 2025‑08‑20
 - [x] Fix: InputMapper (MCU) — prise en charge `pb=chN` depuis `docs/xtouch-matching.csv`; PB non filtré par canal, Note/CC filtrés par `paging.channel`; faders 2..8 désormais routés — 2025‑08‑20
  - [x] CLI: REPL — ajout de la complétion Tab via `readline.completer` (commandes, sous-commandes et complétions contextuelles: pages, ports MIDI, fader/lcd) — 2025‑08‑20
@@ -121,6 +127,11 @@
 - [x] Passthrough MIDI par page (bridge to/from port) + navigation prev/next (notes 46/47 ch=1)
 - [x] Bridge global Voicemeeter (désactivé automatiquement si passthrough par page présent)
 - [x] Création du système de gestion de projet (`TASKS.md`, `MEMORY.md`)
+
+### 2025-08-22 — Robustesse MIDI (reconnexion automatique)
+- [x] MidiAppClient: reconnexion OUT auto avec backoff (sendSafe + scheduleOutRetry)
+- [x] MidiBridgeDriver: reconnexion IN/OUT auto avec backoff (tryOpen*Once + schedule*Retry + sendSafe)
+- [ ] Tests d'intégration: simuler indisponibilité de port et valider reprise (à ajouter)
 - [x] Ajout d’un squelette Node.js + TypeScript
 - [x] Initialisation du projet (structure, scripts pnpm, TypeScript) 
 - ~~ [ ] Bridge: reverse transform automatique du feedback (CC/Note → Pitch Bend)~~ — abandonné, remplacé par anti‑echo et setpoint moteurs via `midiBridge` + `Router`
