@@ -42,6 +42,14 @@ export async function attachInputMapper(opts: InputMapperOptions): Promise<() =>
             if (mapping?.midi?.type === "passthrough") {
               // En passthrough, relayer press ET release (vel=0)
               router.handleControl(id, data).catch(() => {});
+            } else if (mapping?.midi?.type === "cc") {
+              // Convention bouton→CC: 127 à l'appui, 0 au relâchement
+              const v = vel > 0 ? 127 : 0;
+              router.handleControl(id, v).catch(() => {});
+            } else if (mapping?.midi?.type === "note") {
+              // Convention bouton→Note: 127 à l'appui, 0 au relâchement
+              const v = vel > 0 ? 127 : 0;
+              router.handleControl(id, v).catch(() => {});
             } else {
               // Sinon, ne router que l'appui (vel>0)
               if (vel > 0) router.handleControl(id).catch(() => {});

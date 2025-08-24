@@ -75,7 +75,10 @@ export class MidiAppClient {
 
     if (spec.type === "note") {
       const note = clamp(Number(spec.note) | 0, 0, 127);
-      const vel = clamp(Number(value) | 0, 0, 127);
+      // Default velocity to 127 when not provided (typical button press)
+      const vel = (typeof value === "number" && Number.isFinite(value))
+        ? clamp((value as number) | 0, 0, 127)
+        : 127;
       const bytes: number[] = [status, note, vel];
       this.sendSafe(appKey, out, bytes, needle);
       if (!hasPassthroughForApp(appKey)) {
@@ -87,7 +90,9 @@ export class MidiAppClient {
 
     if (spec.type === "cc") {
       const cc = clamp(Number(spec.cc) | 0, 0, 127);
-      let v7 = 0;
+      // Default behavior for button-triggered CC without explicit value: send 127 on press
+      // This covers mappings where a Note press (value undefined) triggers a CC emission.
+      let v7 = 127;
       if (typeof value === "number" && Number.isFinite(value)) {
         const v = value as number;
         if (v > 127) {

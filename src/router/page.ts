@@ -133,24 +133,60 @@ export function transformAppToXTouch(page: PageConfig, app: AppKey, entry: MidiS
 	if (status === "cc") {
 		const m = resolvePbToCcMappingForApp(page, app);
 		const map = m?.map;
-		if (!map) return null;
 		const ccNum = entry.addr.data1 ?? -1;
-		let faderChannel: number | null = null;
-		for (const [ch, cc] of map.entries()) {
-			if (cc === ccNum) { faderChannel = ch; break; }
+		if (map && map.size > 0) {
+			let faderChannel: number | null = null;
+			for (const [ch, cc] of map.entries()) {
+				if (cc === ccNum) { faderChannel = ch; break; }
+			}
+			if (faderChannel != null) {
+				const v7 = typeof entry.value === "number" ? entry.value : 0;
+				const v7c = Math.max(0, Math.min(127, Math.floor(v7)));
+				const v14 = (v7c << 7) | v7c;
+				return {
+					addr: { portId: app, status: "pb", channel: faderChannel, data1: 0 },
+					value: v14,
+					ts: entry.ts,
+					origin: "app",
+					known: true,
+					stale: entry.stale,
+				};
+			}
 		}
-		if (faderChannel == null) return null;
-		const v7 = typeof entry.value === "number" ? entry.value : 0;
-		const v7c = Math.max(0, Math.min(127, Math.floor(v7)));
-		const v14 = (v7c << 7) | v7c;
-		return {
-			addr: { portId: app, status: "pb", channel: faderChannel, data1: 0 },
-			value: v14,
-			ts: entry.ts,
-			origin: "app",
-			known: true,
-			stale: entry.stale,
-		};
+
+		// Not a fader CC: attempt to drive the corresponding button LED (Note) using page controls
+		try {
+			const controls = (page.controls as Record<string, ControlMapping | undefined>) || {};
+			let targetControlId: string | null = null;
+			for (const [cid, mapping] of Object.entries(controls)) {
+				if (!mapping || (mapping.app || "").trim() !== (app as string)) continue;
+				const spec = mapping.midi;
+				if (!spec || spec.type !== "cc") continue;
+				const cc = Number(spec.cc);
+				if (Number.isFinite(cc) && cc === ccNum) { targetControlId = cid; break; }
+			}
+			if (targetControlId) {
+				const kind = getMessageTypeForControlId(targetControlId, "mcu");
+				if (kind === "note") {
+					const lookup = getInputLookups("mcu");
+					let note: number | null = null;
+					for (const [n, id] of lookup.noteToControl.entries()) { if (id === targetControlId) { note = n; break; } }
+					if (typeof note === "number") {
+						const v = typeof entry.value === "number" ? entry.value : 0;
+						const vel = v > 0 ? 127 : 0;
+						return {
+							addr: { portId: app, status: "note", channel: 1, data1: note },
+							value: vel,
+							ts: entry.ts,
+							origin: "app",
+							known: true,
+							stale: entry.stale,
+						};
+					}
+				}
+			}
+		} catch {}
+		return null;
 	}
 	return null;
 }

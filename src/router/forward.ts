@@ -56,7 +56,10 @@ export function forwardFromApp(
     const rtt = now - prev.ts;
     try { deps.ensureLatencyMeters(app)[entry.addr.status].record(rtt); } catch {}
     const win = getAntiLoopMs(deps.antiLoopWindows as any, entry.addr.status);
-    if (midiValueEquals(prev.value, entry.value) && rtt < win) {
+    // If the transformed output type differs (e.g., CC→Note for LEDs), do not suppress
+    // based on the CC anti-echo window. Only suppress when types match.
+    const sameType = maybeForward.addr.status === entry.addr.status;
+    if (sameType && midiValueEquals(prev.value, entry.value) && rtt < win) {
       return;
     }
   }
