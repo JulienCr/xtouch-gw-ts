@@ -223,6 +223,13 @@ Prochaines étapes
 - Anti‑echo: CC→PB reste supprimable; CC→Note (LEDs) non supprimé.
 - Tests: `pnpm test:unit` et `pnpm test` verts.
 
+2025-08-25 — Étude multi-messages par contrôle
+- Ajout: `docs/multi-messages-control.md` (faisabilité, impacts, schéma Mermaid, plan/étapes).
+- Impact tests (à prévoir):
+  - Unitaires `services/controlMidiSender`: fan‑out séquentiel, press/release, erreurs partielles (best-effort), PB14→CC7b sur chaque message.
+  - Unitaires `midi/appClient`: ordre d’envoi, ensure ports, marquage feedback.
+  - Intégration: bouton et fader envoyant deux CC (ordre, valeurs attendues).
+
 2025-08-22 — Overlay valeur fader (LCD)
 - Ajout API LCD partielle (ligne basse) + module overlay basé sur input X‑Touch.
 - Impact tests: à ajouter (fake driver X‑Touch, vérif qu’en PB/CC sous touch, la ligne basse affiche la valeur attendue; fin touch restaure baseline).
