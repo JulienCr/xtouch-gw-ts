@@ -96,8 +96,20 @@ export function resolvePbToCcMappingForApp(page: PageConfig, app: AppKey): { map
 }
 
 export function transformAppToXTouch(page: PageConfig, app: AppKey, entry: MidiStateEntry): MidiStateEntry | null {
+	const outs = transformAppToXTouchAll(page, app, entry);
+	return outs.length > 0 ? outs[0] : null;
+}
+
+
+/**
+ * Transforme un évènement app → une ou plusieurs sorties X‑Touch.
+ *
+ * - note: relai si autorisé, sinon aucune sortie
+ * - pb/sysex: relai direct
+ * - cc: vers PB si mappé; sinon, fan‑out en Notes pour tous les contrôles partageant (app, cc)
+ */
+export function transformAppToXTouchAll(page: PageConfig, app: AppKey, entry: MidiStateEntry): MidiStateEntry[] {
 	const status = entry.addr.status as MidiStatus;
-	// Ne pas relayer les Notes sauf si explicitement autorisé par un passthrough (filters.types)
 	if (status === "note") {
 		const items = getPagePassthroughItems(page);
 		const relevant = (Array.isArray(items) ? items : [])
@@ -107,7 +119,6 @@ export function transformAppToXTouch(page: PageConfig, app: AppKey, entry: MidiS
 			const types: string[] | undefined = it?.filter?.types;
 			if (Array.isArray(types) && (types.includes("noteOn") || types.includes("noteOff"))) { allow = true; break; }
 		}
-		// Symétrie stricte: autoriser Note uniquement si la page a un contrôle mappé correspondant à cette note pour cette app
 		if (!allow) {
 			try {
 				const note = entry.addr.data1 ?? -1;
@@ -124,11 +135,10 @@ export function transformAppToXTouch(page: PageConfig, app: AppKey, entry: MidiS
 				}
 			} catch {}
 		}
-		if (!allow) return null;
-		return entry;
+		return allow ? [entry] : [];
 	}
 	if (status === "pb" || status === "sysex") {
-		return entry;
+		return [entry];
 	}
 	if (status === "cc") {
 		const m = resolvePbToCcMappingForApp(page, app);
@@ -143,52 +153,55 @@ export function transformAppToXTouch(page: PageConfig, app: AppKey, entry: MidiS
 				const v7 = typeof entry.value === "number" ? entry.value : 0;
 				const v7c = Math.max(0, Math.min(127, Math.floor(v7)));
 				const v14 = (v7c << 7) | v7c;
-				return {
+				return [{
 					addr: { portId: app, status: "pb", channel: faderChannel, data1: 0 },
 					value: v14,
 					ts: entry.ts,
 					origin: "app",
 					known: true,
 					stale: entry.stale,
-				};
+				} as MidiStateEntry];
 			}
 		}
 
-		// Not a fader CC: attempt to drive the corresponding button LED (Note) using page controls
+		// Fan‑out LED: tous les contrôles ayant app+cc identiques
 		try {
 			const controls = (page.controls as Record<string, ControlMapping | undefined>) || {};
-			let targetControlId: string | null = null;
+			const lookup = getInputLookups("mcu");
+			const matches: string[] = [];
 			for (const [cid, mapping] of Object.entries(controls)) {
 				if (!mapping || (mapping.app || "").trim() !== (app as string)) continue;
 				const spec = mapping.midi;
 				if (!spec || spec.type !== "cc") continue;
 				const cc = Number(spec.cc);
-				if (Number.isFinite(cc) && cc === ccNum) { targetControlId = cid; break; }
+				if (Number.isFinite(cc) && cc === ccNum) { matches.push(cid); }
 			}
-			if (targetControlId) {
-				const kind = getMessageTypeForControlId(targetControlId, "mcu");
-				if (kind === "note") {
-					const lookup = getInputLookups("mcu");
+			if (matches.length > 0) {
+				const v = typeof entry.value === "number" ? entry.value : 0;
+				const vel = v > 0 ? 127 : 0;
+				const outs: MidiStateEntry[] = [];
+				for (const cid of matches) {
+					const kind = getMessageTypeForControlId(cid, "mcu");
+					if (kind !== "note") continue;
 					let note: number | null = null;
-					for (const [n, id] of lookup.noteToControl.entries()) { if (id === targetControlId) { note = n; break; } }
+					for (const [n, id] of lookup.noteToControl.entries()) { if (id === cid) { note = n; break; } }
 					if (typeof note === "number") {
-						const v = typeof entry.value === "number" ? entry.value : 0;
-						const vel = v > 0 ? 127 : 0;
-						return {
+						outs.push({
 							addr: { portId: app, status: "note", channel: 1, data1: note },
 							value: vel,
 							ts: entry.ts,
 							origin: "app",
 							known: true,
 							stale: entry.stale,
-						};
+						} as MidiStateEntry);
 					}
 				}
+				if (outs.length > 0) return outs;
 			}
 		} catch {}
-		return null;
+		return [];
 	}
-	return null;
+	return [];
 }
 
 

@@ -217,6 +217,12 @@ Prochaines étapes
 - Créer issues par module (P0 d’abord), ajouter checklists et critères de sortie
 
 ## Journal d’avancement (MàJ continue)
+2025-08-25 — Fan‑out LEDs couplées + refactor transform
+- Changement: ajout `transformAppToXTouchAll` (multi-sorties) et refactor `transformAppToXTouch` en wrapper.
+- Forward/planner utilisent la version multi-sorties pour propager l’état LED à tous les contrôles partageant (app, cc).
+- Anti‑echo: CC→PB reste supprimable; CC→Note (LEDs) non supprimé.
+- Tests: `pnpm test:unit` et `pnpm test` verts.
+
 2025-08-22 — Overlay valeur fader (LCD)
 - Ajout API LCD partielle (ligne basse) + module overlay basé sur input X‑Touch.
 - Impact tests: à ajouter (fake driver X‑Touch, vérif qu’en PB/CC sous touch, la ligne basse affiche la valeur attendue; fin touch restaure baseline).

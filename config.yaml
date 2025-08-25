@@ -126,7 +126,96 @@ pages:
       mute3:
         app: "voicemeeter"
         midi: {type: "passthrough"}
-        
+  
+  - name: "Lighting"
+    lcd:
+      labels:
+        - "Néons\nLatéraux"
+        - "Néons\nContres"
+        - "Contres\nJardin"
+        - "Contres\nCour"
+        - "Wash\nCanapé"
+        - "Wash\nÉtagère"
+        - ""
+        - ""
+        - "Face"
+      colors: [6,6,5,5,2,2,0,3]
+    controls:
+      fader1:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 0 }
+      fader2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 1 }
+      fader3:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 2 }
+      fader4:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 3 }
+      fader5:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 4 }
+      fader6:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 5 }
+      fader8:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 77 }
+
+      # Boutons couleur Frame 1 (Néons Latéraux)
+      rec1:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 33 } # blanc
+      solo1:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 39 } # cyan
+      mute1:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 37 } # rouge
+      select1:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 36 } # rose
+
+      rec2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 41 } # blanc
+      solo2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 47 } # cyan 
+      mute2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 45 } # rouge
+      select2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 44 } # rose
+
+      rec3:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 25 }  # CC 25
+      solo3:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 26 } # cyan
+      mute3:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 29 } # rouge
+      select3:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 28 } # rose
+      
+      rec4:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 25 }  # CC 25
+      solo4:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 26 } # cyan
+      mute4:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 29 } # rouge
+      select4:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 28 } # rose
+
   - name: "Lum contres"
     lcd:
       labels:
@@ -247,7 +336,6 @@ pages:
       auto_latch:     # Vert
         app: "qlc"
         midi: { type: "cc", channel: 1, cc: 38 }  # CC 38
-
   - name: "Néons Contres RGB"
     lcd:
       labels:
@@ -303,13 +391,3 @@ pages:
       auto_latch:     # Vert
         app: "qlc"
         midi: { type: "cc", channel: 1, cc: 30 }  # CC 30
-    passthroughs:
-      - driver: "midi"
-        to_port: "qlc-in"
-        from_port: "qlc-out"
-        transform:
-          pb_to_cc:
-            target_channel: 1   # P4 = même CC que P2 mais sur canal MIDI 2 (QLC+ = +128)
-            base_cc: 96     # Base CC P2 (80) → P4 = 209–216 en QLC
-            cc_by_channel:
-              9: 78  # Master Dimmer (Fader 9)
