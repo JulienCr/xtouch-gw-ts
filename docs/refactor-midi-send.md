@@ -7,7 +7,7 @@
 - [x] Exposer `MidiAppClient.sendRaw(appKey, bytes)` (ou `type: "passthrough"`) et tracer sendSafe/forward/feedback/setpoints
 - [x] Dans `drivers/midibridge`, remplacer l'envoi direct par délégation à `MidiAppClient` (résolution appKey) — OUT seulement
 - [ ] Option: `xtouch/api-midi.ts` délègue à l'orchestrateur si présent (DI)
-- [ ] Remplacer les constructions locales (Note/CC/PB) par `bytes.ts` dans `midi/appClient`, `router/emit`, `xtouch/api-midi` (partiel: `midi/appClient`, `xtouch/api-midi` faits)
+- [x] Remplacer les constructions locales (Note/CC/PB) par `bytes.ts` dans `midi/appClient`, `router/emit`, `xtouch/api-midi`
 - [ ] Tests intégration (parité frames, anti-loop PB, timing) et mise à jour `tests-audit.md`
 
 Journal d'itération
