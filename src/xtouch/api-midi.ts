@@ -3,6 +3,17 @@ import { rawFromPb14 } from "../midi/bytes"; // MODIF: centraliser via bytes.ts
 export type RawSender = { sendRawMessage(bytes: number[]): void };
 
 export function sendNoteOn(driver: RawSender, channel: number, note: number, velocity: number): void {
+  // MODIF: DI optionnelle vers orchestrateur si présent
+  try {
+    const orch = (global as any).__controlMidiSender__;
+    if (orch?.send) {
+      const ch = clamp(channel, 1, 16);
+      const n = clamp(note, 0, 127);
+      const v = clamp(velocity, 0, 127);
+      orch.send("xtouch-orchestrator", { type: "passthrough", channel: ch }, [0x90 + (ch - 1), n, v]);
+      return;
+    }
+  } catch {}
   const ch = clamp(channel, 1, 16);
   const n = clamp(note, 0, 127);
   const v = clamp(velocity, 0, 127);
@@ -14,6 +25,17 @@ export function sendNoteOff(driver: RawSender, channel: number, note: number): v
 }
 
 export function sendControlChange(driver: RawSender, channel: number, controller: number, value: number): void {
+  // MODIF: DI optionnelle vers orchestrateur si présent
+  try {
+    const orch = (global as any).__controlMidiSender__;
+    if (orch?.send) {
+      const ch = clamp(channel, 1, 16);
+      const cc = clamp(controller, 0, 127);
+      const v = clamp(value, 0, 127);
+      orch.send("xtouch-orchestrator", { type: "passthrough", channel: ch }, [0xB0 + (ch - 1), cc, v]);
+      return;
+    }
+  } catch {}
   const ch = clamp(channel, 1, 16);
   const cc = clamp(controller, 0, 127);
   const v = clamp(value, 0, 127);
@@ -21,6 +43,17 @@ export function sendControlChange(driver: RawSender, channel: number, controller
 }
 
 export function sendPitchBend14(driver: RawSender, channel: number, value14: number): void {
+  // MODIF: DI optionnelle vers orchestrateur si présent
+  try {
+    const orch = (global as any).__controlMidiSender__;
+    if (orch?.send) {
+      const ch = clamp(channel, 1, 16);
+      const v = clamp(value14 | 0, 0, 16383);
+      const bytes = rawFromPb14(ch, v);
+      orch.send("xtouch-orchestrator", { type: "passthrough", channel: ch }, bytes);
+      return;
+    }
+  } catch {}
   const v = clamp(value14 | 0, 0, 16383);
   const bytes = rawFromPb14(channel, v);
   driver.sendRawMessage(bytes);

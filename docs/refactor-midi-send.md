@@ -8,7 +8,7 @@
 - [x] Dans `drivers/midibridge`, remplacer l'envoi direct par délégation à `MidiAppClient` (résolution appKey) — OUT seulement
 - [x] Remplacer les constructions locales (Note/CC/PB) par `bytes.ts` dans `midi/appClient`, `router/emit`, `xtouch/api-midi`
 - [x] `xtouch/valueOverlay.ts`: utiliser `convert.ts` pour percent/7b/8b (PB) et percent (CC)
-- [ ] Option: `xtouch/api-midi.ts` délègue à l'orchestrateur si présent (DI)
+- [x] Option: `xtouch/api-midi.ts` délègue à l'orchestrateur si présent (DI)
 - [ ] Tests intégration (parité frames, anti-loop PB, timing) et mise à jour `tests-audit.md`
 
 Journal d'itération
@@ -17,7 +17,7 @@ Journal d'itération
    - Sorties: fonctions utilitaires + tests unitaires de bornes/arrondis/round-trips
 2) Lot 2 — Orchestrateur OUT unique (fait)
    - Cibles: `midi/appClient` (API `sendRaw` ajoutée), `drivers/midibridge` (délégation OUT)
-3) Lot 3 — Remplacements globaux + DI API utils (en cours)
+3) Lot 3 — Remplacements globaux + DI API utils (fait)
    - Cibles: `xtouch/api-midi.ts` (DI optionnelle), `router/emit.ts` (fait), `xtouch/valueOverlay.ts` (fait)
 
 ## Refactor: Unifier la logique d'émission MIDI (Note/CC/PB)
