@@ -1,6 +1,6 @@
 import type { PageConfig } from "../config";
 import type { StateStore, MidiStateEntry, MidiStatus, AppKey } from "../state";
-import { getAppsForPage, getChannelsForApp, resolvePbToCcMappingForApp, transformAppToXTouch } from "./page";
+import { getAppsForPage, getChannelsForApp, resolvePbToCcMappingForApp, transformAppToXTouch, transformAppToXTouchAll } from "./page";
 
 /**
  * Construit la liste ordonnée d'entrées à émettre vers X‑Touch pour refléter l'état de la page.
@@ -70,8 +70,10 @@ export function planRefresh(page: PageConfig, state: StateStore): MidiStateEntry
         const latestExact = state.getKnownLatestForApp(app, "note", ch, note);
         const latestAnyCh = latestExact || state.getKnownLatestForApp(app, "note", undefined, note);
         if (latestAnyCh) {
-          const e = transformAppToXTouch(page, app, latestAnyCh);
-          if (e) pushNoteCandidate(e, 2);
+          const outs = transformAppToXTouchAll(page, app, latestAnyCh);
+          if (outs && outs.length > 0) {
+            for (const e of outs) pushNoteCandidate(e, 2);
+          }
         } else {
           const addr = { portId: app, status: "note" as MidiStatus, channel: ch, data1: note } as MidiStateEntry["addr"];
           pushNoteCandidate({ addr, value: 0, ts: Date.now(), origin: "xtouch", known: false } as MidiStateEntry, 1);
@@ -85,8 +87,10 @@ export function planRefresh(page: PageConfig, state: StateStore): MidiStateEntry
         const latestExact = state.getKnownLatestForApp(app, "cc", ch, cc);
         const latestAnyCh = latestExact || state.getKnownLatestForApp(app, "cc", undefined, cc);
         if (latestAnyCh) {
-          const e = transformAppToXTouch(page, app, latestAnyCh);
-          if (e) pushCcCandidate(e, 2);
+          const outs = transformAppToXTouchAll(page, app, latestAnyCh);
+          if (outs && outs.length > 0) {
+            for (const e of outs) pushCcCandidate(e, 2);
+          }
         } else {
           const addr = { portId: app, status: "cc" as MidiStatus, channel: ch, data1: cc } as MidiStateEntry["addr"];
           pushCcCandidate({ addr, value: 0, ts: Date.now(), origin: "xtouch", known: false } as MidiStateEntry, 1);

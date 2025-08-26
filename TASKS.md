@@ -27,6 +27,7 @@
 - [ ] Learn page (assistant): enchaîner plusieurs learns pour produire un bloc `controls`
 - [ ] Tests de perf/jitter (< 20 ms) et micro-bench sur hot paths
 - [ ] CI GitHub Actions: pnpm i --frozen-lockfile, lint, check:types, test
+- [ ] Feature: Multi-messages par contrôle (fan-out) — YAML `controls.*.midi[]`; étude `docs/multi-messages-control.md`; UI config-editor (optionnel)
 - [x] Refactor MIDI: extraire un client partagé `MidiAppClient` (ports IN/OUT, cache, feedback → Router, optimistic shadow) et l'utiliser dans `drivers/midiBridge.ts` et `services/controlMidiSender.ts` pour supprimer la duplication
 - [ ] Clarifier l'API: renommer `controlMidiSender` → `midiAppClient` (ou similaire) et adapter `Router.handleControl()` pour appeler ce client générique pour `controls.*.midi`
 - [x] Garder `MidiBridgeDriver` focalisé sur le « passthrough » page-scopé (X‑Touch ⇄ App) en s'appuyant sur `MidiAppClient` pour l'accès port/émission; éviter d'y intégrer la logique `controls.midi`
