@@ -229,8 +229,23 @@ Prochaines étapes
 - Plan tests à ajouter:
   - Unitaires `src/midi/bytes.ts`: rawFromNoteOn/Cc/Pb14 (bornes, idempotence, statuts corrects).
   - Intégration `midi/appClient`: ordre d’envoi, conversion 14b→7b pour CC, setpoint faders mappés.
-  - Intégration `drivers/midibridge`: applyTransform(pb_to_cc/pb_to_note), squelch PB, reconnexion.
+  - Intégration `drivers/midibridge`: applyTransform(pb_to_cc/pb_to_note), squelch PB, reconnexion, délégation OUT.
+  - Contrats `router/emit`: utiliser `bytes.ts` pour construire Note/CC/PB; ordre Notes→CC→SysEx→PB conservé.
+  - Overlay `xtouch/valueOverlay`: conversions percent/7b/8b via `convert.ts` vérifiées.
 
+2025-08-26 — Unification achevée (Lots 1–3)
+- Convert: helpers centralisés + tests unitaires basiques OK.
+- Bytes: Note/CC/PB centralisés + tests unitaires OK.
+- Transform: PB→CC via `to7bitFrom14bit`.
+- AppClient: `sendRaw` exposé; CC/Note/PB via bytes; forward/feedback/setpoints conservés.
+- Bridge: OUT délégué à orchestrateur; IN/retry conservés.
+- Router emit: frames via bytes.
+- XTouch API: DI optionnelle vers orchestrateur (passthrough) + bytes.
+- Overlay: conversions via convert.
+Suivi tests (prochaines actions)
+- Ajouter property-based tests pour conversions (monotonicité, inverses partiels 7b/14b).
+- Tests intégration Bridge après délégation OUT (parité frames, timing).
+- Tests AppClient: ensureFeedback gating avec passthrough anywhere.
 2025-08-26 — Centralisation des conversions 14b↔7b/8b/percent
 - À créer: `src/midi/convert.ts` (helpers de conversion canonique).
 - Tests à ajouter:
