@@ -28,9 +28,9 @@
 - [ ] Tests de perf/jitter (< 20 ms) et micro-bench sur hot paths
 - [ ] CI GitHub Actions: pnpm i --frozen-lockfile, lint, check:types, test
 - [ ] Feature: Multi-messages par contrôle (fan-out) — YAML `controls.*.midi[]`; étude `docs/multi-messages-control.md`; UI config-editor (optionnel)
-- [ ] Refactor MIDI: unifier la construction des trames (Note/CC/PB) via `src/midi/bytes.ts` et remplacer les constructions locales dans `xtouch/api-midi.ts`, `midi/appClient`, `drivers/midibridge`. Voir `docs/refactor-midi-send.md`.
+- [x] Refactor MIDI: unifier la construction des trames (Note/CC/PB) via `src/midi/bytes.ts` et remplacer les constructions locales dans `xtouch/api-midi.ts`, `midi/appClient` (partiel: Note/CC/PB), `drivers/midibridge` (à faire). Voir `docs/refactor-midi-send.md`. — 2025‑08‑26
 - [ ] Architecture simplifiée (Option B): faire de `MidiAppClient` l’orchestrateur unique OUT; `MidiBridgeDriver` délègue l’émission via `sendRaw/passthrough` après filtre/transform. `xtouch/api-midi.ts` devient optionnel/DI.
-- [ ] Centraliser conversions 14b↔7b/8b/percent dans `src/midi/convert.ts` et remplacer les usages (midi/appClient, xtouch/valueOverlay, midi/transform, router/page si pertinent). Tests unitaires + propriétés.
+- [x] Centraliser conversions 14b↔7b/8b/percent dans `src/midi/convert.ts` et remplacer les usages (midi/transform, midi/appClient CC). Tests unitaires basiques ajoutés. — 2025‑08‑26
 - [x] Refactor MIDI: extraire un client partagé `MidiAppClient` (ports IN/OUT, cache, feedback → Router, optimistic shadow) et l'utiliser dans `drivers/midiBridge.ts` et `services/controlMidiSender.ts` pour supprimer la duplication
 - [ ] Clarifier l'API: renommer `controlMidiSender` → `midiAppClient` (ou similaire) et adapter `Router.handleControl()` pour appeler ce client générique pour `controls.*.midi`
 - [x] Garder `MidiBridgeDriver` focalisé sur le « passthrough » page-scopé (X‑Touch ⇄ App) en s'appuyant sur `MidiAppClient` pour l'accès port/émission; éviter d'y intégrer la logique `controls.midi`

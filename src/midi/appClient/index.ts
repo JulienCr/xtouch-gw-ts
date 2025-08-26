@@ -3,16 +3,14 @@ import { logger } from "../../logger";
 import type { ControlMidiSpec } from "../../types";
 import type { AppConfig, PageConfig } from "../../config";
 import { findPortIndexByNameFragment } from "../ports";
+import { to7bitFrom14bit } from "../convert"; // MODIF: centralise conversion 14b→7b
+import { rawFromPb14, rawFromControlChange, rawFromNoteOn } from "../bytes"; // MODIF: centralise construction bytes
 import { scheduleFaderSetpoint } from "../../xtouch/faderSetpoint";
 import { clamp, getGlobalXTouch, hasPassthroughForApp, markAppOutgoingAndForward } from "./core";
 import { ensureFeedbackOpen } from "./feedback";
 import { resolveAppKey } from "../../shared/appKey";
 
-function scale14to7(v14: number): number {
-  // 0..16383 → 0..127 using integer arithmetic to avoid FP artifacts
-  const v = Math.min(Math.max(v14 | 0, 0), 16383);
-  return (v * 127 + 8191) >> 14; // round with bias compensation
-}
+// MODIF: supprimé scale14to7 (remplacé par to7bitFrom14bit)
 
 export class MidiAppClient {
   private readonly outPerApp: Map<string, Output> = new Map();
@@ -80,12 +78,11 @@ export class MidiAppClient {
 
     if (spec.type === "note") {
       const note = clamp(Number(spec.note) | 0, 0, 127);
-      // Default velocity to 127 when not provided (typical button press)
       const vel = (typeof value === "number" && Number.isFinite(value))
         ? clamp((value as number) | 0, 0, 127)
         : 127;
-      const bytes: number[] = [status, note, vel];
-      this.sendSafe(appKey, out, bytes, needle);
+      const bytes = rawFromNoteOn(channel, note, vel); // MODIF
+      this.sendSafe(appKey, out, bytes as unknown as number[], needle);
       if (!hasPassthroughForApp(appKey)) {
         markAppOutgoingAndForward(appKey, bytes, needle);
       }
@@ -95,9 +92,9 @@ export class MidiAppClient {
 
     if (spec.type === "cc") {
       const cc = clamp(Number(spec.cc) | 0, 0, 127);
-      const v7 = clamp(scale14to7((Number(value)) | 0), 0, 127);
-      const bytes: number[] = [status, cc, v7];
-      this.sendSafe(appKey, out, bytes, needle);
+      const v7 = clamp(to7bitFrom14bit((Number(value)) | 0), 0, 127); // MODIF
+      const bytes = rawFromControlChange(channel, cc, v7); // MODIF
+      this.sendSafe(appKey, out, bytes as unknown as number[], needle);
       if (!hasPassthroughForApp(appKey)) {
         markAppOutgoingAndForward(appKey, bytes, needle);
       }
@@ -106,14 +103,30 @@ export class MidiAppClient {
     }
 
     const v14 = clamp(Number(value) | 0, 0, 16383);
-    const lsb = v14 & 0x7f;
-    const msb = (v14 >> 7) & 0x7f;
-    const bytes: number[] = [status, lsb, msb];
-    this.sendSafe(appKey, out, bytes, needle);
+    const bytes = rawFromPb14(channel, v14); // MODIF
+    this.sendSafe(appKey, out, bytes as unknown as number[], needle);
     const xt = getGlobalXTouch();
     if (xt) scheduleFaderSetpoint(xt, channel, v14);
     if (!hasPassthroughForApp(appKey)) {
       markAppOutgoingAndForward(appKey, bytes, needle);
+    }
+    ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+  }
+
+  /**
+   * Envoie des octets bruts (passthrough generique) via l'app clé.
+   * Conserve les effets de bord (forward/feedback) comme pour `type: "passthrough"`.
+   */
+  async sendRaw(app: string, bytes: number[]): Promise<void> {
+    const appKey = String(app).trim();
+    const needle = this.appToOutName.get(appKey) || appKey;
+    const out = await this.ensureOutOpen(appKey, needle, true);
+    if (!out) return;
+    const tx = (Array.isArray(bytes) ? bytes.map((n) => clamp(Number(n) | 0, 0, 127)) : []);
+    if (tx.length === 0) return;
+    this.sendSafe(appKey, out, tx, needle);
+    if (!hasPassthroughForApp(appKey)) {
+      markAppOutgoingAndForward(appKey, tx, needle);
     }
     ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
   }

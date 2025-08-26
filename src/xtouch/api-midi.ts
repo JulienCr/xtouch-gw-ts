@@ -1,4 +1,4 @@
-import { rawFromPb14 } from "../midi/utils";
+import { rawFromPb14 } from "../midi/bytes"; // MODIF: centraliser via bytes.ts
 
 export type RawSender = { sendRawMessage(bytes: number[]): void };
 

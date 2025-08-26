@@ -41,6 +41,10 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Leçon: centraliser la resynchro côté Router/CLI, laisser chaque driver gérer sa lecture d'état.
  - 2025-08-22 — Perte de ports MIDI Windows (RtMidi WinMM) et reconnexion
  - 2025-08-26 — Unifier l’émission MIDI (architecture)
+ - 2025-08-26 — Mise en place convert/bytes + usages (partiel)
+   - Décision: centraliser conversions (convert.ts) et construction trames (bytes.ts).
+   - Implémentation: `to7bitFrom14bit` utilisé dans `midi/transform.ts`; `rawFromNoteOn/Cc/Pb14` utilisés dans `midi/appClient` et import `rawFromPb14` depuis `xtouch/api-midi.ts`.
+   - Leçon: DRY sur les chemins d’émission, prépare la délégation OUT unique via `MidiAppClient.sendRaw()`.
   - Constat: trois implémentations (xtouch/api-midi, midi/appClient, drivers/midibridge) dupliquent la construction des trames et la conversion 14b→7b.
   - Décision: viser une façade unique d’émission OUT via `MidiAppClient` (orchestrateur). Le MidiBridge applique filtre/transform puis délègue l’envoi (passthrough bytes) à l’orchestrateur. Les helpers `xtouch/api-midi` restent optionnels ou délèguent via DI. Détails: `docs/refactor-midi-send.md` (Option B recommandée).
   - Leçon: centraliser effets de bord (forward, feedback, setpoints, reconnexion) pour éviter dérives et latence.
