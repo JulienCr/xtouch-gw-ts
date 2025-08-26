@@ -2,7 +2,6 @@ import { logger, setLogLevel } from "./logger";
 import { loadConfig, findConfigPath, watchConfig, AppConfig } from "./config";
 import type { PageConfig } from "./config";
 import { Router } from "./router";
-import { VoicemeeterDriver } from "./drivers/voicemeeter";
 import { MidiBridgeDriver } from "./drivers/midibridge";
 import { attachCli } from "./cli";
 import { getPagePassthroughItems } from "./config/passthrough";
@@ -96,7 +95,6 @@ export async function startApp(): Promise<() => Promise<void>> {
 
   // X-Touch: ouvrir les ports définis dans config.yaml
   let xtouch: import("./xtouch/driver").XTouchDriver | null = null;
-  let vmBridge: VoicemeeterDriver | null = null;
   let pageBridges: MidiBridgeDriver[] = [];
   
   // Listeners en arrière-plan pour capter le feedback des apps hors page active
@@ -154,27 +152,6 @@ export async function startApp(): Promise<() => Promise<void>> {
 
     // Reset déplacé dans startXTouchAndNavigation pour s'exécuter plus tôt
 
-    // Si aucune page ne définit de passthrough, activer le bridge global vers Voicemeeter
-    const hasPagePassthrough = (router.getPagesMerged() ?? []).some(
-      (p) => !!(p as any).passthrough || (Array.isArray((p as any).passthroughs) && (p as any).passthroughs.length > 0)
-    );
-    if (!hasPagePassthrough) {
-      // Enregistrer un claim global pour éviter l'ouverture en double côté MidiAppClient
-      try {
-        const g = (global as unknown as { __appBridges__?: Set<string> });
-        if (!g.__appBridges__) (global as any).__appBridges__ = new Set<string>();
-        (global as any).__appBridges__.add("voicemeeter");
-      } catch {}
-      vmBridge = new VoicemeeterDriver(x, {
-        toVoicemeeterOutName: "xtouch-gw",
-        fromVoicemeeterInName: "xtouch-gw-feedback",
-      }, (appKey2, raw, portId) => router.onMidiFromApp(appKey2, raw, portId));
-      await vmBridge.init();
-      logger.info("Mode bridge global Voicemeeter actif (aucun passthrough par page détecté).");
-    } else {
-      logger.info("Mode passthrough par page actif (bridge global désactivé).");
-    }
-
     // Initialiser bridge pour page active si défini
     const initialPage = router.getActivePage();
     try { (global as any).__controlMidiSender__?.reconcileForPage?.(initialPage); } catch {}
@@ -187,7 +164,7 @@ export async function startApp(): Promise<() => Promise<void>> {
     // Forcer un refresh après l'init pour rejouer l'état connu
     try { router.refreshPage(); } catch {}
   } catch (err) {
-    logger.warn("X-Touch/Voicemeeter non connecté:", (err as any)?.message ?? err);
+    logger.warn("X-Touch non connecté:", (err as any)?.message ?? err);
   }
 
   // CLI & arrêt propre
@@ -213,8 +190,6 @@ export async function startApp(): Promise<() => Promise<void>> {
     try { persistence.unsubState(); } catch {}
     try { stopWatch(); } catch {}
     try { for (const b of pageBridges) b.shutdown().catch(() => {}); } catch {}
-    try { vmBridge?.shutdown(); } catch {}
-    try { (global as any).__appBridges__?.delete?.("voicemeeter"); } catch {}
     try { await shutdownControlMidiSender(); } catch {}
     
     try { xtouch?.stop(); } catch {}
