@@ -4,10 +4,15 @@ import type { ControlMidiSpec } from "../../types";
 import type { AppConfig, PageConfig } from "../../config";
 import { findPortIndexByNameFragment } from "../ports";
 import { scheduleFaderSetpoint } from "../../xtouch/faderSetpoint";
-import { resolvePbToCcMappingForApp } from "../../router/page";
-import { clamp, getGlobalXTouch, hasPassthroughForApp, hasPassthroughAnywhereForApp, markAppOutgoingAndForward } from "./core";
+import { clamp, getGlobalXTouch, hasPassthroughForApp, markAppOutgoingAndForward } from "./core";
 import { ensureFeedbackOpen } from "./feedback";
 import { resolveAppKey } from "../../shared/appKey";
+
+function scale14to7(v14: number): number {
+  // 0..16383 → 0..127 using integer arithmetic to avoid FP artifacts
+  const v = Math.min(Math.max(v14 | 0, 0), 16383);
+  return (v * 127 + 8191) >> 14; // round with bias compensation
+}
 
 export class MidiAppClient {
   private readonly outPerApp: Map<string, Output> = new Map();
@@ -90,33 +95,7 @@ export class MidiAppClient {
 
     if (spec.type === "cc") {
       const cc = clamp(Number(spec.cc) | 0, 0, 127);
-      // Default behavior for button-triggered CC without explicit value: send 127 on press
-      // This covers mappings where a Note press (value undefined) triggers a CC emission.
-      let v7 = 127;
-      if (typeof value === "number" && Number.isFinite(value)) {
-        const v = value as number;
-        if (v > 127) {
-          v7 = Math.round(clamp(v, 0, 16383) / 16383 * 127);
-          const xt = getGlobalXTouch();
-          if (xt) {
-            let mappedChannel: number | null = null;
-            try {
-              const g = (global as unknown as { __router__?: { getActivePage: () => PageConfig | undefined } }).__router__;
-              const page = g?.getActivePage?.();
-              if (page) {
-                const m = resolvePbToCcMappingForApp(page, appKey as any);
-                const ch = m?.channelForCc?.get(cc);
-                if (typeof ch === "number" && Number.isFinite(ch) && ch >= 1 && ch <= 16) mappedChannel = ch;
-              }
-            } catch {}
-            if (mappedChannel != null) {
-              scheduleFaderSetpoint(xt, mappedChannel, clamp((value as number) | 0, 0, 16383));
-            }
-          }
-        } else {
-          v7 = clamp(v | 0, 0, 127);
-        }
-      }
+      const v7 = clamp(scale14to7((Number(value)) | 0), 0, 127);
       const bytes: number[] = [status, cc, v7];
       this.sendSafe(appKey, out, bytes, needle);
       if (!hasPassthroughForApp(appKey)) {

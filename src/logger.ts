@@ -27,7 +27,22 @@ function shouldLog(level: LogLevel): boolean {
 function format(level: LogLevel, message: unknown, ...args: unknown[]): string {
   const ts = new Date().toISOString();
   const base = `[${ts}] [${level.toUpperCase()}]`;
-  const text = [message, ...args].map(String).join(" ");
+  
+  const formatValue = (value: unknown): string => {
+    if (value === null) return "null";
+    if (value === undefined) return "undefined";
+    if (typeof value === "object") {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
+      }
+    }
+    return String(value);
+  };
+  
+  const text = [message, ...args].map(formatValue).join(" ");
+  
   switch (level) {
     case "error":
       return chalk.red.bold(`${base} ${text}`);

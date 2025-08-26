@@ -5,6 +5,7 @@ import { parseNumberMaybeHex, pb14FromRaw } from "./utils";
  * Transformations sortantes (X-Touch → cible).
  */
 export function applyTransform(data: number[], t?: TransformConfig): number[] | null {
+
   if (!t) return data;
   // PitchBend → NoteOn
   if (t.pb_to_note) {
@@ -51,10 +52,3 @@ export function applyTransform(data: number[], t?: TransformConfig): number[] | 
 
   return data;
 }
-
-/**
- * Transformations inverses pour feedback (cible → X-Touch).
- */
-// Note: reverse transformations are now handled by the router/page mapping layer.
-
-

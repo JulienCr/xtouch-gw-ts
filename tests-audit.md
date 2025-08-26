@@ -224,6 +224,19 @@ Prochaines étapes
 - Tests: `pnpm test:unit` et `pnpm test` verts.
 
 2025-08-25 — Étude multi-messages par contrôle
+2025-08-26 — Refactor MIDI send (déduplication)
+- Ajout doc: `docs/refactor-midi-send.md`.
+- Plan tests à ajouter:
+  - Unitaires `src/midi/bytes.ts`: rawFromNoteOn/Cc/Pb14 (bornes, idempotence, statuts corrects).
+  - Intégration `midi/appClient`: ordre d’envoi, conversion 14b→7b pour CC, setpoint faders mappés.
+  - Intégration `drivers/midibridge`: applyTransform(pb_to_cc/pb_to_note), squelch PB, reconnexion.
+
+2025-08-26 — Centralisation des conversions 14b↔7b/8b/percent
+- À créer: `src/midi/convert.ts` (helpers de conversion canonique).
+- Tests à ajouter:
+  - Unitaires: bornes, arrondis exacts (sans FP), inverses 7b/14b.
+  - Property-based (fast-check): monotonicité, idempotence bornée, absence de dépassement.
+
 - Ajout: `docs/multi-messages-control.md` (faisabilité, impacts, schéma Mermaid, plan/étapes).
 - Impact tests (à prévoir):
   - Unitaires `services/controlMidiSender`: fan‑out séquentiel, press/release, erreurs partielles (best-effort), PB14→CC7b sur chaque message.

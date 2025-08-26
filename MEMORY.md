@@ -40,6 +40,11 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Solution: nouveau hook optionnel `Driver.sync()` appelé via `Router.syncDrivers()`, et commande CLI `sync` enchaînant reset X‑Touch → reload snapshot → sync drivers → refresh page/LCD.
   - Leçon: centraliser la resynchro côté Router/CLI, laisser chaque driver gérer sa lecture d'état.
  - 2025-08-22 — Perte de ports MIDI Windows (RtMidi WinMM) et reconnexion
+ - 2025-08-26 — Unifier l’émission MIDI (architecture)
+  - Constat: trois implémentations (xtouch/api-midi, midi/appClient, drivers/midibridge) dupliquent la construction des trames et la conversion 14b→7b.
+  - Décision: viser une façade unique d’émission OUT via `MidiAppClient` (orchestrateur). Le MidiBridge applique filtre/transform puis délègue l’envoi (passthrough bytes) à l’orchestrateur. Les helpers `xtouch/api-midi` restent optionnels ou délèguent via DI. Détails: `docs/refactor-midi-send.md` (Option B recommandée).
+  - Leçon: centraliser effets de bord (forward, feedback, setpoints, reconnexion) pour éviter dérives et latence.
+
   - Symptôme: erreurs "MidiOutWinMM::openPort" / "Internal RtMidi error" lors de pertes ou verrouillages de ports (ex: qlc-in), parfois après déconnexions.
   - Solution: ajout d'une reconnexion automatique avec backoff léger.
     - MidiAppClient: `sendSafe()` et `scheduleOutRetry()`; relance OUT quand open ou send échoue.
@@ -52,6 +57,7 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
     - **Feedback manquant pour controls.midi**: Pas de mise à jour de l'état après envoi. Fix: ouverture de ports d'entrée dédiés + optimistic update immédiat du state. Ajustement: éviter les double-ouvertures en skip si passthrough sur n'importe quelle page.
     - **Désynchronisation entre pages**: Fader déplacé sur page passthrough non reflété sur page controls.midi. Fix: optimistic update dans midiBridge + controlMidiSender pour maintenir le state à jour.
   - **Leçons apprises:**
+  - Décision (conversions): multiples implémentations 14b→7b/percent détectées (appClient.scale14to7, valueOverlay, transform). Centraliser dans `src/midi/convert.ts` pour éviter les divergences d’arrondi et faciliter les tests de propriétés.
     - **Gestion des ports MIDI**: Un seul service doit "posséder" les ports IN/OUT pour une app donnée. Prioriser les passthroughs sur les controls.midi.
     - **Optimistic updates**: Mettre à jour le state immédiatement après envoi MIDI pour éviter les désynchronisations lors des changements de page.
     - **Filtrage des événements**: Ne traiter les événements controls.midi que quand ils sont explicitement mappés sur la page active.
