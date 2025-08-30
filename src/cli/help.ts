@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import YAML from "yaml";
 import chalk from "chalk";
+import { levenshtein } from "./levenshtein";
 
 /**
  * v1 (legacy) entry used to transform old YAML to v2.
@@ -284,23 +285,7 @@ function stringWidth(str: string): number { return stripAnsi(str).length; }
 
 function writeLine(s: string): void { process.stdout.write(s + "\n"); }
 
-function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length;
-  const dp = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + cost
-      );
-    }
-  }
-  return dp[m][n];
-}
+// levenshtein centralisé dans src/cli/levenshtein.ts
 
 function wrapText(text: string, width: number): string {
   const words = (text || "").split(/\s+/);

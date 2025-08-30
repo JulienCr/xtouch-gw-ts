@@ -15,7 +15,7 @@ Plan (vivant)
   - Fait: `src/shared/num.ts` (clamp) et `src/shared/time.ts` (delay) ajoutés.
   - Fait: `xtouch/api-midi.ts` utilise clamp+delay partagés; `animations/*` et `test-utils/*` utilisent delay partagé.
   - Fait: `midi/appClient/core.ts` ré‑exporte clamp depuis shared.
-  - À faire: déporter la version interne de Levenshtein dans `help.ts` vers `cli/levenshtein`.
+  - Fait: déport de Levenshtein interne (help.ts) → import depuis `cli/levenshtein`.
 - [~] Remplacer les clamps “manuels” par les builders centralisés
   - Fait: `midi/transform.ts` s’appuie sur `rawFrom*` et `to7bitFrom14bit` (bornage central).
   - À faire: nettoyer les clamps redondants restants (voir duplications ci‑dessous).
