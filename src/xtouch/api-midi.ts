@@ -9,7 +9,7 @@ export function sendNoteOn(driver: RawSender, channel: number, note: number, vel
   driver.sendRawMessage([0x90 + (ch - 1), n, v]);
 }
 
-export function sendNoteOff(driver: RawSender, channel: number, note: number): void {
+function sendNoteOff(driver: RawSender, channel: number, note: number): void {
   sendNoteOn(driver, channel, note, 0);
 }
 
@@ -69,5 +69,4 @@ export async function resetAll(driver: RawSender, options?: {
 
 function delay(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)); }
 function clamp(n: number, min: number, max: number): number { return Math.max(min, Math.min(max, n)); }
-
 

@@ -32,7 +32,7 @@ export interface MidiTestOptions {
   lcdStepDelayMs?: number;
 }
 
-export const defaultMidiTestOptions: MidiTestOptions = {
+const defaultMidiTestOptions: MidiTestOptions = {
   portNameFragmentOverride: null,
   defaultDelayMs: 150,
   logHex: true,
@@ -134,5 +134,4 @@ export async function runMidiTest(providedSender?: xtapi.RawSender, override?: P
     try { cleanup?.(); } catch {}
   }
 }
-
 
