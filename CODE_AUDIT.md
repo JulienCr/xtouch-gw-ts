@@ -6,15 +6,22 @@ Objectif
 
 Contexte d’exécution pour cet audit
 - Node local: v12.22.9. Le projet requiert Node >= 24.1.0. Les scripts `pnpm deadcode`/`knip` ne peuvent pas être exécutés ici.
+  - Fait (branche chore/cleanup/knip-deadcode): exécution locale de Knip, suppression des fichiers non référencés, réduction des exports inutilisés et ajustements de config.
 - Actions proposées pour une passe “outillée” côté dev: `fnm use 24` ou `nvm use 24` puis `pnpm i && pnpm deadcode` (ou `pnpm deadcode:strict`).
 
 Plan (vivant)
-- [ ] Lancer Knip et intégrer les résultats ici (dès Node 24 dispo)
+- [x] Lancer Knip et intégrer les résultats ici (branche chore/cleanup/knip-deadcode)
 - [ ] Déduplication helpers: clamp/delay/Levenshtein/bytes MIDI
 - [ ] Remplacer les clamps “manuels” par les builders centralisés
 - [ ] Harmoniser la construction des trames Note/CC/PB
 - [ ] Uniformiser le parsing hex (`parseNumberMaybeHex`)
-- [ ] Vérifier et enlever le code mort (CLI runtime/misc)
+- [x] Vérifier et enlever le code mort (CLI runtime/misc)
+      - Supprimés: `src/cli/runtime.ts`, `src/cli/commands/misc.ts`, `src/drivers/voicemeeter.ts`
+      - Dépendance retirée: `voicemeeter-connector` (non utilisée)
+      - Ajout dev: `@typescript-eslint/utils` (pour eslint.config.mjs)
+      - Knip: ignore le binaire `pwsh` et ne considère plus `typedoc.json` comme unresolved
+      - Exports rendus internes pour réduire le bruit Knip: `defaultMidiTestOptions` (test-utils), `computeAnchorFromAlignment` (OBS transforms), `updateFunctionKeyLeds` (xtouch/fkeys), `sendNoteOff` (xtouch/api-midi), `sendLcdStripLowerText` (xtouch/api-lcd)
+      - Nettoyage convert: suppression de `to7bitFromNormalized` et du re-export `rawFromPb14` (préférer `src/midi/bytes`)
 
 —
 
@@ -71,12 +78,11 @@ Duplications repérées (avec références)
 
 —
 
-Code mort (candidats)
-- src/cli/runtime.ts
-  - Non référencé (recherche globale). Contient `createMidiSniffer`, `toHex`, `clearConsole` — jamais importés.
-- src/cli/commands/misc.ts
-  - Non référencé. Duplique `completion`/`help`/`version` déjà implémentés dans `src/cli/commands.ts`.
-- Action: valider avec Knip puis supprimer; ou réintégrer explicitement si conservés.
+Code mort
+- Supprimés suite à validation Knip:
+  - `src/cli/runtime.ts`
+  - `src/cli/commands/misc.ts`
+  - `src/drivers/voicemeeter.ts`
 
 —
 
@@ -114,4 +120,3 @@ Annexes — commandes utiles
 
 Notes
 - Ce document sert de base d’itération: cochez, ajoutez des items, ou demandez‑moi d’appliquer un lot ciblé (ex.: “remplacer les clamps et delays”).
-
