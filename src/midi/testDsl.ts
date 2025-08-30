@@ -1,5 +1,5 @@
 import { rawFromPb14, parseNumberMaybeHex } from "../midi/utils";
-import { rawFromNoteOn, rawFromNoteOff } from "../midi/bytes";
+import { rawFromNoteOn, rawFromNoteOff, rawFromControlChange } from "../midi/bytes";
 
 export type ParsedWait = { kind: "Wait"; ms: number };
 export type ParsedRaw = { kind: "Raw"; bytes: [number, number, number]; label: string };
@@ -32,8 +32,7 @@ export function parseCommand(line: string, opts: { defaultDelayMs: number; noteO
   if (cmd === "cc" || cmd === "controlchange") {
     const cc = toInt(params.cc ?? params.control ?? params.num, 0) & 0x7f;
     const val = toInt(params.value ?? params.val, 0) & 0x7f;
-    const status = 0xb0 + (ch - 1);
-    const bytes: [number, number, number] = [status, cc, val];
+    const bytes = rawFromControlChange(ch, cc, val);
     return { kind: "Raw", bytes, label: `CC ch=${ch} cc=${cc} val=${val}` };
   }
   if (cmd === "pb" || cmd === "pitchbend") {
