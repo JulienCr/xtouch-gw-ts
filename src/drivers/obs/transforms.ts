@@ -11,7 +11,7 @@ export interface ObsItemState {
 
 export interface ObsDelta { dx?: number; dy?: number; ds?: number }
 
-export function computeAnchorFromAlignment(alignment: number | undefined): { anchorX: number; anchorY: number } {
+function computeAnchorFromAlignment(alignment: number | undefined): { anchorX: number; anchorY: number } {
 	const a = alignment ?? 0;
 	const left = (a & 1) !== 0; const right = (a & 2) !== 0; const top = (a & 4) !== 0; const bottom = (a & 8) !== 0;
 	return { anchorX: left ? 0 : right ? 1 : 0.5, anchorY: top ? 0 : bottom ? 1 : 0.5 };
@@ -148,5 +148,4 @@ export class EncoderSpeedTracker {
 	clearHistory(encoderId: string): void { this.stateByEncoder.delete(encoderId); }
 	clearAllHistory(): void { this.stateByEncoder.clear(); }
 }
-
 

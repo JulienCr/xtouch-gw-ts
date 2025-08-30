@@ -5,7 +5,7 @@ import { F_KEY_NOTES } from "./constants";
 /**
  * Allume/éteint les LEDs F1..F8 selon l'index actif.
  */
-export function updateFunctionKeyLeds(x: XTouchDriver, channel1to16: number, notes: number[], activeIndex: number): void {
+function updateFunctionKeyLeds(x: XTouchDriver, channel1to16: number, notes: number[], activeIndex: number): void {
 	const ch = Math.max(1, Math.min(16, channel1to16)) | 0;
 	for (let i = 0; i < notes.length; i += 1) {
 		const note = notes[i] | 0;
@@ -29,5 +29,4 @@ export function updatePrevNextLeds(x: XTouchDriver, channel1to16: number, prevNo
 	x.sendRawMessage([status, Math.max(0, Math.min(127, prevNote | 0)), 0x7F]);
 	x.sendRawMessage([status, Math.max(0, Math.min(127, nextNote | 0)), 0x7F]);
 }
-
 
