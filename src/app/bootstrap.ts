@@ -6,6 +6,7 @@ import type { AppConfig, PagingConfig, PageConfig } from "../config";
 import { XTouchDriver } from "../xtouch/driver";
 import { applyLcdForActivePage } from "../ui/lcd";
 import { updateFKeyLedsForActivePage, updatePrevNextLeds } from "../xtouch/fkeys";
+import { getInputLookups } from "../xtouch/matching";
 import { attachFaderValueOverlay } from "../xtouch/valueOverlay";
 import { BackgroundListenerManager } from "../midi/backgroundListeners";
 import { attachNavigation } from "./navigation";
@@ -35,10 +36,20 @@ export function createBackgroundManager(router: Router) {
 }
 
 function toRequiredPaging(cfg: AppConfig): Required<PagingConfig> {
+  const mode = cfg.xtouch?.mode ?? "mcu";
+  let defaultPrev = 46;
+  let defaultNext = 47;
+  try {
+    const { noteToControl } = getInputLookups(mode);
+    const noteByControl = new Map<string, number>();
+    for (const [note, ctrl] of noteToControl.entries()) noteByControl.set(ctrl, note);
+    defaultPrev = noteByControl.get("bank_left") ?? defaultPrev;
+    defaultNext = noteByControl.get("bank_right") ?? defaultNext;
+  } catch {}
   return {
     channel: cfg.paging?.channel ?? 1,
-    prev_note: cfg.paging?.prev_note ?? 46,
-    next_note: cfg.paging?.next_note ?? 47,
+    prev_note: cfg.paging?.prev_note ?? (defaultPrev as number),
+    next_note: cfg.paging?.next_note ?? (defaultNext as number),
   } as any;
 }
 
@@ -73,13 +84,14 @@ export async function startXTouchAndNavigation(router: Router, options: StartXTo
   router.attachXTouch(xtouch);
   applyLcdForActivePage(router, xtouch);
   const paging = toRequiredPaging(config);
-  try { updateFKeyLedsForActivePage(router, xtouch, paging.channel); } catch {}
+  try { updateFKeyLedsForActivePage(router, xtouch, paging.channel, config.xtouch?.mode ?? "mcu"); } catch {}
   try { updatePrevNextLeds(xtouch, paging.channel, paging.prev_note, paging.next_note); } catch {}
 
   const unsubscribeNavigation = attachNavigation({
     router,
     xtouch,
     paging,
+    mode: config.xtouch?.mode ?? "mcu",
     onAfterPageChange: (page) => onAfterPageChange(xtouch, page, paging),
   });
 
@@ -88,5 +100,3 @@ export async function startXTouchAndNavigation(router: Router, options: StartXTo
 
   return { xtouch, unsubscribeNavigation, paging };
 }
-
-

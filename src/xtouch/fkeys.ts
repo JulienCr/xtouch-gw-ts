@@ -1,6 +1,7 @@
 import type { Router } from "../router";
 import type { XTouchDriver } from "./driver";
-import { F_KEY_NOTES } from "./constants";
+import type { XTouchMode } from "../config";
+import { getInputLookups } from "./matching";
 import { clamp } from "../shared/num";
 
 /**
@@ -17,10 +18,25 @@ function updateFunctionKeyLeds(x: XTouchDriver, channel1to16: number, notes: num
 }
 
 /** Met à jour les LEDs F1..F8 pour refléter la page active. */
-export function updateFKeyLedsForActivePage(router: Router, x: XTouchDriver, pagingChannel: number): void {
+function getFKeyNotes(mode: XTouchMode): number[] {
+  const lookup = getInputLookups(mode);
+  const noteByControl = new Map<string, number>();
+  for (const [note, ctrlId] of lookup.noteToControl.entries()) {
+    noteByControl.set(ctrlId, note);
+  }
+  const out: number[] = [];
+  for (let i = 1; i <= 8; i += 1) {
+    const n = noteByControl.get(`f${i}`);
+    if (typeof n === "number") out.push(n);
+  }
+  return out;
+}
+
+export function updateFKeyLedsForActivePage(router: Router, x: XTouchDriver, pagingChannel: number, mode: XTouchMode): void {
 	const pages = router.listPages();
 	const activeIdx = Math.max(0, pages.findIndex((n) => n === router.getActivePageName()));
-	updateFunctionKeyLeds(x, pagingChannel, F_KEY_NOTES, Math.min(activeIdx, F_KEY_NOTES.length - 1));
+	const notes = getFKeyNotes(mode);
+	updateFunctionKeyLeds(x, pagingChannel, notes, Math.min(activeIdx, Math.max(0, notes.length - 1)));
 }
 
 /** Allume en permanence les boutons Prev/Next de pagination. */

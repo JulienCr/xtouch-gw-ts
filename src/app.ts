@@ -67,7 +67,7 @@ export async function startApp(): Promise<() => Promise<void>> {
           // Mettre à jour l'état des LEDs F1..F8 après reload
           try {
             const pagingCh = (cfg.paging?.channel ?? 1) | 0;
-            updateFKeyLedsForActivePage(router, x, pagingCh);
+            updateFKeyLedsForActivePage(router, x, pagingCh, cfg.xtouch?.mode ?? "mcu");
           } catch {}
           // Rebrancher l'InputMapper générique (mode/canal peuvent changer)
           try { detachInputMapper?.(); } catch {}
@@ -109,7 +109,7 @@ export async function startApp(): Promise<() => Promise<void>> {
     const { xtouch: x, unsubscribeNavigation, paging } = await startXTouchAndNavigation(router, {
       config: cfg,
       onAfterPageChange: (x, page, paging) => {
-        try { updateFKeyLedsForActivePage(router, x, paging.channel); } catch {}
+        try { updateFKeyLedsForActivePage(router, x, paging.channel, cfg.xtouch?.mode ?? "mcu"); } catch {}
         applyLcdForActivePage(router, x);
         rebuildBackgroundListeners(page);
         // MODIF: synchroniser les entrées feedback de controls.midi avec la page (fermer celles couverts par passthroughs)

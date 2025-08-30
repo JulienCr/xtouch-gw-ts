@@ -1,7 +1,8 @@
 import type { Router } from "../router";
 import type { XTouchDriver } from "../xtouch/driver";
-import type { PagingConfig, PageConfig } from "../config";
+import type { PagingConfig, PageConfig, XTouchMode } from "../config";
 import { updatePrevNextLeds } from "../xtouch/fkeys";
+import { getInputLookups } from "../xtouch/matching";
 
 export interface NavigationDeps {
   /** Router applicatif contrôlant les pages */
@@ -10,6 +11,7 @@ export interface NavigationDeps {
   xtouch: XTouchDriver;
   /** Configuration de pagination (canal + notes prev/next) */
   paging: Required<PagingConfig>;
+  mode: XTouchMode;
   /** Callback invoqué après un changement de page effectif */
   onAfterPageChange?: (page: PageConfig | undefined) => void;
 }
@@ -24,8 +26,23 @@ export interface NavigationDeps {
  * @returns Fonction d'unsubscribe pour détacher les listeners
  */
 export function attachNavigation(deps: NavigationDeps): () => void {
-  const { router, xtouch, paging, onAfterPageChange } = deps;
+  const { router, xtouch, paging, mode, onAfterPageChange } = deps;
   let cooldownUntil = 0;
+  const fkeyNotes = (() => {
+    try {
+      const { noteToControl } = getInputLookups(mode);
+      const noteByControl = new Map<string, number>();
+      for (const [note, ctrl] of noteToControl.entries()) noteByControl.set(ctrl, note);
+      const arr: number[] = [];
+      for (let i = 1; i <= 8; i += 1) {
+        const n = noteByControl.get(`f${i}`);
+        if (typeof n === "number") arr.push(n);
+      }
+      return arr;
+    } catch {
+      return [54,55,56,57,58,59,60,61];
+    }
+  })();
 
   const unsub = xtouch.subscribe((_delta, data) => {
     const status = data[0] ?? 0;
@@ -47,7 +64,7 @@ export function attachNavigation(deps: NavigationDeps): () => void {
         if (note === paging.prev_note) { router.prevPage(); changed = true; }
         if (note === paging.next_note) { router.nextPage(); changed = true; }
       } else {
-        const idx = [54,55,56,57,58,59,60,61].indexOf(note);
+        const idx = fkeyNotes.indexOf(note);
         if (idx >= 0) { router.setActivePage(idx); changed = true; }
       }
       if (!changed) return;
@@ -65,5 +82,3 @@ export function attachNavigation(deps: NavigationDeps): () => void {
     try { unsub(); } catch {}
   };
 }
-
-
