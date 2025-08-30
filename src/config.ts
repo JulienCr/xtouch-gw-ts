@@ -202,7 +202,18 @@ export interface AppConfig {
       path?: string;
       /** Fichier CSV de mapping (voir script de calibration) */
       mapping_csv?: string;
-    }
+    };
+    /** Réglages analogiques (facultatif) */
+    analog?: {
+      /** Gain de pan (px/tick à v=1, step=1) — défaut 15 */
+      pan_gain?: number;
+      /** Gain de zoom (échelle/tick à v=1, base=1) — défaut 3 */
+      zoom_gain?: number;
+      /** Deadzone analogique (0..1) — défaut 0.02 */
+      deadzone?: number;
+      /** Gamma (courbe de réponse) — défaut 1.5 */
+      gamma?: number;
+    };
   };
   /** Configuration X‑Touch (mode, etc.) */
   xtouch?: XTouchConfig;

@@ -31,6 +31,11 @@ paging:
 gamepad:
   enabled: true
   provider: hid
+  analog:
+    pan_gain: 15
+    zoom_gain: 1.1
+    deadzone: 0.02
+    gamma: 1.5
   hid:
     product_match: "Faceoff Wired Pro Controller"
     mapping_csv: ./docs/gamepad-hid-mapping.csv
@@ -44,7 +49,30 @@ pages_global:
     # Gamepad: mêmes actions que les 3 VPOTs (test boutons)
     gamepad.axis.lx: { app: "obs", action: "nudgeX", params: ["--- CAM Main 2", "--- CAM Main", 1] }
     gamepad.axis.ly: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 1] }
-    gamepad.axis.ry: { app: "obs", action: "scaleUniform", params: ["--- CAM Main 2", "--- CAM Main", 0.02] }
+    gamepad.axis.ry: 
+      app: "obs"
+      action: "scaleUniform"
+      params: ["--- CAM Main 2", "--- CAM Main", 0.01]
+
+    gamepad.btn.a:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Main 2"]
+
+    gamepad.btn.b:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Main"]
+
+    gamepad.btn.x:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Jardin"]
+
+    gamepad.btn.y:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Cour"]
 
     fader_master:
       app: "qlc"

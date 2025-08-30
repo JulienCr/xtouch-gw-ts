@@ -32,6 +32,23 @@ export class ObsDriver implements Driver {
 	private analogTimer: any | null = null;
 	private lastAnalogTickMs = 0;
 
+	// Analog tuning (can be loaded from config)
+	private analogPanGain = 15; // px per 60Hz tick at full deflection (step=1)
+	private analogZoomGain = 3; // scale per 60Hz tick at full deflection (base=1)
+	private analogDeadzone = 0.02;
+	private analogGamma = 1.5;
+
+	private shapeAnalog(v: number): number {
+		const dead = this.analogDeadzone;
+		if (!Number.isFinite(v)) return 0;
+		if (Math.abs(v) < dead) return 0;
+		const sign = v >= 0 ? 1 : -1;
+		const mag = Math.min(1, Math.max(0, Math.abs(v)));
+		// Gamma curve to avoid on/off feeling: low values give finer control
+		const shaped = Math.pow(mag, this.analogGamma);
+		return sign * shaped;
+	}
+
 	async init(): Promise<void> { await this.connectFromConfig(); }
 
 	/**
@@ -120,8 +137,9 @@ export class ObsDriver implements Driver {
 				const step = Number.isFinite(deltaParam as number) ? Math.abs(Number(deltaParam)) : 2;
 				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
 				if (Number.isFinite(v) && v >= -1 && v <= 1) {
-					const gain = 15; // px per 60Hz tick at full deflection
-					this.setAnalogRate(sceneName, sourceName, { vx: v * step * gain });
+                    const gain = this.analogPanGain; // px per 60Hz tick at full deflection
+					const vv = this.shapeAnalog(v);
+					this.setAnalogRate(sceneName, sourceName, { vx: vv * step * gain });
 					return;
 				}
 				const base = this.resolveStepDelta(deltaParam, context?.value, step);
@@ -134,8 +152,9 @@ export class ObsDriver implements Driver {
 				const step = Number.isFinite(deltaParam as number) ? Math.abs(Number(deltaParam)) : 2;
 				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
 				if (Number.isFinite(v) && v >= -1 && v <= 1) {
-					const gain = 15; // px per 60Hz tick
-					this.setAnalogRate(sceneName, sourceName, { vy: v * step * gain });
+                    const gain = this.analogPanGain; // px per 60Hz tick
+					const vv = this.shapeAnalog(v);
+					this.setAnalogRate(sceneName, sourceName, { vy: vv * step * gain });
 					return;
 				}
 				const base = this.resolveStepDelta(deltaParam, context?.value, step);
@@ -149,8 +168,9 @@ export class ObsDriver implements Driver {
 				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
 				let ds: number;
 				if (Number.isFinite(v) && v >= -1 && v <= 1) {
-					const gain = 3; // per 60Hz tick
-					this.setAnalogRate(sceneName, sourceName, { vs: v * base * gain });
+                    const gain = this.analogZoomGain; // per 60Hz tick
+					const vv = this.shapeAnalog(v);
+					this.setAnalogRate(sceneName, sourceName, { vs: vv * base * gain });
 					return;
 				} else {
 					ds = this.resolveStepDelta(deltaParam, context?.value, base);
@@ -171,7 +191,15 @@ export class ObsDriver implements Driver {
 	private async connectFromConfig(): Promise<void> {
 		try {
 			const p = await findConfigPath(); if (!p) throw new Error("config.yaml introuvable pour OBS.");
-			const cfg = await loadConfig(p);
+      const cfg = await loadConfig(p);
+      // Load analog tuning if present
+      try {
+        const a = (cfg as any).gamepad?.analog || {};
+        if (typeof a.pan_gain === 'number') this.analogPanGain = Math.max(0, a.pan_gain);
+        if (typeof a.zoom_gain === 'number') this.analogZoomGain = Math.max(0, a.zoom_gain);
+        if (typeof a.deadzone === 'number') this.analogDeadzone = Math.min(1, Math.max(0, a.deadzone));
+        if (typeof a.gamma === 'number') this.analogGamma = Math.max(0.5, Math.min(4, a.gamma));
+      } catch {}
 			const host = cfg.obs?.host ?? "127.0.0.1"; const port = cfg.obs?.port ?? 4455; const password = cfg.obs?.password ?? undefined;
 			const url = `ws://${host}:${port}`;
 
