@@ -11,19 +11,17 @@ Contexte d’exécution pour cet audit
 
 Plan (vivant)
 - [x] Lancer Knip et intégrer les résultats ici (branche chore/cleanup/knip-deadcode)
-- [~] Déduplication helpers: clamp/delay/Levenshtein/bytes MIDI
+- [x] Déduplication helpers: clamp/delay/Levenshtein/bytes MIDI
   - Fait: `src/shared/num.ts` (clamp) et `src/shared/time.ts` (delay) ajoutés.
   - Fait: `xtouch/api-midi.ts` utilise clamp+delay partagés; `animations/*` et `test-utils/*` utilisent delay partagé.
   - Fait: `midi/appClient/core.ts` ré‑exporte clamp depuis shared.
-  - Fait: déport de Levenshtein interne (help.ts) → import depuis `cli/levenshtein`.
+  - Fait: Levenshtein: `help.ts` importe `cli/levenshtein`.
+  - Fait: bytes MIDI uniformisés: `xtouch/api-midi.ts`, `xtouch/fkeys.ts`, `router/emit.ts`, `midi/transform.ts`, `midi/testDsl.ts`.
 - [~] Remplacer les clamps “manuels” par les builders centralisés
-  - Fait: `midi/transform.ts` s’appuie sur `rawFrom*` et `to7bitFrom14bit` (bornage central).
-  - À faire: nettoyer les clamps redondants restants (voir duplications ci‑dessous).
-- [~] Harmoniser la construction des trames Note/CC/PB
-  - Fait: `xtouch/driver.ts` → `xtapi.sendPitchBend14`.
-  - Fait: `midi/transform.ts` → `rawFromNoteOn`/`rawFromControlChange`.
-  - Fait: `xtouch/fkeys.ts` → `driver.sendNoteOn` (supprime bytes manuels).
-  - Fait: `router/emit.ts` → supprime clamps redondants, s’appuie sur `rawFrom*`.
+  - Fait: usages critiques migrés (api-midi, fkeys, emit, transform, dsl).
+  - À faire: revue ponctuelle des clamps restants (faible priorité).
+- [x] Harmoniser la construction des trames Note/CC/PB
+  - Résumé: toutes les constructions runtime passent par `rawFrom*` ou `xtapi`.
 - [x] Uniformiser le parsing hex (`parseNumberMaybeHex`)
   - Fait: `router/page.ts` pour `base_cc` et `cc`.
   - Fait: `xtouch/matching.ts` (CSV: note/cc/pb channel).
@@ -42,51 +40,29 @@ Mises à jour (branche: `chore/dedup-midi-helpers`)
 - Commits:
   - chore(dedup): centralize clamp use and PB encoding.
   - refactor(transform): use rawFromNoteOn/rawFromControlChange for byte construction.
+  - refactor(shared): add clamp/time and apply targeted dedup.
+  - refactor(cli): use shared levenshtein in help.ts.
+  - refactor(parse): use parseNumberMaybeHex for CSV/DSL numeric parsing.
+  - refactor(bytes): use rawFrom* in xtouch/api-midi and test DSL.
+  - docs(audit): mark hex parsing harmonization as complete.
 
 Duplications repérées (avec références)
 
 1) clamp (canaux/valeurs)
-- Définition dupliquée: résolu pour `xtouch/api-midi.ts` (utilise désormais la version partagée de `midi/appClient/core`).
-  - Reste: conserver une source unique (proposé: `src/shared/num.ts`) et migrer les imports.
-- Clamps “manuels” récurrents (exemples):
-  - src/xtouch/driver.ts:231, 232
-  - src/xtouch/fkeys.ts:9, 14, 27, 29
-  - src/router/emit.ts:40, 46, 52
-  - src/router/forward.ts:45
-  - src/midi/bytes.ts:10, 18, 26 (déjà centralisés pour Note/CC)
-- Reco:
-  - Introduire `src/shared/num.ts` avec `clamp(n,min,max)` et l’utiliser partout où un clamp “manuel” est écrit.
-  - Côté émission MIDI, préférer les helpers centralisés de `src/midi/bytes.ts` (qui bornent déjà) pour éviter le double clamp.
+- Dédup: source unique proposée `src/shared/num.ts` (déjà utilisée par les modules critiques).
+- Clamps “manuels” résiduels: faible impact; revue ultérieure possible.
 
 2) delay (promesse temporisée)
-- Implémentée à plusieurs endroits identiques:
-  - src/animations/lcdRainbow.ts:52
-  - src/animations/wave.ts:39
-  - src/test-utils/openRawSender.ts:19
-  - src/test-utils/runners.ts:20
-  - src/xtouch/api-midi.ts:70
-- Reco: créer `src/shared/time.ts` exportant `delay(ms)` et l’utiliser partout.
+- Résolu: `src/shared/time.ts` exporte `delay(ms)` et est utilisé par animations/test-utils/api-midi.
 
 3) Levenshtein
-- Implémentation dans deux fichiers:
-  - src/cli/levenshtein.ts:8
-  - src/cli/help.ts:300 (fonction interne)
-- Reco: supprimer la version interne de `help.ts` et importer `./levenshtein`.
+- Résolu: `help.ts` importe `./levenshtein` (suppression dupli interne).
 
 4) Construction des trames MIDI (Note/CC/PB)
-- Progrès:
-  - Résolu: `xtouch/driver.ts` ne construit plus PB manuellement (utilise `xtapi.sendPitchBend14`).
-  - Résolu: `midi/transform.ts` construit via `rawFromNoteOn`/`rawFromControlChange`.
-- Reste à faire:
-  - Note On LED: `xtouch/fkeys.ts` — remplacer par `rawFromNoteOn` ou `xtapi.sendNoteOn`.
-  - `router/emit.ts` — supprimer le double clamp et laisser `rawFrom*` borner.
-  - Audit rapide des autres fichiers pour `0x90/0xB0/0xE0`.
+- Résolu: toutes les constructions runtime passent par `rawFrom*`/`xtapi` (driver, transform, fkeys, emit, testDsl).
 
 5) Parsing hex/numérique
-- Logique ad hoc dans `src/router/page.ts` (ex.: base_cc) alors que `parseNumberMaybeHex` existe:
-  - src/router/page.ts:66–75
-  - Helper dédié: src/midi/utils.ts:39
-- Reco: remplacer les `parseInt` spécifiques par `parseNumberMaybeHex()`; uniformiser l’acceptation `0x..`/`..h`/décimal.
+- Résolu: `router/page.ts`, `xtouch/matching.ts`, `midi/testDsl.ts` utilisent `parseNumberMaybeHex`.
 
 6) Helpers LCD/affichage
 - `ascii7` n’est présent que dans `src/xtouch/api-lcd.ts`, OK.
@@ -120,10 +96,10 @@ Simplifications proposées
 Étapes concrètes (proposition)
 - [ ] Passer la CI/dev sur Node 24+ (scripts pnpm opérationnels)
 - [ ] Lancer `pnpm deadcode` (Knip) et coller le rapport ici
-- [ ] Introduire `src/shared/num.ts` et `src/shared/time.ts` (+ refactor minimal)
-- [ ] Remplacer les constructions MIDI manuelles par `rawFrom*`/`xtapi` (reste: `xtouch/fkeys.ts`, `router/emit.ts`)
-- [ ] Nettoyer `src/cli/help.ts` (import `levenshtein`)
-- [ ] Retester build/tests et cocher les items correspondants
+- [x] Introduire `src/shared/num.ts` et `src/shared/time.ts` (+ refactor minimal)
+- [x] Remplacer les constructions MIDI manuelles par `rawFrom*`/`xtapi`
+- [x] Nettoyer `src/cli/help.ts` (import `levenshtein`)
+- [ ] Retester build/tests en CI et cocher définitivement
 
 —
 
