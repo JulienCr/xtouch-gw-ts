@@ -24,9 +24,10 @@ Plan (vivant)
   - Fait: `midi/transform.ts` → `rawFromNoteOn`/`rawFromControlChange`.
   - Fait: `xtouch/fkeys.ts` → `driver.sendNoteOn` (supprime bytes manuels).
   - Fait: `router/emit.ts` → supprime clamps redondants, s’appuie sur `rawFrom*`.
-- [~] Uniformiser le parsing hex (`parseNumberMaybeHex`)
-  - Fait: `router/page.ts` utilise `parseNumberMaybeHex` pour `base_cc` et `cc`.
-  - À faire: revue d’autres parseurs CC/notes éventuels.
+- [x] Uniformiser le parsing hex (`parseNumberMaybeHex`)
+  - Fait: `router/page.ts` pour `base_cc` et `cc`.
+  - Fait: `xtouch/matching.ts` (CSV: note/cc/pb channel).
+  - Fait: `midi/testDsl.ts` (DSL: toInt via parseNumberMaybeHex, support 0x.., ..h, suffixe n).
 - [x] Vérifier et enlever le code mort (CLI runtime/misc)
       - Supprimés: `src/cli/runtime.ts`, `src/cli/commands/misc.ts`, `src/drivers/voicemeeter.ts`
       - Dépendance retirée: `voicemeeter-connector` (non utilisée)
