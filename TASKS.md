@@ -37,6 +37,7 @@
 - [ ] Tests: couvrir les conversions PB→CC (14b→7b) et la résolution `channelForCc` via `resolvePbToCcMappingForApp()` côté `controlMidiSender`/client partagé
 - [x] Diviser `src/midi/appClient.ts` (>150 lignes) en modules plus petits: `midi/appClient/core.ts` (send/convert/ports), `midi/appClient/feedback.ts` (wiring IN), `midi/appClient/index.ts` (API publique)
 - [ ] JSDoc sur `midi/appClient/*` et points de contact service/driver mis à jour
+ - [x] Nettoyage: retirer DI globale et hardcode "xtouch-orchestrator" de `src/xtouch/api-midi.ts` (helper raw uniquement). — 2025‑08‑28
 
 ## En cours
 - [x] Pages: support d'un bloc `pages_global` (defaults fusionnés dans chaque page; override par page)

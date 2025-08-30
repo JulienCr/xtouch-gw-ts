@@ -48,6 +48,7 @@ But: noter les erreurs, impasses et choix importants pour ne pas les répéter.
   - Constat: trois implémentations (xtouch/api-midi, midi/appClient, drivers/midibridge) dupliquent la construction des trames et la conversion 14b→7b.
   - Décision: viser une façade unique d’émission OUT via `MidiAppClient` (orchestrateur). Le MidiBridge applique filtre/transform puis délègue l’envoi (passthrough bytes) à l’orchestrateur. Les helpers `xtouch/api-midi` restent optionnels ou délèguent via DI. Détails: `docs/refactor-midi-send.md` (Option B recommandée).
   - Leçon: centraliser effets de bord (forward, feedback, setpoints, reconnexion) pour éviter dérives et latence.
+  - Correction: suppression d’un nom d’app hardcodé inexistant ("xtouch-orchestrator") et de la DI globale dans `src/xtouch/api-midi.ts`. Motif: aucun port ne doit être en dur; `api-midi` reste un helper RAW local sans dépendance globale. Tests verts après changement.
 
   - Symptôme: erreurs "MidiOutWinMM::openPort" / "Internal RtMidi error" lors de pertes ou verrouillages de ports (ex: qlc-in), parfois après déconnexions.
   - Solution: ajout d'une reconnexion automatique avec backoff léger.

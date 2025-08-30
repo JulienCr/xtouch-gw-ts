@@ -34,7 +34,9 @@
     "docs:open:html": "pwsh -NoProfile -Command \"Start-Process docs/api-html/index.html\"",
     "web": "node scripts/check-next-build.mjs && pnpm -C web/config-editor start",
     "web:build": "pnpm -C web/config-editor build",
-    "web:dev": "pnpm -C web/config-editor dev"
+    "web:dev": "pnpm -C web/config-editor dev",
+    "deadcode": "knip",
+    "deadcode:strict": "knip --strict"
   },
   "dependencies": {
     "@julusian/midi": "^3.6.1",
@@ -58,6 +60,7 @@
     "typedoc": "^0.28.10",
     "typedoc-plugin-markdown": "^4.8.1",
     "typescript": "^5.9.2",
-    "vitest": "^2.1.9"
+    "vitest": "^2.1.9",
+    "knip": "^5.34.3"
   }
 }
