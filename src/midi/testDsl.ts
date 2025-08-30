@@ -1,4 +1,5 @@
 import { rawFromPb14, parseNumberMaybeHex } from "../midi/utils";
+import { rawFromNoteOn, rawFromNoteOff } from "../midi/bytes";
 
 export type ParsedWait = { kind: "Wait"; ms: number };
 export type ParsedRaw = { kind: "Raw"; bytes: [number, number, number]; label: string };
@@ -44,11 +45,12 @@ export function parseCommand(line: string, opts: { defaultDelayMs: number; noteO
   const note = toInt(params.note, 0) & 0x7f;
   const isOff = cmd === "noteoff";
   const asOn0 = isOff && opts.noteOffAsNoteOn0;
-  const status = (cmd === "noteon" || asOn0) ? (0x90 + (ch - 1)) : isOff ? (0x80 + (ch - 1)) : -1;
-  if (status < 0) return null;
+  if (cmd !== "noteon" && !isOff) return null;
   const velDefault = cmd === "noteon" ? 127 : 0;
-  const vel = asOn0 ? 0 : (toInt(params.velocity ?? params.vel, velDefault) & 0x7f);
-  const bytes: [number, number, number] = [status, note, vel];
+  const vel = toInt(params.velocity ?? params.vel, velDefault) & 0x7f;
+  const bytes: [number, number, number] = asOn0
+    ? rawFromNoteOn(ch, note, 0)
+    : (cmd === "noteon" ? rawFromNoteOn(ch, note, vel) : rawFromNoteOff(ch, note, vel));
   const kind = asOn0 ? "NoteOff→NoteOn0" : (cmd === "noteon" ? "NoteOn" : "NoteOff");
   return { kind: "Raw", bytes, label: `${kind} ch=${ch} note=${note} vel=${vel}` };
 }
@@ -56,4 +58,3 @@ export function parseCommand(line: string, opts: { defaultDelayMs: number; noteO
 export function parseSequence(lines: string[], opts: { defaultDelayMs: number; noteOffAsNoteOn0: boolean }): Parsed[] {
   return lines.map((l) => parseCommand(l, opts)).filter((x): x is Parsed => !!x);
 }
-

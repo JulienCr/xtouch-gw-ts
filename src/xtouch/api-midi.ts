@@ -1,14 +1,12 @@
-import { rawFromPb14 } from "../midi/bytes"; // MODIF: centraliser via bytes.ts
+import { rawFromPb14, rawFromNoteOn, rawFromControlChange } from "../midi/bytes"; // centraliser via bytes.ts
 import { clamp } from "../shared/num";
 import { delay } from "../shared/time";
 
 export type RawSender = { sendRawMessage(bytes: number[]): void };
 
 export function sendNoteOn(driver: RawSender, channel: number, note: number, velocity: number): void {
-  const ch = clamp(channel, 1, 16);
-  const n = clamp(note, 0, 127);
-  const v = clamp(velocity, 0, 127);
-  driver.sendRawMessage([0x90 + (ch - 1), n, v]);
+  const bytes = rawFromNoteOn(channel, note, velocity);
+  driver.sendRawMessage(bytes);
 }
 
 function sendNoteOff(driver: RawSender, channel: number, note: number): void {
@@ -16,10 +14,8 @@ function sendNoteOff(driver: RawSender, channel: number, note: number): void {
 }
 
 export function sendControlChange(driver: RawSender, channel: number, controller: number, value: number): void {
-  const ch = clamp(channel, 1, 16);
-  const cc = clamp(controller, 0, 127);
-  const v = clamp(value, 0, 127);
-  driver.sendRawMessage([0xB0 + (ch - 1), cc, v]);
+  const bytes = rawFromControlChange(channel, controller, value);
+  driver.sendRawMessage(bytes);
 }
 
 export function sendPitchBend14(driver: RawSender, channel: number, value14: number): void {
