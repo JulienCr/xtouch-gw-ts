@@ -11,9 +11,18 @@ Contexte d’exécution pour cet audit
 
 Plan (vivant)
 - [x] Lancer Knip et intégrer les résultats ici (branche chore/cleanup/knip-deadcode)
-- [ ] Déduplication helpers: clamp/delay/Levenshtein/bytes MIDI
-- [ ] Remplacer les clamps “manuels” par les builders centralisés
-- [ ] Harmoniser la construction des trames Note/CC/PB
+- [~] Déduplication helpers: clamp/delay/Levenshtein/bytes MIDI
+  - Fait: suppression dupli clamp local dans `xtouch/api-midi.ts` (utilise clamp partagé de `midi/appClient/core`).
+  - À faire: centraliser `clamp` dans `src/shared/num.ts` et réaligner les imports.
+  - À faire: centraliser `delay` dans `src/shared/time.ts` et remplacer les duplications.
+  - À faire: déporter la version interne de Levenshtein dans `help.ts` vers `cli/levenshtein`.
+- [~] Remplacer les clamps “manuels” par les builders centralisés
+  - Fait: `midi/transform.ts` s’appuie sur `rawFrom*` et `to7bitFrom14bit` (bornage central).
+  - À faire: nettoyer les clamps redondants restants (voir duplications ci‑dessous).
+- [~] Harmoniser la construction des trames Note/CC/PB
+  - Fait: `xtouch/driver.ts` utilise `xtapi.sendPitchBend14` (au lieu de calcul manuel PB).
+  - Fait: `midi/transform.ts` utilise `rawFromNoteOn` et `rawFromControlChange`.
+  - À faire: remplacer les constructions ad hoc restantes (ex.: `xtouch/fkeys.ts`, `router/emit.ts`).
 - [ ] Uniformiser le parsing hex (`parseNumberMaybeHex`)
 - [x] Vérifier et enlever le code mort (CLI runtime/misc)
       - Supprimés: `src/cli/runtime.ts`, `src/cli/commands/misc.ts`, `src/drivers/voicemeeter.ts`
@@ -25,12 +34,16 @@ Plan (vivant)
 
 —
 
+Mises à jour (branche: `chore/dedup-midi-helpers`)
+- Commits:
+  - chore(dedup): centralize clamp use and PB encoding.
+  - refactor(transform): use rawFromNoteOn/rawFromControlChange for byte construction.
+
 Duplications repérées (avec références)
 
 1) clamp (canaux/valeurs)
-- Définition dupliquée:
-  - src/midi/appClient/core.ts:13
-  - src/xtouch/api-midi.ts:71
+- Définition dupliquée: résolu pour `xtouch/api-midi.ts` (utilise désormais la version partagée de `midi/appClient/core`).
+  - Reste: conserver une source unique (proposé: `src/shared/num.ts`) et migrer les imports.
 - Clamps “manuels” récurrents (exemples):
   - src/xtouch/driver.ts:231, 232
   - src/xtouch/fkeys.ts:9, 14, 27, 29
@@ -57,14 +70,13 @@ Duplications repérées (avec références)
 - Reco: supprimer la version interne de `help.ts` et importer `./levenshtein`.
 
 4) Construction des trames MIDI (Note/CC/PB)
-- Constructions “à la main” alors que `src/midi/bytes.ts` existe:
-  - Pitch Bend: src/xtouch/driver.ts:229–237 construit `[status, lsb, msb]` au lieu d’utiliser `rawFromPb14`.
-  - Note On LED: src/xtouch/fkeys.ts:13–15 construit le Note On au lieu d’utiliser `rawFromNoteOn` ou `xtapi.sendNoteOn`.
-- Double clamp avant helpers:
-  - src/router/emit.ts:40–54 clampe puis appelle `rawFromNoteOn`/`rawFromControlChange`/`rawFromPb14` qui clampent déjà.
-- Reco:
-  - Centraliser via `src/midi/bytes.ts` ou via l’API `xtouch/api-midi.ts` et supprimer les constructions ad hoc.
-  - Dans `emit.ts`, faire confiance aux helpers pour le bornage et supprimer les clamps redondants.
+- Progrès:
+  - Résolu: `xtouch/driver.ts` ne construit plus PB manuellement (utilise `xtapi.sendPitchBend14`).
+  - Résolu: `midi/transform.ts` construit via `rawFromNoteOn`/`rawFromControlChange`.
+- Reste à faire:
+  - Note On LED: `xtouch/fkeys.ts` — remplacer par `rawFromNoteOn` ou `xtapi.sendNoteOn`.
+  - `router/emit.ts` — supprimer le double clamp et laisser `rawFrom*` borner.
+  - Audit rapide des autres fichiers pour `0x90/0xB0/0xE0`.
 
 5) Parsing hex/numérique
 - Logique ad hoc dans `src/router/page.ts` (ex.: base_cc) alors que `parseNumberMaybeHex` existe:
@@ -105,9 +117,9 @@ Simplifications proposées
 - [ ] Passer la CI/dev sur Node 24+ (scripts pnpm opérationnels)
 - [ ] Lancer `pnpm deadcode` (Knip) et coller le rapport ici
 - [ ] Introduire `src/shared/num.ts` et `src/shared/time.ts` (+ refactor minimal)
-- [ ] Remplacer les constructions MIDI manuelles par `rawFrom*`/`xtapi`
+- [ ] Remplacer les constructions MIDI manuelles par `rawFrom*`/`xtapi` (reste: `xtouch/fkeys.ts`, `router/emit.ts`)
 - [ ] Nettoyer `src/cli/help.ts` (import `levenshtein`)
-- [ ] Supprimer `src/cli/runtime.ts` et `src/cli/commands/misc.ts` si validé par Knip
+- [ ] Retester build/tests et cocher les items correspondants
 
 —
 
