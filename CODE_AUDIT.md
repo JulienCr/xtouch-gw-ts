@@ -12,18 +12,21 @@ Contexte d’exécution pour cet audit
 Plan (vivant)
 - [x] Lancer Knip et intégrer les résultats ici (branche chore/cleanup/knip-deadcode)
 - [~] Déduplication helpers: clamp/delay/Levenshtein/bytes MIDI
-  - Fait: suppression dupli clamp local dans `xtouch/api-midi.ts` (utilise clamp partagé de `midi/appClient/core`).
-  - À faire: centraliser `clamp` dans `src/shared/num.ts` et réaligner les imports.
-  - À faire: centraliser `delay` dans `src/shared/time.ts` et remplacer les duplications.
+  - Fait: `src/shared/num.ts` (clamp) et `src/shared/time.ts` (delay) ajoutés.
+  - Fait: `xtouch/api-midi.ts` utilise clamp+delay partagés; `animations/*` et `test-utils/*` utilisent delay partagé.
+  - Fait: `midi/appClient/core.ts` ré‑exporte clamp depuis shared.
   - À faire: déporter la version interne de Levenshtein dans `help.ts` vers `cli/levenshtein`.
 - [~] Remplacer les clamps “manuels” par les builders centralisés
   - Fait: `midi/transform.ts` s’appuie sur `rawFrom*` et `to7bitFrom14bit` (bornage central).
   - À faire: nettoyer les clamps redondants restants (voir duplications ci‑dessous).
 - [~] Harmoniser la construction des trames Note/CC/PB
-  - Fait: `xtouch/driver.ts` utilise `xtapi.sendPitchBend14` (au lieu de calcul manuel PB).
-  - Fait: `midi/transform.ts` utilise `rawFromNoteOn` et `rawFromControlChange`.
-  - À faire: remplacer les constructions ad hoc restantes (ex.: `xtouch/fkeys.ts`, `router/emit.ts`).
-- [ ] Uniformiser le parsing hex (`parseNumberMaybeHex`)
+  - Fait: `xtouch/driver.ts` → `xtapi.sendPitchBend14`.
+  - Fait: `midi/transform.ts` → `rawFromNoteOn`/`rawFromControlChange`.
+  - Fait: `xtouch/fkeys.ts` → `driver.sendNoteOn` (supprime bytes manuels).
+  - Fait: `router/emit.ts` → supprime clamps redondants, s’appuie sur `rawFrom*`.
+- [~] Uniformiser le parsing hex (`parseNumberMaybeHex`)
+  - Fait: `router/page.ts` utilise `parseNumberMaybeHex` pour `base_cc` et `cc`.
+  - À faire: revue d’autres parseurs CC/notes éventuels.
 - [x] Vérifier et enlever le code mort (CLI runtime/misc)
       - Supprimés: `src/cli/runtime.ts`, `src/cli/commands/misc.ts`, `src/drivers/voicemeeter.ts`
       - Dépendance retirée: `voicemeeter-connector` (non utilisée)
