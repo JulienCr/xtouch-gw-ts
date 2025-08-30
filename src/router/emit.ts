@@ -1,4 +1,5 @@
-import { human, hex, rawFromPb14 } from "../midi/utils";
+import { human, hex } from "../midi/utils";
+import { rawFromPb14, rawFromControlChange, rawFromNoteOn } from "../midi/bytes"; // MODIF: centraliser bytes
 import type { MidiStateEntry } from "../state";
 import type { XTouchDriver } from "../xtouch/driver";
 import { midiValueEquals, getAntiLoopMs } from "./antiEcho";
@@ -37,17 +38,15 @@ export function makeXTouchEmitter(
     switch (addr.status) {
       case "note": {
         const ch = Math.max(1, Math.min(16, addr.channel ?? 1));
-        const status = 0x90 + (ch - 1);
         const note = Math.max(0, Math.min(127, addr.data1 ?? 0));
         const vel = typeof value === "number" ? Math.max(0, Math.min(127, Math.floor(value))) : 0;
-        return [status, note, vel];
+        return rawFromNoteOn(ch, note, vel);
       }
       case "cc": {
         const ch = Math.max(1, Math.min(16, addr.channel ?? 1));
-        const status = 0xB0 + (ch - 1);
         const cc = Math.max(0, Math.min(127, addr.data1 ?? 0));
         const v = typeof value === "number" ? Math.max(0, Math.min(127, Math.floor(value))) : 0;
-        return [status, cc, v];
+        return rawFromControlChange(ch, cc, v);
       }
       case "pb": {
         const ch = Math.max(1, Math.min(16, addr.channel ?? 1));

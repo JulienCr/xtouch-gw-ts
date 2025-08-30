@@ -1,6 +1,7 @@
 import type { XTouchDriver } from "./driver";
 import { getInputLookups } from "./matching";
 import { isPB, isCC, pb14FromRaw } from "../midi/utils";
+import { toPercentFrom14bit, to7bitFrom14bit, to8bitFrom14bit } from "../midi/convert"; // MODIF: centraliser conversions
 import type { AppConfig, PageConfig } from "../config";
 import type { ControlMapping } from "../types";
 
@@ -128,14 +129,14 @@ export function attachFaderValueOverlay(
       if (strip == null || !activeTouches.has(strip)) return;
       const ov = getOverlayModeForStrip(strip);
       if (!ov.enabled) return;
-      const pct = Math.round((value14 / 16383) * 100);
+      const pct = toPercentFrom14bit(value14); // MODIF
       if (ov.mode === "percent") {
         try { xtouch.sendLcdStripLowerText(strip, `${pct}%`); } catch {}
       } else if (ov.mode === "7bit") {
-        const v7 = Math.round((value14 / 16383) * 127);
+        const v7 = to7bitFrom14bit(value14); // MODIF
         try { xtouch.sendLcdStripLowerText(strip, `${v7}`); } catch {}
       } else {
-        const v8 = Math.round((value14 / 16383) * 255);
+        const v8 = to8bitFrom14bit(value14); // MODIF
         try { xtouch.sendLcdStripLowerText(strip, `${v8}`); } catch {}
       }
       return;

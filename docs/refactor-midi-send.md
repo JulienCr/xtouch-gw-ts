@@ -1,3 +1,25 @@
+### Step-by-step (WIP)
+
+- [x] Créer la branche `refactor/midi-send-unify` (2025-08-26)
+- [x] Introduire `src/midi/convert.ts` (helpers 14b↔7b/8b/%/normalized, réexport `pb14FromRaw`/`rawFromPb14`) + tests
+- [x] Introduire `src/midi/bytes.ts` (rawFromNoteOn/Cc/Pb14/NoteOff, clamp) + tests
+- [x] Remplacer les conversions locales dans `midi/transform.ts` par `convert.ts`
+- [x] Exposer `MidiAppClient.sendRaw(appKey, bytes)` (ou `type: "passthrough"`) et tracer sendSafe/forward/feedback/setpoints
+- [x] Dans `drivers/midibridge`, remplacer l'envoi direct par délégation à `MidiAppClient` (résolution appKey) — OUT seulement
+- [x] Remplacer les constructions locales (Note/CC/PB) par `bytes.ts` dans `midi/appClient`, `router/emit`, `xtouch/api-midi`
+- [x] `xtouch/valueOverlay.ts`: utiliser `convert.ts` pour percent/7b/8b (PB) et percent (CC)
+- [x] Option: `xtouch/api-midi.ts` délègue à l'orchestrateur si présent (DI)
+- [ ] Tests intégration (parité frames, anti-loop PB, timing) et mise à jour `tests-audit.md`
+
+Journal d'itération
+1) Lot 1 — Conversions + Bytes (fait)
+   - Cibles: `src/midi/convert.ts`, `src/midi/bytes.ts`, `src/midi/transform.ts` (usage `to7bitFrom14bit`)
+   - Sorties: fonctions utilitaires + tests unitaires de bornes/arrondis/round-trips
+2) Lot 2 — Orchestrateur OUT unique (fait)
+   - Cibles: `midi/appClient` (API `sendRaw` ajoutée), `drivers/midibridge` (délégation OUT)
+3) Lot 3 — Remplacements globaux + DI API utils (fait)
+   - Cibles: `xtouch/api-midi.ts` (DI optionnelle), `router/emit.ts` (fait), `xtouch/valueOverlay.ts` (fait)
+
 ## Refactor: Unifier la logique d'émission MIDI (Note/CC/PB)
 
 Objectif: éliminer la duplication entre trois chemins d'émission MIDI et concentrer la construction des trames et les conversions dans un module commun, tout en préservant les effets de bord spécifiques (forward, feedback, anti‑echo, transform passthrough).

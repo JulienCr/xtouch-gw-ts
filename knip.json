@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip/dist/knip-schema.json",
+  "entry": [
+    "src/index.ts",
+    "src/app.ts",
+    "src/router.ts"
+  ],
+  "project": [
+    "src/**/*.ts",
+    "scripts/**/*.mjs"
+  ],
+  "ignore": [
+    "dist/**",
+    "web/**",
+    "docs/**",
+    "coverage/**",
+    "**/_tests/**"
+  ]
+}

@@ -9,6 +9,7 @@ import { resolveAppKeyFromPort } from "../../shared/appKey";
 import { markAppOutgoingAndForward } from "../../midi/appClient"; // shadow/forward unifiés
 import { scheduleFaderSetpoint } from "../../xtouch/faderSetpoint";
 import { ReconnectHelper } from "./reconnect";
+import { sendControlMidi } from "../../services/controlMidiSender"; // MODIF: délégation OUT vers orchestrateur
 
 // Typage sûr pour accès au squelch PB
 type PitchBendSquelchCapable = { isPitchBendSquelched?: () => boolean };
@@ -43,7 +44,7 @@ export class MidiBridgeDriver implements Driver {
 
   async init(): Promise<void> {
     try {
-      this.reconn.tryOpenOutOnce();
+      // MODIF: OUT délégué à l'orchestrateur (MidiAppClient via ControlMidiSender)
       this.reconn.tryOpenInOnce();
 
       this.unsubXTouch = this.xtouch.subscribe((_delta, data) => {
@@ -63,7 +64,9 @@ export class MidiBridgeDriver implements Driver {
               return;
             }
             logger.debug(`Bridge TX -> ${this.toPort}: ${human(tx)} [${hex(tx)}]`);
-            this.reconn.sendSafe(tx);
+            // MODIF: délèguer l'envoi OUT à l'orchestrateur (passthrough bytes)
+            const app = resolveAppKeyFromPort(this.toPort);
+            sendControlMidi(app, { type: "passthrough", channel: 1 }, tx).catch(() => {});
             try {
               if (isPBMsg) {
                 const ch1 = (status & 0x0f) + 1;

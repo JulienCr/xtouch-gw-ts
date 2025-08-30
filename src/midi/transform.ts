@@ -1,5 +1,6 @@
 import type { TransformConfig } from "../config";
-import { parseNumberMaybeHex, pb14FromRaw } from "./utils";
+import { parseNumberMaybeHex } from "./utils";
+import { pb14FromRaw, to7bitFrom14bit } from "./convert"; // MODIF: centralise conversion PB→7b
 
 /**
  * Transformations sortantes (X-Touch → cible).
@@ -33,7 +34,7 @@ export function applyTransform(data: number[], t?: TransformConfig): number[] | 
       const lsb = data[1] ?? 0;
       const msb = data[2] ?? 0;
       const value14 = pb14FromRaw(lsb, msb); // 0..16383
-      const value7 = Math.round((value14 / 16383) * 127);
+      const value7 = to7bitFrom14bit(value14); // MODIF: utilise helper centralisé
       const targetChannel1 = Math.max(1, Math.min(16, t.pb_to_cc.target_channel ?? 1));
       const targetChannel0 = targetChannel1 - 1;
       // Resolve CC number
