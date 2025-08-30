@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@julusian/midi"],
+  serverExternalPackages: ["@julusian/midi", "node-hid"],
   eslint: {
     // Allow production builds to succeed even if there are ESLint errors
     ignoreDuringBuilds: true,

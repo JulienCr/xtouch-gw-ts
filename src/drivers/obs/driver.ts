@@ -22,6 +22,16 @@ export class ObsDriver implements Driver {
 	private selectedEmitTimer: any | null = null;
 	private lastSelectedSent: string | null = null;
 
+	// Aggregation for near-simultaneous deltas (e.g., LX+LY diagonals)
+	private aggTimers: Map<string, any> = new Map();
+	private aggDeltas: Map<string, { dx?: number; dy?: number; ds?: number; scene: string; source: string }> = new Map();
+	private aggDelayMs = 4;
+
+	// Continuous analog rates (per scene/source) so holding the stick yields stable motion
+	private analogRates: Map<string, { scene: string; source: string; vx: number; vy: number; vs: number }> = new Map();
+	private analogTimer: any | null = null;
+	private lastAnalogTickMs = 0;
+
 	async init(): Promise<void> { await this.connectFromConfig(); }
 
 	/**
@@ -107,23 +117,46 @@ export class ObsDriver implements Driver {
 			}
 			case "nudgeX": {
 				const [sceneName, sourceName, deltaParam] = params as [string, string, number?];
-				const base = this.resolveStepDelta(deltaParam, context?.value, 2);
+				const step = Number.isFinite(deltaParam as number) ? Math.abs(Number(deltaParam)) : 2;
+				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
+				if (Number.isFinite(v) && v >= -1 && v <= 1) {
+					const gain = 15; // px per 60Hz tick at full deflection
+					this.setAnalogRate(sceneName, sourceName, { vx: v * step * gain });
+					return;
+				}
+				const base = this.resolveStepDelta(deltaParam, context?.value, step);
 				const dx = this.encoderSpeed.resolveAdaptiveDelta(context?.controlId ?? "encX", base);
-				await this.applyDelta(sceneName, sourceName, { dx });
+				this.scheduleApplyAggregated(sceneName, sourceName, { dx });
 				return;
 			}
 			case "nudgeY": {
 				const [sceneName, sourceName, deltaParam] = params as [string, string, number?];
-				const base = this.resolveStepDelta(deltaParam, context?.value, 2);
+				const step = Number.isFinite(deltaParam as number) ? Math.abs(Number(deltaParam)) : 2;
+				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
+				if (Number.isFinite(v) && v >= -1 && v <= 1) {
+					const gain = 15; // px per 60Hz tick
+					this.setAnalogRate(sceneName, sourceName, { vy: v * step * gain });
+					return;
+				}
+				const base = this.resolveStepDelta(deltaParam, context?.value, step);
 				const dy = this.encoderSpeed.resolveAdaptiveDelta(context?.controlId ?? "encY", base);
-				await this.applyDelta(sceneName, sourceName, { dy });
+				this.scheduleApplyAggregated(sceneName, sourceName, { dy });
 				return;
 			}
 			case "scaleUniform": {
 				const [sceneName, sourceName, deltaParam] = params as [string, string, number?];
-				const ds = this.resolveStepDelta(deltaParam, context?.value, 0.01);
+				const base = Number.isFinite(deltaParam as number) ? Number(deltaParam) : 0.01;
+				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
+				let ds: number;
+				if (Number.isFinite(v) && v >= -1 && v <= 1) {
+					const gain = 3; // per 60Hz tick
+					this.setAnalogRate(sceneName, sourceName, { vs: v * base * gain });
+					return;
+				} else {
+					ds = this.resolveStepDelta(deltaParam, context?.value, base);
+				}
 				logger.debug(`OBS scaleUniform -> scene='${sceneName}' source='${sourceName}' ds=${ds} (ctx=${String(context?.value)})`);
-				await this.applyDelta(sceneName, sourceName, { ds });
+				this.scheduleApplyAggregated(sceneName, sourceName, { ds });
 				return;
 			}
 			default:
@@ -228,11 +261,88 @@ export class ObsDriver implements Driver {
 		} catch (err) { logger.warn("OBS: écriture transform échouée:", err as any); try { this.cacheKeyToItemId.delete(this.key(sceneName, sourceName)); } catch { } }
 	}
 
+	/**
+	 * Agrège des deltas proches dans le temps pour une même cible et applique en un seul SetSceneItemTransform.
+	 */
+	private scheduleApplyAggregated(sceneName: string, sourceName: string, delta: { dx?: number; dy?: number; ds?: number }): void {
+		const k = this.key(sceneName, sourceName);
+		const acc = this.aggDeltas.get(k) ?? { scene: sceneName, source: sourceName };
+		if (delta.dx != null) acc.dx = (acc.dx ?? 0) + delta.dx;
+		if (delta.dy != null) acc.dy = (acc.dy ?? 0) + delta.dy;
+		if (delta.ds != null) acc.ds = (acc.ds ?? 0) + delta.ds;
+		this.aggDeltas.set(k, acc);
+		if (!this.aggTimers.has(k)) {
+			const t = setTimeout(async () => {
+				this.aggTimers.delete(k);
+				const d = this.aggDeltas.get(k);
+				this.aggDeltas.delete(k);
+				if (!d) return;
+				try { await this.applyDelta(d.scene, d.source, { dx: d.dx, dy: d.dy, ds: d.ds }); } catch {}
+			}, this.aggDelayMs);
+			this.aggTimers.set(k, t);
+		}
+	}
+
+	private key(sceneName: string, sourceName: string): string { return `${sceneName}::${sourceName}`; }
+
+	private setAnalogRate(sceneName: string, sourceName: string, patch: { vx?: number; vy?: number; vs?: number }): void {
+		const k = this.key(sceneName, sourceName);
+		const cur = this.analogRates.get(k) ?? { scene: sceneName, source: sourceName, vx: 0, vy: 0, vs: 0 };
+		const dead = 0.02;
+		if (patch.vx != null) cur.vx = Math.abs(patch.vx) < dead ? 0 : patch.vx;
+		if (patch.vy != null) cur.vy = Math.abs(patch.vy) < dead ? 0 : patch.vy;
+		if (patch.vs != null) cur.vs = Math.abs(patch.vs) < dead ? 0 : patch.vs;
+		if (cur.vx === 0 && cur.vy === 0 && cur.vs === 0) {
+			this.analogRates.delete(k);
+		} else {
+			this.analogRates.set(k, cur);
+			this.ensureAnalogTimer();
+		}
+		if (this.analogRates.size === 0) this.stopAnalogTimer();
+	}
+
+	private ensureAnalogTimer(): void {
+		if (this.analogTimer) return;
+		this.lastAnalogTickMs = Date.now();
+		this.analogTimer = setInterval(() => this.onAnalogTick(), 16);
+	}
+
+	private stopAnalogTimer(): void {
+		if (!this.analogTimer) return;
+		try { clearInterval(this.analogTimer as any); } catch {}
+		this.analogTimer = null;
+	}
+
+	private async onAnalogTick(): Promise<void> {
+		const now = Date.now();
+		const dt = Math.max(0.001, (now - this.lastAnalogTickMs) / 16); // normalize to 60Hz ticks
+		this.lastAnalogTickMs = now;
+		for (const cur of this.analogRates.values()) {
+			const dx = cur.vx * dt;
+			const dy = cur.vy * dt;
+			const ds = cur.vs * dt;
+			if (dx !== 0 || dy !== 0 || ds !== 0) {
+				try { await this.applyDelta(cur.scene, cur.source, { dx: dx || undefined, dy: dy || undefined, ds: ds || undefined }); } catch {}
+			}
+		}
+		if (this.analogRates.size === 0) this.stopAnalogTimer();
+	}
+
 	private resolveStepDelta(deltaParam: number | undefined, ctxValue: unknown, baseStep: number): number {
 		const step = Number.isFinite(deltaParam as number) ? Math.abs(Number(deltaParam)) : baseStep;
 		const v = typeof ctxValue === "number" ? ctxValue : NaN;
-		if (!Number.isFinite(v)) return step; if (v === 0 || v === 64) return 0;
-		if (v >= 1 && v <= 63) return step; if (v >= 65 && v <= 127) return -step; return 0;
+		if (!Number.isFinite(v)) return step;
+		// Support analog normalized input (-1..+1) from HID sticks/triggers
+		if (v >= -1 && v <= 1) {
+			const dead = 0.02; // small deadzone for noise
+			if (Math.abs(v) < dead) return 0;
+			return v > 0 ? step : -step;
+		}
+		// Legacy encoder semantics: 1..63 positive, 65..127 negative, 0/64 no-op
+		if (v === 0 || v === 64) return 0;
+		if (v >= 1 && v <= 63) return step;
+		if (v >= 65 && v <= 127) return -step;
+		return 0;
 	}
 
 	/**
@@ -319,5 +429,3 @@ export class ObsDriver implements Driver {
 		this.emitSelectedScene();
 	  }
 }
-
-
