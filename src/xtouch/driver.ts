@@ -228,13 +228,8 @@ export class XTouchDriver {
    */
   setFader14(channel1to16: number, value14: number): void {
     if (!this.output) return;
-    const ch = Math.max(1, Math.min(16, channel1to16));
-    const v = Math.max(0, Math.min(16383, Math.floor(value14)));
-    // Pitch Bend: status E0 + channel-1, LSB, MSB
-    const status = 0xE0 + (ch - 1);
-    const lsb = v & 0x7F;
-    const msb = (v >> 7) & 0x7F;
-    this.output.sendMessage([status, lsb, msb]);
+    // Déduplication: réutilise l'API centralisée
+    xtapi.sendPitchBend14(this, channel1to16, value14);
   }
 
   /** Écrit du texte sur un strip LCD (ligne haute/basse). */
@@ -323,5 +318,4 @@ export class XTouchDriver {
     return { input: this.connectedInputName, output: this.connectedOutputName };
   }
 }
-
 

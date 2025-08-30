@@ -1,4 +1,5 @@
 import { rawFromPb14 } from "../midi/bytes"; // MODIF: centraliser via bytes.ts
+import { clamp } from "../midi/appClient/core";
 
 export type RawSender = { sendRawMessage(bytes: number[]): void };
 
@@ -68,5 +69,4 @@ export async function resetAll(driver: RawSender, options?: {
 }
 
 function delay(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)); }
-function clamp(n: number, min: number, max: number): number { return Math.max(min, Math.min(max, n)); }
 

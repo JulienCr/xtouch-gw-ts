@@ -1,6 +1,7 @@
 import type { TransformConfig } from "../config";
 import { parseNumberMaybeHex } from "./utils";
-import { pb14FromRaw, to7bitFrom14bit } from "./convert"; // MODIF: centralise conversion PB→7b
+import { to7bitFrom14bit } from "./convert"; // MODIF: centralise conversion PB→7b
+import { pb14FromRaw } from "./utils";
 
 /**
  * Transformations sortantes (X-Touch → cible).
