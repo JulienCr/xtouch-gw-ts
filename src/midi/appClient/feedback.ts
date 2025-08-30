@@ -1,24 +1,20 @@
 import { Input } from "@julusian/midi";
 import { logger } from "../../logger";
 import { findPortIndexByNameFragment } from "../ports";
-import { hasPassthroughAnywhereForApp, hasBridgeForApp } from "./core";
+import type { MidiClientHooks } from "./hooks";
 
 export type FeedbackState = {
   inPerApp: Map<string, Input>;
   appToInName: Map<string, string>;
 };
 
-export async function ensureFeedbackOpen(app: string, state: FeedbackState): Promise<void> {
+export async function ensureFeedbackOpen(app: string, state: FeedbackState, hooks?: MidiClientHooks): Promise<void> {
   const appKey = String(app).trim();
   if (state.inPerApp.has(appKey)) return;
   const needle = state.appToInName.get(appKey);
   if (!needle) return;
-  // Skip opening if ANY page has a passthrough for this app, or a global bridge owns it.
-  // Background listeners (for other pages) or the owning bridge will handle IN to avoid double-open.
-  if (hasPassthroughAnywhereForApp(appKey) || hasBridgeForApp(appKey)) {
-    //logger.trace(`MidiAppClient: skip IN for app='${appKey}' (handled elsewhere).`);
-    return;
-  }
+  // Ask orchestrator whether we should open IN for this app.
+  if (hooks?.shouldOpenFeedback?.(appKey) === false) return;
   try {
     const inp = new Input();
     const idx = findPortIndexByNameFragment(inp, needle);
@@ -29,10 +25,7 @@ export async function ensureFeedbackOpen(app: string, state: FeedbackState): Pro
     }
     inp.ignoreTypes(false, false, false);
     inp.on("message", (_delta, data) => {
-      try {
-        const r = (global as unknown as { __router__?: { onMidiFromApp: (appKey: string, raw: number[], portId: string) => void } }).__router__;
-        r?.onMidiFromApp?.(appKey, data, needle);
-      } catch {}
+      try { hooks?.onFeedback?.(appKey, data, needle); } catch {}
     });
     inp.openPort(idx);
     state.inPerApp.set(appKey, inp);

@@ -1,6 +1,11 @@
 import type { AppConfig, PageConfig } from "../config";
 import type { ControlMidiSpec } from "../types";
+import type { Router } from "../router";
+import type { XTouchDriver } from "../xtouch/driver";
 import { MidiAppClient } from "../midi/appClient";
+import type { MidiClientHooks } from "../midi/appClient/hooks";
+import { resolveAppKey } from "../shared/appKey";
+import { scheduleFaderSetpoint } from "../xtouch/faderSetpoint";
 
 /**
  * Gestionnaire global d'émission MIDI pour les mappings de `controls.*.midi`.
@@ -10,8 +15,38 @@ import { MidiAppClient } from "../midi/appClient";
  * - Envoie des trames Note On, Control Change ou Pitch Bend selon la spécification
  */
 class ControlMidiSenderImpl {
-  // délègue au client partagé
-  private readonly client = new MidiAppClient();
+  // délègue au client partagé (infra MIDI)
+  private readonly client: MidiAppClient;
+  private router?: Router;
+  private xtouch: XTouchDriver | null = null;
+
+  constructor() {
+    const hooks: MidiClientHooks = {
+      onOutgoing: (app, bytes, portId) => {
+        try {
+          this.router?.markAppShadowForOutgoing?.(app, bytes, portId);
+          this.router?.onMidiFromApp?.(app, bytes, portId);
+        } catch {}
+      },
+      onFeedback: (app, raw, portId) => {
+        try { this.router?.onMidiFromApp?.(app, raw, portId); } catch {}
+      },
+      shouldForwardOutgoing: (app) => !this.hasActivePagePassthroughForApp(app),
+      shouldOpenFeedback: (app) => !this.hasAnyPagePassthroughForApp(app),
+      onPitchBendSent: (channel, value14) => {
+        try { if (this.xtouch) scheduleFaderSetpoint(this.xtouch, channel, value14); } catch {}
+      },
+    };
+    this.client = new MidiAppClient(hooks);
+  }
+
+  setRouter(router: Router): void {
+    this.router = router;
+  }
+
+  setXTouch(x: XTouchDriver | null): void {
+    this.xtouch = x;
+  }
 
   /**
    * Initialise le service (pré‑ouverture best‑effort des ports connus).
@@ -69,6 +104,33 @@ class ControlMidiSenderImpl {
   async shutdown(): Promise<void> {
     await this.client.shutdown();
   }
+
+  private hasActivePagePassthroughForApp(app: string): boolean {
+    try {
+      const page = this.router?.getActivePage?.();
+      const items = (page?.passthroughs ?? (page?.passthrough ? [page?.passthrough] : [])) as any[];
+      for (const it of items) {
+        const appKey = resolveAppKey(String(it?.to_port || ""), String(it?.from_port || ""));
+        if (appKey === app) return true;
+      }
+      return false;
+    } catch { return false; }
+  }
+
+  private hasAnyPagePassthroughForApp(app: string): boolean {
+    try {
+      const pages = this.router?.getPagesMerged?.();
+      if (!Array.isArray(pages)) return false;
+      for (const p of pages) {
+        const items = (p as any).passthroughs ?? ((p as any).passthrough ? [(p as any).passthrough] : []);
+        for (const it of (items as any[])) {
+          const appKey = resolveAppKey(String(it?.to_port || ""), String(it?.from_port || ""));
+          if (appKey === app) return true;
+        }
+      }
+      return false;
+    } catch { return false; }
+  }
 }
 
 const ControlMidiSender = new ControlMidiSenderImpl();
@@ -76,10 +138,9 @@ const ControlMidiSender = new ControlMidiSenderImpl();
 /**
  * Initialise le service global d'émission MIDI.
  */
-export async function initControlMidiSender(cfg: AppConfig): Promise<void> {
+export async function initControlMidiSender(cfg: AppConfig, deps: { router: Router }): Promise<void> {
+  ControlMidiSender.setRouter(deps.router);
   await ControlMidiSender.init(cfg);
-  // exposer pour orchestration (reconcile on page change)
-  try { (global as any).__controlMidiSender__ = ControlMidiSender; } catch {}
 }
 
 /** Met à jour les ports par app à partir d’une nouvelle config (hot reload). */
@@ -99,7 +160,15 @@ export async function sendControlMidi(app: string, spec: ControlMidiSpec, value:
  */
 export async function shutdownControlMidiSender(): Promise<void> {
   await ControlMidiSender.shutdown();
-  try { delete (global as any).__controlMidiSender__; } catch {}
+}
+
+// API de façade
+export function setControlMidiSenderXTouch(x: XTouchDriver | null): void {
+  ControlMidiSender.setXTouch(x);
+}
+
+export function reconcileControlMidiSenderForPage(page: PageConfig | undefined): void {
+  ControlMidiSender.reconcileForPage(page);
 }
 
 

@@ -6,7 +6,6 @@ import { hex, human, isPB, pb14FromRaw } from "../../midi/utils";
 import { matchFilter } from "../../midi/filter";
 import { applyTransform } from "../../midi/transform";
 import { resolveAppKeyFromPort } from "../../shared/appKey";
-import { markAppOutgoingAndForward } from "../../midi/appClient"; // shadow/forward unifiés
 import { scheduleFaderSetpoint } from "../../xtouch/faderSetpoint";
 import { ReconnectHelper } from "./reconnect";
 import { sendControlMidi } from "../../services/controlMidiSender"; // MODIF: délégation OUT vers orchestrateur
@@ -76,7 +75,7 @@ export class MidiBridgeDriver implements Driver {
                 scheduleFaderSetpoint(this.xtouch, ch1, value14);
               }
             } catch {}
-            try { markAppOutgoingAndForward(resolveAppKeyFromPort(this.toPort), tx, this.toPort); } catch {}
+            // Forwarding to Router is handled by ControlMidiSender hooks
           } else {
             logger.trace(`Bridge DROP (filtered) -> ${this.toPort}: ${human(data)} [${hex(data)}]`);
           }
@@ -105,5 +104,4 @@ export class MidiBridgeDriver implements Driver {
     logger.info("MidiBridge arrêté.");
   }
 }
-
 

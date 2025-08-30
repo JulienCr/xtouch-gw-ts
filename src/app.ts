@@ -13,7 +13,7 @@ import { updateFKeyLedsForActivePage } from "./xtouch/fkeys";
 import * as xtapi from "./xtouch/api";
 import { attachInputMapper } from "./xtouch/inputMapper";
 import { attachIndicators, refreshIndicators } from "./xtouch/indicators";
-import { initControlMidiSender, shutdownControlMidiSender, updateControlMidiSenderConfig } from "./services/controlMidiSender";
+import { initControlMidiSender, shutdownControlMidiSender, updateControlMidiSenderConfig, reconcileControlMidiSenderForPage, setControlMidiSenderXTouch } from "./services/controlMidiSender";
 
 // Minimal Node globals typing to satisfy TS without @types/node
 declare const process: any;
@@ -50,7 +50,7 @@ export async function startApp(): Promise<() => Promise<void>> {
   // Enregistrer et initialiser les drivers
   await initDrivers(router);
   // Service d'envoi MIDI par contrôle (ports cache)
-  await initControlMidiSender(cfg);
+  await initControlMidiSender(cfg, { router });
 
   // Hot reload config
   const stopWatch = watchConfig(
@@ -113,7 +113,7 @@ export async function startApp(): Promise<() => Promise<void>> {
         applyLcdForActivePage(router, x);
         rebuildBackgroundListeners(page);
         // MODIF: synchroniser les entrées feedback de controls.midi avec la page (fermer celles couverts par passthroughs)
-        try { (global as any).__controlMidiSender__?.reconcileForPage?.(page); } catch {}
+        try { reconcileControlMidiSenderForPage(page); } catch {}
         if (page?.passthrough || page?.passthroughs) {
           for (const b of pageBridges) {
             try { b.shutdown().catch((err) => logger.warn("Bridge shutdown error:", err as any)); } catch {}
@@ -133,8 +133,8 @@ export async function startApp(): Promise<() => Promise<void>> {
       },
     });
     xtouch = x;
-    // Exposer pour services globaux (setpoint moteur après envoi direct)
-    (global as any).__xtouch__ = x;
+    // Injecter le X-Touch dans le service ControlMidiSender
+    setControlMidiSenderXTouch(x);
     // Input layer générique: attacher l'InputMapper (CSV → controlId → router)
     try {
       detachInputMapper = await attachInputMapper({ router, xtouch: x, mode: cfg.xtouch?.mode ?? "mcu", channel: paging.channel });
@@ -154,7 +154,7 @@ export async function startApp(): Promise<() => Promise<void>> {
 
     // Initialiser bridge pour page active si défini
     const initialPage = router.getActivePage();
-    try { (global as any).__controlMidiSender__?.reconcileForPage?.(initialPage); } catch {}
+    try { reconcileControlMidiSenderForPage(initialPage); } catch {}
     if (initialPage?.passthrough || initialPage?.passthroughs) {
       const items = getPagePassthroughItems(initialPage);
       pageBridges = await buildPageBridges(router, x, items, true);
