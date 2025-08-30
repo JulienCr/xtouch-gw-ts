@@ -56,12 +56,9 @@ export function to14bitFromNormalized(normalized: number): number {
 /**
  * Convertit normalized 0..1 vers 7 bits 0..127.
  */
-export function to7bitFromNormalized(normalized: number): number {
-  const v = Math.max(0, Math.min(1, Number(normalized)));
-  return Math.round(v * 127);
-}
+// Removed: to7bitFromNormalized (unused)
 
 // Réexport utilitaires PB 14 bits pour centralisation
-export { pb14FromRaw, rawFromPb14 } from "./utils";
+// Removed re-export of rawFromPb14 (prefer src/midi/bytes)
 
 

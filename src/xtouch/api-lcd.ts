@@ -31,7 +31,7 @@ export function setLcdColors(driver: RawSender, colors: number[]): void {
 }
 
 /** Écrit uniquement la ligne basse d'un strip LCD (7 caractères). */
-export function sendLcdStripLowerText(driver: RawSender, stripIndex0to7: number, lower: string): void {
+function sendLcdStripLowerText(driver: RawSender, stripIndex0to7: number, lower: string): void {
   const strip = Math.max(0, Math.min(7, Math.floor(stripIndex0to7)));
   const lo = ascii7(lower, 7);
   const header = [0xF0, 0x00, 0x00, 0x66, 0x14, 0x12];
@@ -73,5 +73,4 @@ export async function clearAllLcds(
     try { setSevenSegmentText(driver, ""); } catch {}
   }
 }
-
 
