@@ -25,7 +25,7 @@ export function buildTransformUpdate(cur: ObsItemState, delta: ObsDelta): { scen
 	if (delta.ds !== undefined) {
 		const { anchorX, anchorY } = computeAnchorFromAlignment(cur.alignment); const factor = 1 + (delta.ds ?? 0);
 		if (cur.boundsW && cur.boundsH) {
-			const w = cur.boundsW, h = cur.boundsH; const w2 = Math.max(1, w * factor); const h2 = Math.max(1, h * factor);
+			const w = cur.boundsW, h = cur.boundsH; const w2 = Math.max(1, Math.round(w * factor)); const h2 = Math.max(1, Math.round(h * factor));
 			const nextPosX = cur.x + (0.5 - anchorX) * (w - w2); const nextPosY = cur.y + (0.5 - anchorY) * (h - h2);
 			sceneItemTransform.boundsWidth = w2; sceneItemTransform.boundsHeight = h2; sceneItemTransform.positionX = nextPosX; sceneItemTransform.positionY = nextPosY;
 			next.boundsW = w2; next.boundsH = h2; next.x = nextPosX; next.y = nextPosY;

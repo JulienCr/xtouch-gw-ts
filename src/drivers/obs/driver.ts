@@ -136,7 +136,7 @@ export class ObsDriver implements Driver {
 				const [sceneName, sourceName, deltaParam] = params as [string, string, number?];
 				const step = Number.isFinite(deltaParam as number) ? Math.abs(Number(deltaParam)) : 2;
 				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
-				if (Number.isFinite(v) && v >= -1 && v <= 1) {
+				if (String(context?.controlId || '').startsWith('gamepad.') && Number.isFinite(v) && v >= -1 && v <= 1) {
                     const gain = this.analogPanGain; // px per 60Hz tick at full deflection
 					const vv = this.shapeAnalog(v);
 					this.setAnalogRate(sceneName, sourceName, { vx: vv * step * gain });
@@ -144,6 +144,7 @@ export class ObsDriver implements Driver {
 				}
 				const base = this.resolveStepDelta(deltaParam, context?.value, step);
 				const dx = this.encoderSpeed.resolveAdaptiveDelta(context?.controlId ?? "encX", base);
+				this.setAnalogRate(sceneName, sourceName, { vx: 0 });
 				this.scheduleApplyAggregated(sceneName, sourceName, { dx });
 				return;
 			}
@@ -151,7 +152,7 @@ export class ObsDriver implements Driver {
 				const [sceneName, sourceName, deltaParam] = params as [string, string, number?];
 				const step = Number.isFinite(deltaParam as number) ? Math.abs(Number(deltaParam)) : 2;
 				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
-				if (Number.isFinite(v) && v >= -1 && v <= 1) {
+				if (String(context?.controlId || '').startsWith('gamepad.') && Number.isFinite(v) && v >= -1 && v <= 1) {
                     const gain = this.analogPanGain; // px per 60Hz tick
 					const vv = this.shapeAnalog(v);
 					this.setAnalogRate(sceneName, sourceName, { vy: vv * step * gain });
@@ -159,6 +160,7 @@ export class ObsDriver implements Driver {
 				}
 				const base = this.resolveStepDelta(deltaParam, context?.value, step);
 				const dy = this.encoderSpeed.resolveAdaptiveDelta(context?.controlId ?? "encY", base);
+				this.setAnalogRate(sceneName, sourceName, { vy: 0 });
 				this.scheduleApplyAggregated(sceneName, sourceName, { dy });
 				return;
 			}
@@ -167,7 +169,7 @@ export class ObsDriver implements Driver {
 				const base = Number.isFinite(deltaParam as number) ? Number(deltaParam) : 0.01;
 				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
 				let ds: number;
-				if (Number.isFinite(v) && v >= -1 && v <= 1) {
+				if (String(context?.controlId || '').startsWith('gamepad.') && Number.isFinite(v) && v >= -1 && v <= 1) {
                     const gain = this.analogZoomGain; // per 60Hz tick
 					const vv = this.shapeAnalog(v);
 					this.setAnalogRate(sceneName, sourceName, { vs: vv * base * gain });
@@ -176,6 +178,7 @@ export class ObsDriver implements Driver {
 					ds = this.resolveStepDelta(deltaParam, context?.value, base);
 				}
 				logger.debug(`OBS scaleUniform -> scene='${sceneName}' source='${sourceName}' ds=${ds} (ctx=${String(context?.value)})`);
+				this.setAnalogRate(sceneName, sourceName, { vs: 0 });
 				this.scheduleApplyAggregated(sceneName, sourceName, { ds });
 				return;
 			}

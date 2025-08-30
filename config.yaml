@@ -33,7 +33,7 @@ gamepad:
   provider: hid
   analog:
     pan_gain: 15
-    zoom_gain: 1.1
+    zoom_gain: 1.5
     deadzone: 0.02
     gamma: 1.5
   hid:
