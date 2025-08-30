@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { parseNumberMaybeHex } from "../midi/utils";
 
 /**
  * Utility to read X‑Touch control mappings from `docs/xtouch-matching.csv`.
@@ -16,17 +17,17 @@ function parseMessageSpec(spec: string): MessageSpec {
 	const s = (spec || "").trim();
 	if (!s) return null;
 	if (s.startsWith("note=")) {
-		const n = Number(s.slice(5));
+		const n = parseNumberMaybeHex(s.slice(5), NaN);
 		return Number.isFinite(n) ? { type: "note", d1: n } : null;
 	}
 	if (s.startsWith("cc=")) {
-		const n = Number(s.slice(3));
+		const n = parseNumberMaybeHex(s.slice(3), NaN);
 		return Number.isFinite(n) ? { type: "cc", d1: n } : null;
 	}
 	if (s.startsWith("pb=")) {
 		const m = /pb=ch(\d+)/i.exec(s);
 		if (m) {
-			const ch = Number(m[1]);
+			const ch = parseNumberMaybeHex(m[1], NaN);
 			return Number.isFinite(ch) ? { type: "pb", ch } : { type: "pb" };
 		}
 		return { type: "pb" };
