@@ -2,6 +2,7 @@ import type { TransformConfig } from "../config";
 import { parseNumberMaybeHex } from "./utils";
 import { to7bitFrom14bit } from "./convert"; // MODIF: centralise conversion PB→7b
 import { pb14FromRaw } from "./utils";
+import { rawFromNoteOn, rawFromControlChange } from "./bytes"; // dédup: construire via helpers
 
 /**
  * Transformations sortantes (X-Touch → cible).
@@ -20,8 +21,8 @@ export function applyTransform(data: number[], t?: TransformConfig): number[] | 
       const value14 = pb14FromRaw(lsb, msb); // 0..16383
       const velocity = Math.round((value14 / 16383) * 127);
       const note = Math.max(0, Math.min(127, t.pb_to_note.note ?? 0));
-      const noteOnStatus = 0x90 | channelNibble;
-      return [noteOnStatus, note, velocity];
+      // Dédup: utiliser helper pour construire le Note On
+      return rawFromNoteOn(channelNibble + 1, note, velocity);
     }
   }
 
@@ -37,7 +38,6 @@ export function applyTransform(data: number[], t?: TransformConfig): number[] | 
       const value14 = pb14FromRaw(lsb, msb); // 0..16383
       const value7 = to7bitFrom14bit(value14); // MODIF: utilise helper centralisé
       const targetChannel1 = Math.max(1, Math.min(16, t.pb_to_cc.target_channel ?? 1));
-      const targetChannel0 = targetChannel1 - 1;
       // Resolve CC number
       let ccRaw: number | string | undefined = t.pb_to_cc.cc_by_channel?.[srcChannel1];
       if (ccRaw === undefined) {
@@ -47,8 +47,8 @@ export function applyTransform(data: number[], t?: TransformConfig): number[] | 
       }
       let cc = parseNumberMaybeHex(ccRaw, 0);
       cc = Math.max(0, Math.min(127, cc));
-      const ccStatus = 0xB0 | targetChannel0;
-      return [ccStatus, cc, value7];
+      // Dédup: utiliser helper pour construire le CC
+      return rawFromControlChange(targetChannel1, cc, value7);
     }
   }
 
