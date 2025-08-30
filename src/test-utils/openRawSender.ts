@@ -16,7 +16,7 @@ export interface OpenRawSenderResult {
   deviceMode: DeviceMode;
 }
 
-function delay(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
+import { delay } from "../shared/time";
 
 export async function openRawSender(opts: OpenRawSenderOptions): Promise<OpenRawSenderResult | null> {
   const output = new Output();
@@ -67,5 +67,4 @@ export async function openRawSender(opts: OpenRawSenderOptions): Promise<OpenRaw
   const cleanup = () => { try { output.closePort(); logger.info("Port MIDI fermé."); } catch {} };
   return { sender, cleanup, deviceMode };
 }
-
 

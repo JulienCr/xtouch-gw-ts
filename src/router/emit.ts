@@ -37,20 +37,20 @@ export function makeXTouchEmitter(
     const { addr, value } = entry;
     switch (addr.status) {
       case "note": {
-        const ch = Math.max(1, Math.min(16, addr.channel ?? 1));
-        const note = Math.max(0, Math.min(127, addr.data1 ?? 0));
-        const vel = typeof value === "number" ? Math.max(0, Math.min(127, Math.floor(value))) : 0;
+        const ch = (addr.channel ?? 1);
+        const note = (addr.data1 ?? 0);
+        const vel = typeof value === "number" ? Math.floor(value) : 0;
         return rawFromNoteOn(ch, note, vel);
       }
       case "cc": {
-        const ch = Math.max(1, Math.min(16, addr.channel ?? 1));
-        const cc = Math.max(0, Math.min(127, addr.data1 ?? 0));
-        const v = typeof value === "number" ? Math.max(0, Math.min(127, Math.floor(value))) : 0;
+        const ch = (addr.channel ?? 1);
+        const cc = (addr.data1 ?? 0);
+        const v = typeof value === "number" ? Math.floor(value) : 0;
         return rawFromControlChange(ch, cc, v);
       }
       case "pb": {
-        const ch = Math.max(1, Math.min(16, addr.channel ?? 1));
-        const v14 = typeof value === "number" ? Math.max(0, Math.min(16383, Math.floor(value))) : 8192;
+        const ch = (addr.channel ?? 1);
+        const v14 = typeof value === "number" ? Math.floor(value) : 8192;
         const [status, lsb, msb] = rawFromPb14(ch, v14);
         return [status, lsb, msb];
       }
@@ -109,5 +109,4 @@ export function makeXTouchEmitter(
 
   return { send, entryToRaw, emitIfNotDuplicate, clearShadow };
 }
-
 

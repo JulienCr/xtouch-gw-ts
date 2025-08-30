@@ -4,6 +4,7 @@ import { getPbChannelForControlId, getMessageTypeForControlId, getInputLookups }
 import { getPagePassthroughItems } from "../config/passthrough";
 import { resolveAppKey } from "../shared/appKey";
 import type { ControlMapping } from "../types";
+import { parseNumberMaybeHex } from "../midi/utils";
 
 export function getAppsForPage(page: PageConfig): AppKey[] {
 	const items = getPagePassthroughItems(page);
@@ -61,16 +62,16 @@ export function resolvePbToCcMappingForApp(page: PageConfig, app: AppKey): { map
 	const reverse = new Map<number, number>();
 	if (pb2cc) {
 		const baseRaw = pb2cc.base_cc;
-		const base = typeof baseRaw === "string" ? parseInt(baseRaw, 16) : (typeof baseRaw === "number" ? baseRaw : undefined);
+		const base = baseRaw != null ? parseNumberMaybeHex(baseRaw as any, NaN) : undefined;
 		for (let ch = 1; ch <= 9; ch++) {
 			let cc = pb2cc.cc_by_channel?.[ch];
 			if (cc == null && base != null) {
 				cc = base + (ch - 1);
 			}
-			if (typeof cc === "string") {
-				cc = cc.startsWith("0x") ? parseInt(cc, 16) : parseInt(cc, 10);
+			if (cc != null) {
+				const ccNum = parseNumberMaybeHex(cc as any, NaN);
+				if (Number.isFinite(ccNum)) { out.set(ch, ccNum); reverse.set(ccNum, ch); }
 			}
-			if (typeof cc === "number") { out.set(ch, cc); reverse.set(cc, ch); }
 		}
 	}
 
@@ -84,13 +85,13 @@ export function resolvePbToCcMappingForApp(page: PageConfig, app: AppKey): { map
 			// Déterminer le canal PB associé au control_id via le CSV (générique)
 			let ch: number | null = getPbChannelForControlId(controlId, "mcu") ?? null;
 			if (ch == null) continue;
-			const cc = Number(spec.cc);
-			if (Number.isFinite(cc)) {
-				out.set(ch, cc);
-				reverse.set(cc, ch);
+				const cc = parseNumberMaybeHex(spec.cc as any, NaN);
+				if (Number.isFinite(cc)) {
+					out.set(ch, cc);
+					reverse.set(cc, ch);
+				}
 			}
 		}
-	}
 
 	return out.size > 0 ? { map: out, channelForCc: reverse } : null;
 }

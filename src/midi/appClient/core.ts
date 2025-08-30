@@ -1,5 +1,6 @@
 import type { XTouchDriver } from "../../xtouch/driver";
 import { resolveAppKey } from "../../shared/appKey";
+export { clamp } from "../../shared/num";
 
 /** Marque l'envoi côté app et reboucle vers Router pour anti‑echo/latence/state. */
 export function markAppOutgoingAndForward(app: string, raw: number[], portId: string): void {
@@ -10,9 +11,7 @@ export function markAppOutgoingAndForward(app: string, raw: number[], portId: st
   } catch {}
 }
 
-export function clamp(n: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, n));
-}
+// clamp désormais centralisé dans src/shared/num.ts
 
 export function getGlobalXTouch(): XTouchDriver | null {
   try {

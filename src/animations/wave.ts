@@ -36,6 +36,6 @@ export async function playFadersWave(sender: WaveSender, opts: WaveOptions): Pro
   }
 }
 
-function delay(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
 
 
+import { delay } from "../shared/time";

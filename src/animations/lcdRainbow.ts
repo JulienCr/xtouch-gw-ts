@@ -17,6 +17,8 @@ export interface LcdRainbowSender {
  * Anime un dégradé arc‑en‑ciel (palette 8 couleurs) qui "circule" sur les 8 strips LCD.
  * Optionnellement, écrit un texte par strip au démarrage (upper/lower).
  */
+import { delay } from "../shared/time";
+
 export async function playLcdRainbow(sender: LcdRainbowSender, opts: LcdRainbowOptions): Promise<void> {
   const start = Date.now();
   const fps = Math.max(1, Math.min(120, Math.floor(opts.fps)));
@@ -48,7 +50,5 @@ export async function playLcdRainbow(sender: LcdRainbowSender, opts: LcdRainbowO
     await delay(frameDelay);
   }
 }
-
-function delay(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
 
 

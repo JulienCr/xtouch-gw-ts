@@ -1,4 +1,5 @@
 import { logger } from "../logger";
+import { delay } from "../shared/time";
 import * as xtapi from "../xtouch/api";
 import { playFadersWave, type DeviceMode } from "../animations/wave";
 import { playLcdRainbow } from "../animations/lcdRainbow";
@@ -17,7 +18,7 @@ export interface ButtonsWaveOptions {
   deviceMode: DeviceMode;
 }
 
-function delay(ms: number): Promise<void> { return new Promise((r) => setTimeout(r, ms)); }
+// delay centralisé via shared/time
 
 export async function runCustomSequence(sender: xtapi.RawSender, sequence: string[], defaultDelayMs: number, logHex: boolean): Promise<void> {
   const parsed: Parsed[] = parseSequence(sequence, { defaultDelayMs, noteOffAsNoteOn0: true });
@@ -114,5 +115,4 @@ export async function runLcdRainbow(sender: xtapi.RawSender, opts: LcdRainbowRun
     textLower: () => "is ready",
   });
 }
-
 

@@ -1,5 +1,6 @@
 import { rawFromPb14 } from "../midi/bytes"; // MODIF: centraliser via bytes.ts
-import { clamp } from "../midi/appClient/core";
+import { clamp } from "../shared/num";
+import { delay } from "../shared/time";
 
 export type RawSender = { sendRawMessage(bytes: number[]): void };
 
@@ -67,6 +68,3 @@ export async function resetAll(driver: RawSender, options?: {
     } catch {}
   }
 }
-
-function delay(ms: number): Promise<void> { return new Promise(r => setTimeout(r, ms)); }
-
