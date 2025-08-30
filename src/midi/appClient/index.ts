@@ -3,12 +3,13 @@ import { logger } from "../../logger";
 import type { ControlMidiSpec } from "../../types";
 import type { AppConfig, PageConfig } from "../../config";
 import { findPortIndexByNameFragment } from "../ports";
-import { to7bitFrom14bit } from "../convert"; // MODIF: centralise conversion 14b→7b
-import { rawFromPb14, rawFromControlChange, rawFromNoteOn } from "../bytes"; // MODIF: centralise construction bytes
-import { scheduleFaderSetpoint } from "../../xtouch/faderSetpoint";
-import { clamp, getGlobalXTouch, hasPassthroughForApp, markAppOutgoingAndForward } from "./core";
+import { to7bitFrom14bit } from "../convert";
+import { rawFromPb14, rawFromControlChange, rawFromNoteOn } from "../bytes";
+import { clamp } from "./core";
 import { ensureFeedbackOpen } from "./feedback";
 import { resolveAppKey } from "../../shared/appKey";
+import type { MidiClientHooks } from "./hooks";
+import { defaultHooks } from "./hooks";
 
 // MODIF: supprimé scale14to7 (remplacé par to7bitFrom14bit)
 
@@ -17,11 +18,20 @@ export class MidiAppClient {
   private readonly inPerApp: Map<string, Input> = new Map();
   private readonly appToOutName: Map<string, string> = new Map();
   private readonly appToInName: Map<string, string> = new Map();
+  private hooks: MidiClientHooks = defaultHooks();
   /**
    * Retry timers for reopening OUT ports per app. Keyed by app key.
    * The delay grows linearly up to a small cap to avoid spamming the MIDI stack.
    */
   private readonly outRetryTimers = new Map<string, { count: number; timer: NodeJS.Timeout }>();
+
+  constructor(hooks?: MidiClientHooks) {
+    if (hooks) this.hooks = hooks;
+  }
+
+  setHooks(hooks: MidiClientHooks): void {
+    this.hooks = hooks;
+  }
 
   async init(cfg: AppConfig): Promise<void> {
     this.appToOutName.clear();
@@ -65,10 +75,10 @@ export class MidiAppClient {
         const dataBytes = input.slice(1).map((n) => clamp(Number(n) | 0, 0, 127));
         const tx: number[] = [status, ...dataBytes];
         this.sendSafe(appKey, out, tx, needle);
-        if (!hasPassthroughForApp(appKey)) {
-          markAppOutgoingAndForward(appKey, tx, needle);
+        if (this.hooks.shouldForwardOutgoing?.(appKey) !== false) {
+          try { this.hooks.onOutgoing?.(appKey, tx, needle); } catch {}
         }
-        ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+        ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }, this.hooks).catch(() => {});
       }
       return;
     }
@@ -81,36 +91,35 @@ export class MidiAppClient {
       const vel = (typeof value === "number" && Number.isFinite(value))
         ? clamp((value as number) | 0, 0, 127)
         : 127;
-      const bytes = rawFromNoteOn(channel, note, vel); // MODIF
+      const bytes = rawFromNoteOn(channel, note, vel);
       this.sendSafe(appKey, out, bytes as unknown as number[], needle);
-      if (!hasPassthroughForApp(appKey)) {
-        markAppOutgoingAndForward(appKey, bytes, needle);
+      if (this.hooks.shouldForwardOutgoing?.(appKey) !== false) {
+        try { this.hooks.onOutgoing?.(appKey, bytes, needle); } catch {}
       }
-      ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+      ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }, this.hooks).catch(() => {});
       return;
     }
 
     if (spec.type === "cc") {
       const cc = clamp(Number(spec.cc) | 0, 0, 127);
-      const v7 = clamp(to7bitFrom14bit((Number(value)) | 0), 0, 127); // MODIF
-      const bytes = rawFromControlChange(channel, cc, v7); // MODIF
+      const v7 = clamp(to7bitFrom14bit((Number(value)) | 0), 0, 127);
+      const bytes = rawFromControlChange(channel, cc, v7);
       this.sendSafe(appKey, out, bytes as unknown as number[], needle);
-      if (!hasPassthroughForApp(appKey)) {
-        markAppOutgoingAndForward(appKey, bytes, needle);
+      if (this.hooks.shouldForwardOutgoing?.(appKey) !== false) {
+        try { this.hooks.onOutgoing?.(appKey, bytes, needle); } catch {}
       }
-      ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+      ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }, this.hooks).catch(() => {});
       return;
     }
 
     const v14 = clamp(Number(value) | 0, 0, 16383);
-    const bytes = rawFromPb14(channel, v14); // MODIF
+    const bytes = rawFromPb14(channel, v14);
     this.sendSafe(appKey, out, bytes as unknown as number[], needle);
-    const xt = getGlobalXTouch();
-    if (xt) scheduleFaderSetpoint(xt, channel, v14);
-    if (!hasPassthroughForApp(appKey)) {
-      markAppOutgoingAndForward(appKey, bytes, needle);
+    try { this.hooks.onPitchBendSent?.(channel, v14); } catch {}
+    if (this.hooks.shouldForwardOutgoing?.(appKey) !== false) {
+      try { this.hooks.onOutgoing?.(appKey, bytes, needle); } catch {}
     }
-    ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+    ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }, this.hooks).catch(() => {});
   }
 
   /**
@@ -125,15 +134,15 @@ export class MidiAppClient {
     const tx = (Array.isArray(bytes) ? bytes.map((n) => clamp(Number(n) | 0, 0, 127)) : []);
     if (tx.length === 0) return;
     this.sendSafe(appKey, out, tx, needle);
-    if (!hasPassthroughForApp(appKey)) {
-      markAppOutgoingAndForward(appKey, tx, needle);
+    if (this.hooks.shouldForwardOutgoing?.(appKey) !== false) {
+      try { this.hooks.onOutgoing?.(appKey, tx, needle); } catch {}
     }
-    ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }).catch(() => {});
+    ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }, this.hooks).catch(() => {});
   }
 
   async ensureFeedback(app: string): Promise<void> {
     const appKey = String(app).trim();
-    await ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName });
+    await ensureFeedbackOpen(appKey, { inPerApp: this.inPerApp, appToInName: this.appToInName }, this.hooks);
   }
 
   reconcileForPage(page: PageConfig | undefined): void {
@@ -231,7 +240,5 @@ export class MidiAppClient {
     try { logger.info(`MidiAppClient: RETRY OUT ${nextCount} pour app='${app}' dans ${delay}ms.`); } catch {}
   }
 }
-
-export { markAppOutgoingAndForward } from "./core";
 
 
