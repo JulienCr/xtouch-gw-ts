@@ -314,7 +314,6 @@ export class ObsDriver implements Driver {
 		}
 	}
 
-	private key(sceneName: string, sourceName: string): string { return `${sceneName}::${sourceName}`; }
 
 	private setAnalogRate(sceneName: string, sourceName: string, patch: { vx?: number; vy?: number; vs?: number }): void {
 		const k = this.key(sceneName, sourceName);
