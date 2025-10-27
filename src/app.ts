@@ -1,5 +1,6 @@
 import { logger, setLogLevel } from "./logger";
 import { loadConfig, findConfigPath, watchConfig, AppConfig } from "./config";
+import { shouldAttachCli } from "./utils/runtime";
 import type { PageConfig } from "./config";
 import { Router } from "./router";
 import { MidiBridgeDriver } from "./drivers/midibridge";
@@ -221,7 +222,13 @@ export async function startApp(): Promise<() => Promise<void>> {
   };
 
   // CLI de développement (permet 'exit'/'quit' pour arrêter proprement)
-  detachCli = attachCli({ router, xtouch, onExit: cleanup });
+  // N'attacher le CLI que si on est dans un terminal interactif (pas sous PM2)
+  if (shouldAttachCli()) {
+    logger.info("CLI activé (session interactive détectée).");
+    detachCli = attachCli({ router, xtouch, onExit: cleanup });
+  } else {
+    logger.info("CLI désactivé (exécution sous PM2 ou DISABLE_CLI=true ou stdin non-interactif).");
+  }
 
   const onSig = () => {
     try { detachCli(); } catch {}
