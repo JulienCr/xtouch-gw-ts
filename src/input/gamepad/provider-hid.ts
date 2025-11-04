@@ -132,7 +132,7 @@ export async function startHidProvider(opts: HidProviderOptions): Promise<Gamepa
         debugRawLeft--;
         try {
           const hex = Array.prototype.map.call(buf, (b: number) => (b as number).toString(16).padStart(2, "0")).join(" ");
-          logger.info(`HID raw[${buf.length}]: ${hex}`);
+          logger.trace(`HID raw[${buf.length}]: ${hex}`);
         } catch {}
       }
       for (const m of buttons) {

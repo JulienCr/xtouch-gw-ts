@@ -32,27 +32,48 @@ gamepad:
   enabled: true
   provider: hid
   analog:
+    # Vitesse de pan (pixels par tick à v=1, step=1) — à 60Hz → 15*60 = 900 px/sec
     pan_gain: 15
-    zoom_gain: 1.5
+
+    # Vitesse de zoom (multiplicateur d'échelle) — avec base=0.015 → 0.015*1.5*60 = 1.35 scale/sec
+    zoom_gain: 3
+
+    # Zone morte analogique (ignore petits mouvements < 2%) — évite le drift
     deadzone: 0.02
+
+    # Courbe de réponse (>1 = meilleure précision au centre)
     gamma: 1.5
+
+    # Inversion des axes (facultatif)
+    invert:
+      lx: true   # Stick gauche X (gauche=gauche, droite=droite)
+      ly: true    # Stick gauche Y inversé (haut=monter, bas=descendre, style FPS)
+      rx: false   # Stick droit X
+      ry: true   # Stick droit Y
+      zl: false   # Gâchette gauche
+      zr: false   # Gâchette droite
   hid:
     product_match: "Faceoff Wired Pro Controller"
     mapping_csv: ./docs/gamepad-hid-mapping.csv
 
 pages_global:
   controls:
+    vpot1_rotate: { app: "obs", action: "nudgeX", params: ["--- CAM Jardin", "--- CAM Jardin", 1] }
+    vpot2_rotate: { app: "obs", action: "nudgeY", params: ["--- CAM Jardin", "--- CAM Jardin", 1] }
+    vpot3_rotate: { app: "obs", action: "scaleUniform", params: ["--- CAM Jardin", "--- CAM Jardin", 0.02] }
     vpot6_rotate: { app: "obs", action: "nudgeX", params: ["--- CAM Main 2", "--- CAM Main", 1] }
     vpot7_rotate: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 1] }
     vpot8_rotate: { app: "obs", action: "scaleUniform", params: ["--- CAM Main 2", "--- CAM Main", 0.02] }
 
-    # Gamepad: mêmes actions que les 3 VPOTs (test boutons)
+    # Gamepad: contrôle caméra OBS (stick gauche = pan, stick droit Y = zoom)
     gamepad.axis.lx: { app: "obs", action: "nudgeX", params: ["--- CAM Main 2", "--- CAM Main", 1] }
     gamepad.axis.ly: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 1] }
-    gamepad.axis.ry: 
+    gamepad.axis.ry:
       app: "obs"
       action: "scaleUniform"
-      params: ["--- CAM Main 2", "--- CAM Main", 0.01]
+      params: ["--- CAM Main 2", "--- CAM Main", 0.015]
+      # Vitesse effective = 0.015 * zoom_gain(1.5) * analog_value
+      # À stick à fond : 0.015 * 1.5 * 1.0 = 0.0225 par tick = 1.35 scale/sec
 
     gamepad.btn.a:
       app: "obs"
@@ -118,9 +139,9 @@ pages_global:
       action: "TriggerStudioModeTransition"
       indicator: { signal: "obs.studioMode", truthy: true }
 
-    flip:
-      app: "qlc"
-      midi: { type: "cc", channel: 1, cc: 18 }
+    # flip:
+    #   app: "qlc"
+    #   midi: { type: "cc", channel: 1, cc: 18 }
 
     rewind:
       app: "qlc"
@@ -216,10 +237,10 @@ pages:
       #   midi: { type: "cc", channel: 1, cc: 85 }
       fader5:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 4 }
+        midi: { type: "cc", channel: 1, cc: 85 }
       fader6:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 5 }
+        midi: { type: "cc", channel: 1, cc: 49 }
       fader8:
         app: "qlc"
         midi: { type: "cc", channel: 1, cc: 77 }

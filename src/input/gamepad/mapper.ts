@@ -6,11 +6,20 @@ import type { GamepadProvider, GamepadEvent } from "./provider-xinput";
 export interface GamepadMapperOptions {
   router: Router;
   provider: GamepadProvider;
+  /** Optional axis inversion config */
+  invertAxes?: {
+    lx?: boolean;
+    ly?: boolean;
+    rx?: boolean;
+    ry?: boolean;
+    zl?: boolean;
+    zr?: boolean;
+  };
 }
 
 /** Attach mapping from standardized gamepad events to router controls. */
 export function attachGamepadMapper(opts: GamepadMapperOptions): () => void {
-  const { router, provider } = opts;
+  const { router, provider, invertAxes } = opts;
 
   const unsub = provider.subscribe((ev: GamepadEvent) => {
     try {
@@ -54,8 +63,14 @@ export function attachGamepadMapper(opts: GamepadMapperOptions): () => void {
 
       if (ev.type === "axis") {
         // Normalized values: sticks -1..1, triggers 0..1
-        const v = Number(ev.value);
+        let v = Number(ev.value);
         if (!Number.isFinite(v)) return;
+
+        // Apply axis inversion if configured
+        const axisName = id.replace("gamepad.axis.", "");
+        if (invertAxes && invertAxes[axisName as keyof typeof invertAxes]) {
+          v = -v;
+        }
         if (!mapping?.midi) {
           // For now: pass normalized; drivers may interpret sign separately
           try { logger.debug(`Gamepad axis: ${id} = ${v.toFixed(3)} -> action ${String(mapping.app)}.${String(mapping.action || "(action)")}`); } catch {}

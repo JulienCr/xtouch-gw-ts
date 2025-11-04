@@ -213,6 +213,15 @@ export interface AppConfig {
       deadzone?: number;
       /** Gamma (courbe de réponse) — défaut 1.5 */
       gamma?: number;
+      /** Inversion des axes (défaut: tous false) */
+      invert?: {
+        lx?: boolean;
+        ly?: boolean;
+        rx?: boolean;
+        ry?: boolean;
+        zl?: boolean;
+        zr?: boolean;
+      };
     };
   };
   /** Configuration X‑Touch (mode, etc.) */

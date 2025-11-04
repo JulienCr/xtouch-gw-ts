@@ -41,7 +41,11 @@ export async function attachGamepad(opts: AttachGamepadOptions): Promise<() => v
     return () => {};
   }
 
-  const detachMapper = attachGamepadMapper({ router, provider });
+  // Extract axis inversion config
+  const analogCfg = (gpCfg as any).analog || {};
+  const invertAxes = analogCfg.invert || {};
+
+  const detachMapper = attachGamepadMapper({ router, provider, invertAxes });
   logger.info("Gamepad: attaché (provider=%s)", providerName);
   return () => { try { detachMapper(); } catch {} try { provider?.stop(); } catch {} };
 }

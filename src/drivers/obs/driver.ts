@@ -191,18 +191,38 @@ export class ObsDriver implements Driver {
 
 	async shutdown(): Promise<void> { try { await this.obs?.disconnect(); } catch { } this.obs = null; }
 
+	private loadAnalogConfig(cfg: any): void {
+		// Load analog tuning from gamepad.analog config section
+		try {
+			const a = (cfg as any).gamepad?.analog || {};
+			if (typeof a.pan_gain === 'number') this.analogPanGain = Math.max(0, a.pan_gain);
+			if (typeof a.zoom_gain === 'number') this.analogZoomGain = Math.max(0, a.zoom_gain);
+			if (typeof a.deadzone === 'number') this.analogDeadzone = Math.min(1, Math.max(0, a.deadzone));
+			if (typeof a.gamma === 'number') this.analogGamma = Math.max(0.5, Math.min(4, a.gamma));
+			logger.debug(`OBS: analog config reloaded - pan=${this.analogPanGain}, zoom=${this.analogZoomGain}, deadzone=${this.analogDeadzone}, gamma=${this.analogGamma}`);
+		} catch (err) {
+			logger.warn("OBS: failed to load analog config:", err as any);
+		}
+	}
+
+	async onConfigChanged(): Promise<void> {
+		// Reload analog settings on hot-reload
+		try {
+			const p = await findConfigPath();
+			if (p) {
+				const cfg = await loadConfig(p);
+				this.loadAnalogConfig(cfg);
+			}
+		} catch (err) {
+			logger.warn("OBS: onConfigChanged failed:", err as any);
+		}
+	}
+
 	private async connectFromConfig(): Promise<void> {
 		try {
 			const p = await findConfigPath(); if (!p) throw new Error("config.yaml introuvable pour OBS.");
       const cfg = await loadConfig(p);
-      // Load analog tuning if present
-      try {
-        const a = (cfg as any).gamepad?.analog || {};
-        if (typeof a.pan_gain === 'number') this.analogPanGain = Math.max(0, a.pan_gain);
-        if (typeof a.zoom_gain === 'number') this.analogZoomGain = Math.max(0, a.zoom_gain);
-        if (typeof a.deadzone === 'number') this.analogDeadzone = Math.min(1, Math.max(0, a.deadzone));
-        if (typeof a.gamma === 'number') this.analogGamma = Math.max(0.5, Math.min(4, a.gamma));
-      } catch {}
+      this.loadAnalogConfig(cfg);
 			const host = cfg.obs?.host ?? "127.0.0.1"; const port = cfg.obs?.port ?? 4455; const password = cfg.obs?.password ?? undefined;
 			const url = `ws://${host}:${port}`;
 
