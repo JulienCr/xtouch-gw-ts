@@ -78,7 +78,7 @@ pages_global:
     gamepad.btn.a:
       app: "obs"
       action: "changeScene"
-      params: ["--- CAM Main 2"]
+      params: ["--- CAM Cour"]
 
     gamepad.btn.b:
       app: "obs"
@@ -88,12 +88,22 @@ pages_global:
     gamepad.btn.x:
       app: "obs"
       action: "changeScene"
-      params: ["--- CAM Jardin"]
+      params: ["--- CAM Main 2"]
 
     gamepad.btn.y:
       app: "obs"
       action: "changeScene"
-      params: ["--- CAM Cour"]
+      params: ["--- CAM Jardin"]
+
+    gamepad.btn.capture:
+      app: "obs"
+      action: "toggleStudioMode"
+      params: []
+    
+    gamepad.btn.rb:
+      app: "obs"
+      action: "TriggerStudioModeTransition"
+      params: []
 
     fader_master:
       app: "qlc"

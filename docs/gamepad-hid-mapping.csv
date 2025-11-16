@@ -7,8 +7,10 @@ gamepad.btn.plus,bit,1,,0x2
 gamepad.btn.minus,bit,1,,0x1
 gamepad.btn.home,bit,1,,0x10
 gamepad.btn.capture,bit,1,,0x20
-gamepad.btn.lb,bit,0,,0x10
-gamepad.btn.rb,bit,0,,0x20
+gamepad.btn.lt,bit,0,,0x10
+gamepad.btn.rt,bit,0,,0x20
+gamepad.btn.lb,bit,0,,0x40
+gamepad.btn.rb,bit,0,,0x80
 gamepad.btn.l3,bit,1,,0x4
 gamepad.btn.r3,bit,1,,0x8
 gamepad.dpad.up,bit,2,,0x1
