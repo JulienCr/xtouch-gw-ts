@@ -27,11 +27,83 @@ paging:
   prev_note: 46
   next_note: 47
 
+# Entrée manette (HID)
+gamepad:
+  enabled: true
+  provider: hid
+  analog:
+    # Vitesse de pan (pixels par tick à v=1, step=1) — à 60Hz → 15*60 = 900 px/sec
+    pan_gain: 15
+
+    # Vitesse de zoom (multiplicateur d'échelle) — avec base=0.015 → 0.015*1.5*60 = 1.35 scale/sec
+    zoom_gain: 3
+
+    # Zone morte analogique (ignore petits mouvements < 2%) — évite le drift
+    deadzone: 0.02
+
+    # Courbe de réponse (>1 = meilleure précision au centre)
+    gamma: 1.5
+
+    # Inversion des axes (facultatif)
+    invert:
+      lx: true   # Stick gauche X (gauche=gauche, droite=droite)
+      ly: true    # Stick gauche Y inversé (haut=monter, bas=descendre, style FPS)
+      rx: false   # Stick droit X
+      ry: true   # Stick droit Y
+      zl: false   # Gâchette gauche
+      zr: false   # Gâchette droite
+  hid:
+    product_match: "Faceoff Wired Pro Controller"
+    mapping_csv: ./docs/gamepad-hid-mapping.csv
+
 pages_global:
   controls:
+    vpot1_rotate: { app: "obs", action: "nudgeX", params: ["--- CAM Jardin", "--- CAM Jardin", 1] }
+    vpot2_rotate: { app: "obs", action: "nudgeY", params: ["--- CAM Jardin", "--- CAM Jardin", 1] }
+    vpot3_rotate: { app: "obs", action: "scaleUniform", params: ["--- CAM Jardin", "--- CAM Jardin", 0.02] }
     vpot6_rotate: { app: "obs", action: "nudgeX", params: ["--- CAM Main 2", "--- CAM Main", 1] }
     vpot7_rotate: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 1] }
     vpot8_rotate: { app: "obs", action: "scaleUniform", params: ["--- CAM Main 2", "--- CAM Main", 0.02] }
+
+    # Gamepad: contrôle caméra OBS (stick gauche = pan, stick droit Y = zoom)
+    gamepad.axis.lx: { app: "obs", action: "nudgeX", params: ["--- CAM Main 2", "--- CAM Main", 1] }
+    gamepad.axis.ly: { app: "obs", action: "nudgeY", params: ["--- CAM Main 2", "--- CAM Main", 1] }
+    gamepad.axis.ry:
+      app: "obs"
+      action: "scaleUniform"
+      params: ["--- CAM Main 2", "--- CAM Main", 0.015]
+      # Vitesse effective = 0.015 * zoom_gain(1.5) * analog_value
+      # À stick à fond : 0.015 * 1.5 * 1.0 = 0.0225 par tick = 1.35 scale/sec
+
+    gamepad.btn.a:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Cour"]
+
+    gamepad.btn.b:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Main"]
+
+    gamepad.btn.x:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Main 2"]
+
+    gamepad.btn.y:
+      app: "obs"
+      action: "changeScene"
+      params: ["--- CAM Jardin"]
+
+    gamepad.btn.capture:
+      app: "obs"
+      action: "toggleStudioMode"
+      params: []
+    
+    gamepad.btn.rb:
+      app: "obs"
+      action: "TriggerStudioModeTransition"
+      params: []
 
     fader_master:
       app: "qlc"
@@ -76,6 +148,26 @@ pages_global:
       app: "obs"
       action: "TriggerStudioModeTransition"
       indicator: { signal: "obs.studioMode", truthy: true }
+
+    # flip:
+    #   app: "qlc"
+    #   midi: { type: "cc", channel: 1, cc: 18 }
+
+    rewind:
+      app: "qlc"
+      midi: { type: "cc", channel: 1, cc: 17 }
+
+    marker:
+      app: "qlc"
+      midi: { type: "cc", channel: 1, cc: 10 }
+
+    nudge:
+      app: "qlc"
+      midi: { type: "cc", channel: 1, cc: 11 }
+
+    cycle:
+      app: "qlc"
+      midi: { type: "cc", channel: 1, cc: 12 }
 
 pages:
   - name: "Voicemeeter+QLC"
@@ -130,8 +222,8 @@ pages:
   - name: "Lighting"
     lcd:
       labels:
-        - "Néons\nLatéraux"
-        - "Néons\nContres"
+        - "Neons\nJardin"
+        - "Neons\nCours"
         - "Contres\nJardin"
         - "Contres\nCour"
         - "Wash\nCanapé"
@@ -139,7 +231,7 @@ pages:
         - ""
         - ""
         - "Face"
-      colors: [6,6,5,5,2,2,0,3]
+      colors: [6,6,5,0,2,2,0,3]
     controls:
       fader1:
         app: "qlc"
@@ -149,16 +241,16 @@ pages:
         midi: { type: "cc", channel: 1, cc: 1 }
       fader3:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 2 }
-      fader4:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 3 }
+        midi: { type: "cc", channel: 1, cc: 19 }
+      # fader4:
+      #   app: "qlc"
+      #   midi: { type: "cc", channel: 1, cc: 85 }
       fader5:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 4 }
+        midi: { type: "cc", channel: 1, cc: 85 }
       fader6:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 5 }
+        midi: { type: "cc", channel: 1, cc: 49 }
       fader8:
         app: "qlc"
         midi: { type: "cc", channel: 1, cc: 77 }
@@ -166,36 +258,36 @@ pages:
       # Boutons couleur Frame 1 (Néons Latéraux)
       rec1:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 33 } # blanc
+        midi: { type: "cc", channel: 1, cc: 41 } # blanc
       solo1:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 39 } # cyan
+        midi: { type: "cc", channel: 1, cc: 47 } # cyan
       mute1:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 37 } # rouge
-      select1:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 36 } # rose
-
-      rec2:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 41 } # blanc
-      solo2:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 47 } # cyan 
-      mute2:
-        app: "qlc"
         midi: { type: "cc", channel: 1, cc: 45 } # rouge
-      select2:
+      select1:
         app: "qlc"
         midi: { type: "cc", channel: 1, cc: 44 } # rose
 
+      rec2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 60 } # blanc
+      solo2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 62 } # cyan 
+      mute2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 65 } # rouge
+      select2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 64 } # rose
+
       rec3:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 25 }  # CC 25
+        midi: { type: "cc", channel: 1, cc: 31 }  # cyan
       solo3:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 26 } # cyan
+        midi: { type: "cc", channel: 1, cc: 26 } # bleu
       mute3:
         app: "qlc"
         midi: { type: "cc", channel: 1, cc: 29 } # rouge
@@ -203,18 +295,85 @@ pages:
         app: "qlc"
         midi: { type: "cc", channel: 1, cc: 28 } # rose
       
-      rec4:
+      # rec4:
+      #   app: "qlc"
+      #   midi: { type: "cc", channel: 1, cc: 31 }  # cyan
+      # solo4:
+      #   app: "qlc"
+      #   midi: { type: "cc", channel: 1, cc: 26 } # cyan
+      # mute4:
+      #   app: "qlc"
+      #   midi: { type: "cc", channel: 1, cc: 29 } # rouge
+      # select4:
+      #   app: "qlc"
+      #   midi: { type: "cc", channel: 1, cc: 28 } # rose
+
+  - name: "Lat Cours"
+    lcd:
+      labels:
+        - "Lat Cours\nDimmer"
+        - "Lat Cours\nRouge"
+        - "Lat Cours\nVert"
+        - "Lat Cours\nBleu"
+        - "Lat Cours\nAmbre"
+        - "Lat Cours\nBlanc"
+        - ""
+        - "Face"
+      colors: [7,1,2,4,3,7,0,3]
+    controls:
+      fader1:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 25 }  # CC 25
-      solo4:
+        midi: { type: "cc", channel: 1, cc: 85 }
+      fader2:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 26 } # cyan
-      mute4:
+        midi: { type: "cc", channel: 1, cc: 86 }
+      fader3:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 29 } # rouge
-      select4:
+        midi: { type: "cc", channel: 1, cc: 87 }
+      fader4:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 28 } # rose
+        midi: { type: "cc", channel: 1, cc: 88 }
+      fader5:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 89 }
+      fader6:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 90 }
+      fader8:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 77 }
+
+  - name: "Lat Jardin"
+    lcd:
+      labels:
+        - "Lat Jardin\nDimmer"
+        - "Lat Jardin\nRouge"
+        - "Lat Jardin\nVert"
+        - "Lat Jardin\nBleu"
+        - ""
+        - ""
+        - ""
+        - "Face"
+      colors: [7,1,2,4,0,0,0,3]
+    controls:
+      fader1:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 49 }
+      fader2:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 50 }
+      fader3:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 51 }
+      fader4:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 52 }
+      fader5:
+        app: "qlc"
+      fader8:
+        app: "qlc"
+        midi: { type: "cc", channel: 1, cc: 77 }
+
 
   - name: "Lum contres"
     lcd:
@@ -226,8 +385,8 @@ pages:
         - "Lat Cour\nDimmer"
         - "Lat Cour\nRouge"
         - "Lat Cour\nVert"
-        - "Lat Cour\nBleu"
-      colors: [7,1,2,4,7,1,2,4]
+        - "Face"
+      colors: [7,1,2,4,0,0,0,3]
     controls:
       fader1:
         app: "qlc"
@@ -241,153 +400,102 @@ pages:
       fader4:
         app: "qlc"
         midi: { type: "cc", channel: 1, cc: 84 }
-      fader5:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 85 }
-      fader6:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 86 }
-      fader7:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 87 }
+      # fader5:
+      #   app: "qlc"
+      #   midi: { type: "cc", channel: 1, cc: 85 }
+      # fader6:
+      #   app: "qlc"
+      #   midi: { type: "cc", channel: 1, cc: 86 }
+      # fader7:
+      #   app: "qlc"
+      #   midi: { type: "cc", channel: 1, cc: 87 }
+      # fader8:
+      #   app: "qlc"
+      #   midi: { type: "cc", channel: 1, cc: 88 }
       fader8:
         app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 88 }
+        midi: { type: "cc", channel: 1, cc: 77 }
       
-      # Boutons couleur Frame 3 (Lum Contres)
-      mod_shift:      # Orange
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 40 }  # CC 40
-      mod_option:     # Blanc
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 41 }  # CC 41
-      auto_read_off:  # Bleu
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 42 }  # CC 42
-      auto_write:     # Cyan
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 47 }  # CC 47
-      mod_control:    # Jaune
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 43 }  # CC 43
-      mod_cmd_alt:    # Roses
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 44 }  # CC 44
-      auto_touch:     # Rouge
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 45 }  # CC 45
-      auto_latch:     # Vert
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 70 }  # CC 46
-  - name: "Néons Latéraux RGB"
-    lcd:
-      labels:
-        - "Jardin\nRouge"
-        - "Jardin\nVert"
-        - "Jardin\nBleu"
-        - "Cours\nRouge"
-        - "Cours\nVert"
-        - "Cours\nBleu"
-        - "-"
-        - "-"
-      colors: [1,2,4,1,2,4,0,0]
-    controls:
-      fader1:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 90 }
-      fader2:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 91 }
-      fader3:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 92 }
-      fader4:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 93 }
-      fader5:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 94 }
-      fader6:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 95 }
+  #     # Boutons couleur Frame 3 (Lum Contres)
+  #     mod_shift:      # Orange
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 40 }  # CC 40
+  #     mod_option:     # Blanc
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 41 }  # CC 41
+  #     auto_read_off:  # Bleu
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 42 }  # CC 42
+  #     auto_write:     # Cyan
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 47 }  # CC 47
+  #     mod_control:    # Jaune
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 43 }  # CC 43
+  #     mod_cmd_alt:    # Roses
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 44 }  # CC 44
+  #     auto_touch:     # Rouge
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 45 }  # CC 45
+  #     auto_latch:     # Vert
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 70 }  # CC 46
+  # - name: "Néons Latéraux RGB"
+  #   lcd:
+  #     labels:
+  #       - "Jardin\nRouge"
+  #       - "Jardin\nVert"
+  #       - "Jardin\nBleu"
+  #       - "Cours\nRouge"
+  #       - "Cours\nVert"
+  #       - "Cours\nBleu"
+  #       - "-"
+  #       - "-"
+  #     colors: [1,2,4,1,2,4,0,0]
+  #   controls:
+  #     fader1:
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 90 }
+  #     fader2:
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 91 }
+  #     fader3:
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 92 }
+  #     fader4:
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 93 }
+  #     fader5:
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 94 }
+  #     fader6:
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 95 }
       
-      # Boutons couleur Frame 2 (Néons Latéraux)
-      mod_shift:      # Orange
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 32 }  # CC 32
-      mod_option:     # Blanc
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 33 }  # CC 33
-      auto_read_off:  # Bleu
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 34 }  # CC 34
-      auto_write:     # Cyan
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 39 }  # CC 39
-      mod_control:    # Jaune
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 35 }  # CC 35
-      mod_cmd_alt:    # Roses
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 36 }  # CC 36
-      auto_touch:     # Rouge
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 37 }  # CC 37
-      auto_latch:     # Vert
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 38 }  # CC 38
-  - name: "Néons Contres RGB"
-    lcd:
-      labels:
-        - "Contre J\nRouge"
-        - "Contre J\nVert"
-        - "Contre J\nBleu"
-        - "Contre C\nRouge"
-        - "Contre C\nVert"
-        - "Contre C\nBleu"
-      colors: [1,2,4,1,2,4,0,0]
-    controls:
-      fader1:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 96 }
-      fader2:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 97 }
-      fader3:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 98 }
-      fader4:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 99 }
-      fader5:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 100 }
-      fader6:
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 101 }
-      
-      # Boutons couleur Frame 1 (Néons Contres)
-      mod_shift:      # Orange
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 24 }  # CC 24
-      mod_option:     # Blanc
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 25 }  # CC 25
-      auto_read_off:  # Bleu
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 26 }  # CC 26
-      auto_write:     # Cyan
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 31 }  # CC 31
-      mod_control:    # Jaune
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 27 }  # CC 27
-      mod_cmd_alt:    # Roses
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 28 }  # CC 28
-      auto_touch:     # Rouge
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 29 }  # CC 29
-      auto_latch:     # Vert
-        app: "qlc"
-        midi: { type: "cc", channel: 1, cc: 30 }  # CC 30
+  #     # Boutons couleur Frame 2 (Néons Latéraux)
+  #     mod_shift:      # Orange
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 32 }  # CC 32
+  #     mod_option:     # Blanc
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 33 }  # CC 33
+  #     auto_read_off:  # Bleu
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 34 }  # CC 34
+  #     auto_write:     # Cyan
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 39 }  # CC 39
+  #     mod_control:    # Jaune
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 35 }  # CC 35
+  #     mod_cmd_alt:    # Roses
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 36 }  # CC 36
+  #     auto_touch:     # Rouge
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 37 }  # CC 37
+  #     auto_latch:     # Vert
+  #       app: "qlc"
+  #       midi: { type: "cc", channel: 1, cc: 38 }  # CC 38
+  # 

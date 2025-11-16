@@ -5,11 +5,11 @@
   "description": "XTouch GW – Gateway to control Voicemeeter, QLC+, OBS from Behringer X-Touch.",
   "license": "MPL-2.0",
   "engines": {
-    "node": ">=24.1.0"
+    "node": ">=22.0.0"
   },
   "packageManager": "pnpm@9.12.3",
   "volta": {
-    "node": "24.1.0",
+    "node": "22.19.0",
     "pnpm": "9.12.3"
   },
   "type": "commonjs",
@@ -18,6 +18,12 @@
     "build": "tsc -p tsconfig.json && pnpm run build:copy-assets",
     "build:copy-assets": "node -e \"const fs=require('fs');const path=require('path');const src='src';const dist='dist';function copyDir(srcPath,distPath){if(!fs.existsSync(distPath))fs.mkdirSync(distPath,{recursive:true});const items=fs.readdirSync(srcPath);for(const item of items){const srcItem=path.join(srcPath,item);const distItem=path.join(distPath,item);const stat=fs.statSync(srcItem);if(stat.isDirectory()){copyDir(srcItem,distItem);}else if(item.endsWith('.yaml')||item.endsWith('.yml')){fs.copyFileSync(srcItem,distItem);console.log('Copied:',item);}}};copyDir(src,dist);\"",
     "start": "node dist/index.js",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop xtouch-gw",
+    "pm2:restart": "pm2 restart xtouch-gw",
+    "pm2:delete": "pm2 delete xtouch-gw",
+    "pm2:logs": "pm2 logs xtouch-gw",
+    "pm2:status": "pm2 status",
     "check:types": "tsc --noEmit",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
@@ -40,31 +46,38 @@
     "web:build": "pnpm -C web/config-editor build",
     "web:dev": "pnpm -C web/config-editor dev",
     "deadcode": "knip",
-    "deadcode:strict": "knip --strict"
+    "deadcode:strict": "knip --strict",
+    "gamepad:calibrate": "tsx scripts/gamepad-calibrate.ts"
+  },
+  "overrides": {},
+  "bin": {},
+  "pnpm": {
+    "patchedDependencies": {}
   },
   "dependencies": {
     "@julusian/midi": "^3.6.1",
     "chalk": "^4.1.2",
     "chokidar": "^3.6.0",
     "dotenv": "^17.2.1",
+    "node-hid": "^3.2.0",
     "obs-websocket-js": "^5.0.6",
     "yaml": "^2.8.1"
   },
   "devDependencies": {
-    "@types/node": "^20.19.11",
+    "@types/node": "^22.9.4",
     "@typescript-eslint/eslint-plugin": "^8.40.0",
-    "@typescript-eslint/utils": "^8.40.0",
     "@typescript-eslint/parser": "^8.40.0",
+    "@typescript-eslint/utils": "^8.40.0",
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9.33.0",
     "fast-check": "^3.23.2",
+    "knip": "^5.34.3",
     "prettier": "^3.6.2",
     "rimraf": "^5.0.10",
     "tsx": "^4.20.4",
     "typedoc": "^0.28.10",
     "typedoc-plugin-markdown": "^4.8.1",
     "typescript": "^5.9.2",
-    "vitest": "^2.1.9",
-    "knip": "^5.34.3"
+    "vitest": "^2.1.9"
   }
 }

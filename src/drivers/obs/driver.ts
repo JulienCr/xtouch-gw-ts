@@ -22,6 +22,33 @@ export class ObsDriver implements Driver {
 	private selectedEmitTimer: any | null = null;
 	private lastSelectedSent: string | null = null;
 
+	// Aggregation for near-simultaneous deltas (e.g., LX+LY diagonals)
+	private aggTimers: Map<string, any> = new Map();
+	private aggDeltas: Map<string, { dx?: number; dy?: number; ds?: number; scene: string; source: string }> = new Map();
+	private aggDelayMs = 4;
+
+	// Continuous analog rates (per scene/source) so holding the stick yields stable motion
+	private analogRates: Map<string, { scene: string; source: string; vx: number; vy: number; vs: number }> = new Map();
+	private analogTimer: any | null = null;
+	private lastAnalogTickMs = 0;
+
+	// Analog tuning (can be loaded from config)
+	private analogPanGain = 15; // px per 60Hz tick at full deflection (step=1)
+	private analogZoomGain = 3; // scale per 60Hz tick at full deflection (base=1)
+	private analogDeadzone = 0.02;
+	private analogGamma = 1.5;
+
+	private shapeAnalog(v: number): number {
+		const dead = this.analogDeadzone;
+		if (!Number.isFinite(v)) return 0;
+		if (Math.abs(v) < dead) return 0;
+		const sign = v >= 0 ? 1 : -1;
+		const mag = Math.min(1, Math.max(0, Math.abs(v)));
+		// Gamma curve to avoid on/off feeling: low values give finer control
+		const shaped = Math.pow(mag, this.analogGamma);
+		return sign * shaped;
+	}
+
 	async init(): Promise<void> { await this.connectFromConfig(); }
 
 	/**
@@ -107,23 +134,52 @@ export class ObsDriver implements Driver {
 			}
 			case "nudgeX": {
 				const [sceneName, sourceName, deltaParam] = params as [string, string, number?];
-				const base = this.resolveStepDelta(deltaParam, context?.value, 2);
+				const step = Number.isFinite(deltaParam as number) ? Math.abs(Number(deltaParam)) : 2;
+				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
+				if (String(context?.controlId || '').startsWith('gamepad.') && Number.isFinite(v) && v >= -1 && v <= 1) {
+                    const gain = this.analogPanGain; // px per 60Hz tick at full deflection
+					const vv = this.shapeAnalog(v);
+					this.setAnalogRate(sceneName, sourceName, { vx: vv * step * gain });
+					return;
+				}
+				const base = this.resolveStepDelta(deltaParam, context?.value, step);
 				const dx = this.encoderSpeed.resolveAdaptiveDelta(context?.controlId ?? "encX", base);
-				await this.applyDelta(sceneName, sourceName, { dx });
+				this.setAnalogRate(sceneName, sourceName, { vx: 0 });
+				this.scheduleApplyAggregated(sceneName, sourceName, { dx });
 				return;
 			}
 			case "nudgeY": {
 				const [sceneName, sourceName, deltaParam] = params as [string, string, number?];
-				const base = this.resolveStepDelta(deltaParam, context?.value, 2);
+				const step = Number.isFinite(deltaParam as number) ? Math.abs(Number(deltaParam)) : 2;
+				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
+				if (String(context?.controlId || '').startsWith('gamepad.') && Number.isFinite(v) && v >= -1 && v <= 1) {
+                    const gain = this.analogPanGain; // px per 60Hz tick
+					const vv = this.shapeAnalog(v);
+					this.setAnalogRate(sceneName, sourceName, { vy: vv * step * gain });
+					return;
+				}
+				const base = this.resolveStepDelta(deltaParam, context?.value, step);
 				const dy = this.encoderSpeed.resolveAdaptiveDelta(context?.controlId ?? "encY", base);
-				await this.applyDelta(sceneName, sourceName, { dy });
+				this.setAnalogRate(sceneName, sourceName, { vy: 0 });
+				this.scheduleApplyAggregated(sceneName, sourceName, { dy });
 				return;
 			}
 			case "scaleUniform": {
 				const [sceneName, sourceName, deltaParam] = params as [string, string, number?];
-				const ds = this.resolveStepDelta(deltaParam, context?.value, 0.01);
+				const base = Number.isFinite(deltaParam as number) ? Number(deltaParam) : 0.01;
+				const v = typeof context?.value === "number" ? (context!.value as number) : NaN;
+				let ds: number;
+				if (String(context?.controlId || '').startsWith('gamepad.') && Number.isFinite(v) && v >= -1 && v <= 1) {
+                    const gain = this.analogZoomGain; // per 60Hz tick
+					const vv = this.shapeAnalog(v);
+					this.setAnalogRate(sceneName, sourceName, { vs: vv * base * gain });
+					return;
+				} else {
+					ds = this.resolveStepDelta(deltaParam, context?.value, base);
+				}
 				logger.debug(`OBS scaleUniform -> scene='${sceneName}' source='${sourceName}' ds=${ds} (ctx=${String(context?.value)})`);
-				await this.applyDelta(sceneName, sourceName, { ds });
+				this.setAnalogRate(sceneName, sourceName, { vs: 0 });
+				this.scheduleApplyAggregated(sceneName, sourceName, { ds });
 				return;
 			}
 			default:
@@ -135,10 +191,38 @@ export class ObsDriver implements Driver {
 
 	async shutdown(): Promise<void> { try { await this.obs?.disconnect(); } catch { } this.obs = null; }
 
+	private loadAnalogConfig(cfg: any): void {
+		// Load analog tuning from gamepad.analog config section
+		try {
+			const a = (cfg as any).gamepad?.analog || {};
+			if (typeof a.pan_gain === 'number') this.analogPanGain = Math.max(0, a.pan_gain);
+			if (typeof a.zoom_gain === 'number') this.analogZoomGain = Math.max(0, a.zoom_gain);
+			if (typeof a.deadzone === 'number') this.analogDeadzone = Math.min(1, Math.max(0, a.deadzone));
+			if (typeof a.gamma === 'number') this.analogGamma = Math.max(0.5, Math.min(4, a.gamma));
+			logger.debug(`OBS: analog config reloaded - pan=${this.analogPanGain}, zoom=${this.analogZoomGain}, deadzone=${this.analogDeadzone}, gamma=${this.analogGamma}`);
+		} catch (err) {
+			logger.warn("OBS: failed to load analog config:", err as any);
+		}
+	}
+
+	async onConfigChanged(): Promise<void> {
+		// Reload analog settings on hot-reload
+		try {
+			const p = await findConfigPath();
+			if (p) {
+				const cfg = await loadConfig(p);
+				this.loadAnalogConfig(cfg);
+			}
+		} catch (err) {
+			logger.warn("OBS: onConfigChanged failed:", err as any);
+		}
+	}
+
 	private async connectFromConfig(): Promise<void> {
 		try {
 			const p = await findConfigPath(); if (!p) throw new Error("config.yaml introuvable pour OBS.");
-			const cfg = await loadConfig(p);
+      const cfg = await loadConfig(p);
+      this.loadAnalogConfig(cfg);
 			const host = cfg.obs?.host ?? "127.0.0.1"; const port = cfg.obs?.port ?? 4455; const password = cfg.obs?.password ?? undefined;
 			const url = `ws://${host}:${port}`;
 
@@ -228,11 +312,87 @@ export class ObsDriver implements Driver {
 		} catch (err) { logger.warn("OBS: écriture transform échouée:", err as any); try { this.cacheKeyToItemId.delete(this.key(sceneName, sourceName)); } catch { } }
 	}
 
+	/**
+	 * Agrège des deltas proches dans le temps pour une même cible et applique en un seul SetSceneItemTransform.
+	 */
+	private scheduleApplyAggregated(sceneName: string, sourceName: string, delta: { dx?: number; dy?: number; ds?: number }): void {
+		const k = this.key(sceneName, sourceName);
+		const acc = this.aggDeltas.get(k) ?? { scene: sceneName, source: sourceName };
+		if (delta.dx != null) acc.dx = (acc.dx ?? 0) + delta.dx;
+		if (delta.dy != null) acc.dy = (acc.dy ?? 0) + delta.dy;
+		if (delta.ds != null) acc.ds = (acc.ds ?? 0) + delta.ds;
+		this.aggDeltas.set(k, acc);
+		if (!this.aggTimers.has(k)) {
+			const t = setTimeout(async () => {
+				this.aggTimers.delete(k);
+				const d = this.aggDeltas.get(k);
+				this.aggDeltas.delete(k);
+				if (!d) return;
+				try { await this.applyDelta(d.scene, d.source, { dx: d.dx, dy: d.dy, ds: d.ds }); } catch {}
+			}, this.aggDelayMs);
+			this.aggTimers.set(k, t);
+		}
+	}
+
+
+	private setAnalogRate(sceneName: string, sourceName: string, patch: { vx?: number; vy?: number; vs?: number }): void {
+		const k = this.key(sceneName, sourceName);
+		const cur = this.analogRates.get(k) ?? { scene: sceneName, source: sourceName, vx: 0, vy: 0, vs: 0 };
+		const dead = 0.02;
+		if (patch.vx != null) cur.vx = Math.abs(patch.vx) < dead ? 0 : patch.vx;
+		if (patch.vy != null) cur.vy = Math.abs(patch.vy) < dead ? 0 : patch.vy;
+		if (patch.vs != null) cur.vs = Math.abs(patch.vs) < dead ? 0 : patch.vs;
+		if (cur.vx === 0 && cur.vy === 0 && cur.vs === 0) {
+			this.analogRates.delete(k);
+		} else {
+			this.analogRates.set(k, cur);
+			this.ensureAnalogTimer();
+		}
+		if (this.analogRates.size === 0) this.stopAnalogTimer();
+	}
+
+	private ensureAnalogTimer(): void {
+		if (this.analogTimer) return;
+		this.lastAnalogTickMs = Date.now();
+		this.analogTimer = setInterval(() => this.onAnalogTick(), 16);
+	}
+
+	private stopAnalogTimer(): void {
+		if (!this.analogTimer) return;
+		try { clearInterval(this.analogTimer as any); } catch {}
+		this.analogTimer = null;
+	}
+
+	private async onAnalogTick(): Promise<void> {
+		const now = Date.now();
+		const dt = Math.max(0.001, (now - this.lastAnalogTickMs) / 16); // normalize to 60Hz ticks
+		this.lastAnalogTickMs = now;
+		for (const cur of this.analogRates.values()) {
+			const dx = cur.vx * dt;
+			const dy = cur.vy * dt;
+			const ds = cur.vs * dt;
+			if (dx !== 0 || dy !== 0 || ds !== 0) {
+				try { await this.applyDelta(cur.scene, cur.source, { dx: dx || undefined, dy: dy || undefined, ds: ds || undefined }); } catch {}
+			}
+		}
+		if (this.analogRates.size === 0) this.stopAnalogTimer();
+	}
+
 	private resolveStepDelta(deltaParam: number | undefined, ctxValue: unknown, baseStep: number): number {
 		const step = Number.isFinite(deltaParam as number) ? Math.abs(Number(deltaParam)) : baseStep;
 		const v = typeof ctxValue === "number" ? ctxValue : NaN;
-		if (!Number.isFinite(v)) return step; if (v === 0 || v === 64) return 0;
-		if (v >= 1 && v <= 63) return step; if (v >= 65 && v <= 127) return -step; return 0;
+		if (!Number.isFinite(v)) return step;
+		// Support analog normalized input (-1..+1) from HID sticks/triggers
+		if (v >= -1 && v <= 1) {
+			const dead = 0.02; // small deadzone for noise
+			if (Math.abs(v) < dead) return 0;
+			return v > 0 ? step : -step;
+		}
+		// Legacy encoder semantics: 1..63 positive, 65..127 negative, 0/64 no-op
+		if (v === 0 || v === 64) return 0;
+		if (v >= 1 && v <= 63) return step;
+		if (v >= 65 && v <= 127) return -step;
+		return 0;
 	}
 
 	/**
@@ -319,5 +479,3 @@ export class ObsDriver implements Driver {
 		this.emitSelectedScene();
 	  }
 }
-
-

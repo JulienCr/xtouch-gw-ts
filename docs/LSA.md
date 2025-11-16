@@ -182,3 +182,63 @@ flowchart LR
 ---
 
 Si tu veux, je peux te générer une **version “print A4”** (1 page) avec uniquement les **checklists** et un **mini-schéma**.
+
+## 🎛️ Tests X-Touch disponibles
+
+### 1. **Tests unitaires de l'API X-Touch**
+```bash
+pnpm test src/xtouch/_tests/api.test.ts
+```
+
+Ces tests couvrent :
+- Encodage des messages MIDI (Note On, Control Change, Pitch Bend)
+- Fonctions de reset des faders
+- Gestion des LEDs et boutons
+- Affichage LCD et 7-segments
+- Fonctions utilitaires
+
+### 2. **Tests d'intégration MidiBridge (avec X-Touch simulé)**
+```bash
+pnpm test src/drivers/_tests/midiBridge.test.ts
+```
+
+Ces tests simulent l'interaction entre la X-Touch et les applications externes.
+
+### 3. **Test MIDI complet (avec matériel réel)**
+```bash
+<code_block_to_apply_changes_from>
+```
+
+Ce test utilise le vrai matériel X-Touch pour valider l'ensemble du pipeline.
+
+## 🚀 Commandes recommandées
+
+### Pour les tests X-Touch uniquement :
+```bash
+# Tests unitaires API X-Touch
+pnpm test src/xtouch/_tests/
+
+# Tests d'intégration avec X-Touch simulé
+pnpm test src/drivers/_tests/midiBridge.test.ts
+
+# Test complet avec matériel (si connecté)
+pnpm test:midi
+```
+
+### Pour tous les tests (recommandé) :
+```bash
+# Mode watch pour développement
+pnpm test:watch
+
+# Tests complets avec couverture
+pnpm test
+```
+
+## 📊 État actuel des tests X-Touch
+
+D'après l'audit des tests, les tests X-Touch sont bien couverts :
+- ✅ **API primitives** : Messages MIDI, LCD, 7-segments
+- ✅ **Intégration** : MidiBridge avec X-Touch simulé
+- ✅ **Test matériel** : Pipeline complet avec vrai matériel
+
+Voulez-vous que je lance un test spécifique pour voir l'état actuel ?

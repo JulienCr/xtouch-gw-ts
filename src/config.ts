@@ -177,6 +177,53 @@ export interface AppConfig {
     port?: number;
     password?: string;
   };
+  /** Configuration Gamepad (Windows XInput) */
+  gamepad?: {
+    /** Activer l'entrée manette */
+    enabled?: boolean;
+    /** Provider à utiliser ("hid" recommandé) */
+    provider?: "xinput" | "hid";
+    /** Index du device XInput (0..3) */
+    device_index?: number;
+    /** Deadzone pour axes (0..1, défaut 0.15) */
+    deadzone?: number;
+    /** Fréquence d'échantillonnage (Hz, défaut 60) */
+    sample_hz?: number;
+    /** Seuil de déclenchement pour ZL/ZR (0..1, défaut 0.5) */
+    trigger_threshold?: number;
+    /** Options spécifiques HID */
+    hid?: {
+      /** Correspondance produit/manufacturer (substring) */
+      product_match?: string;
+      /** VID/PID explicites */
+      vendor_id?: number;
+      product_id?: number;
+      /** Chemin explicite (Windows) */
+      path?: string;
+      /** Fichier CSV de mapping (voir script de calibration) */
+      mapping_csv?: string;
+    };
+    /** Réglages analogiques (facultatif) */
+    analog?: {
+      /** Gain de pan (px/tick à v=1, step=1) — défaut 15 */
+      pan_gain?: number;
+      /** Gain de zoom (échelle/tick à v=1, base=1) — défaut 3 */
+      zoom_gain?: number;
+      /** Deadzone analogique (0..1) — défaut 0.02 */
+      deadzone?: number;
+      /** Gamma (courbe de réponse) — défaut 1.5 */
+      gamma?: number;
+      /** Inversion des axes (défaut: tous false) */
+      invert?: {
+        lx?: boolean;
+        ly?: boolean;
+        rx?: boolean;
+        ry?: boolean;
+        zl?: boolean;
+        zr?: boolean;
+      };
+    };
+  };
   /** Configuration X‑Touch (mode, etc.) */
   xtouch?: XTouchConfig;
   /** Navigation entre pages */

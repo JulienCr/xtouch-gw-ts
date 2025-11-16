@@ -1,5 +1,6 @@
 import { logger, setLogLevel } from "./logger";
 import { loadConfig, findConfigPath, watchConfig, AppConfig } from "./config";
+import { shouldAttachCli } from "./utils/runtime";
 import type { PageConfig } from "./config";
 import { Router } from "./router";
 import { MidiBridgeDriver } from "./drivers/midibridge";
@@ -14,6 +15,7 @@ import * as xtapi from "./xtouch/api";
 import { attachInputMapper } from "./xtouch/inputMapper";
 import { attachIndicators, refreshIndicators } from "./xtouch/indicators";
 import { initControlMidiSender, shutdownControlMidiSender, updateControlMidiSenderConfig, reconcileControlMidiSenderForPage, setControlMidiSenderXTouch } from "./services/controlMidiSender";
+import { attachGamepad } from "./input/gamepad";
 
 // Minimal Node globals typing to satisfy TS without @types/node
 declare const process: any;
@@ -78,15 +80,25 @@ export async function startApp(): Promise<() => Promise<void>> {
           try { detachIndicators = await attachIndicators({ router, xtouch: x, config: cfg }); } catch {}
           // Force drivers to re-emit indicator signals after (re)attach so LEDs sync immediately
           try { await refreshIndicators({ router, xtouch: x, config: cfg }); } catch {}
-        }
-      } catch (e) {
-        logger.debug("Hot reload LCD refresh skipped:", e as any);
       }
-      // Reconfigurer les listeners background après reload
-      try { rebuildBackgroundListeners(router.getActivePage()); } catch {}
-    },
-    (err) => logger.warn("Erreur hot reload config:", err as any)
-  );
+    } catch (e) {
+      logger.debug("Hot reload LCD refresh skipped:", e as any);
+    }
+    // Reconfigurer les listeners background après reload
+    try { rebuildBackgroundListeners(router.getActivePage()); } catch {}
+    // Reconfigurer l'entrée Gamepad (si activée)
+    try {
+      detachGamepad?.();
+      detachGamepad = null;
+      if (cfg?.gamepad?.enabled) {
+        detachGamepad = await attachGamepad({ router, config: cfg });
+      }
+    } catch (e) {
+      logger.warn("Gamepad: hot reload attach a échoué:", (e as any)?.message ?? e);
+    }
+  },
+  (err) => logger.warn("Erreur hot reload config:", err as any)
+);
 
   // Sélection page par défaut
   if (cfg.pages.length > 0) {
@@ -105,6 +117,7 @@ export async function startApp(): Promise<() => Promise<void>> {
   const rebuildBackgroundListeners = (activePage: PageConfig | undefined) => rebuild(activePage, router.getPagesMerged());
   let detachInputMapper: (() => void) | null = null;
   let detachIndicators: (() => void) | null = null;
+  let detachGamepad: (() => void) | null = null;
   try {
     const { xtouch: x, unsubscribeNavigation, paging } = await startXTouchAndNavigation(router, {
       config: cfg,
@@ -161,6 +174,14 @@ export async function startApp(): Promise<() => Promise<void>> {
     }
     // Initialiser les listeners background au démarrage
     rebuildBackgroundListeners(initialPage);
+    // Gamepad (optionnel)
+    try {
+      if (cfg?.gamepad?.enabled) {
+        detachGamepad = await attachGamepad({ router, config: cfg });
+      }
+    } catch (e) {
+      logger.warn("Gamepad: attach a échoué:", (e as any)?.message ?? e);
+    }
     // Forcer un refresh après l'init pour rejouer l'état connu
     try { router.refreshPage(); } catch {}
   } catch (err) {
@@ -196,11 +217,18 @@ export async function startApp(): Promise<() => Promise<void>> {
     try { bgManager.shutdown(); } catch {}
     try { detachIndicators?.(); } catch {}
     try { detachInputMapper?.(); } catch {}
+    try { detachGamepad?.(); } catch {}
     process.exit(0);
   };
 
   // CLI de développement (permet 'exit'/'quit' pour arrêter proprement)
-  detachCli = attachCli({ router, xtouch, onExit: cleanup });
+  // N'attacher le CLI que si on est dans un terminal interactif (pas sous PM2)
+  if (shouldAttachCli()) {
+    logger.info("CLI activé (session interactive détectée).");
+    detachCli = attachCli({ router, xtouch, onExit: cleanup });
+  } else {
+    logger.info("CLI désactivé (exécution sous PM2 ou DISABLE_CLI=true ou stdin non-interactif).");
+  }
 
   const onSig = () => {
     try { detachCli(); } catch {}

@@ -29,6 +29,7 @@ export default function RootLayout({
           <nav className="max-w-5xl mx-auto px-4 py-3 flex gap-4">
             <a href="/" className="text-blue-600 hover:underline">Config Builder</a>
             <a href="/state" className="text-blue-600 hover:underline">State</a>
+            <a href="/gamepad" className="text-blue-600 hover:underline">Gamepad</a>
           </nav>
         </header>
         <div className="max-w-5xl mx-auto">

@@ -148,4 +148,3 @@ export class EncoderSpeedTracker {
 	clearHistory(encoderId: string): void { this.stateByEncoder.delete(encoderId); }
 	clearAllHistory(): void { this.stateByEncoder.clear(); }
 }
-
