@@ -1,3 +1,7 @@
+# Obsolete 
+
+Refonte en rust : https://github.com/JulienCr/xtouch-gw
+
 # XTouch GW
 
 Passerelle Node.js/TypeScript pour piloter Voicemeeter, QLC+ et OBS depuis un Behringer X‑Touch (MIDI DIN).
